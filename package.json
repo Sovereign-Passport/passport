@@ -1,0 +1,43 @@
+{
+  "name": "sovereign-passport",
+  "version": "0.1.0",
+  "description": "Sovereign digital identity for communities. No central server. Your keys, your data, your identity.",
+  "author": "Sovereign-Passport contributors",
+  "license": "MIT",
+  "homepage": "https://sovereign-passport.id",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sovereign-Passport/passport.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sovereign-Passport/passport/issues"
+  },
+  "keywords": [
+    "identity",
+    "sovereign-identity",
+    "did",
+    "decentralized-identity",
+    "verifiable-credentials",
+    "sd-jwt",
+    "web3",
+    "privacy",
+    "pwa",
+    "community",
+    "zero-dependency",
+    "webcrypto"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev":     "npx serve app -p 3000",
+    "test":    "echo 'Open tests/test-vault.html, test-identity.html, test-node.html, test-credentials.html in a browser'",
+    "serve":   "npx serve . -p 8080",
+    "lint":    "npx eslint app/src shared --ext .js",
+    "format":  "npx prettier --write app/src shared"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
