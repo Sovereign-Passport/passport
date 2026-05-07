@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passport — Identity Layer Test Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 32px;
+      min-height: 100vh;
+    }
+    h1 { color: #7eb8f7; font-size: 18px; margin-bottom: 4px; letter-spacing: 0.05em; }
+    .subtitle { color: #555; font-size: 12px; margin-bottom: 32px; }
+    #output {
+      background: #111118;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 24px;
+      line-height: 2;
+      min-height: 200px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pass  { color: #4ade80; }
+    .fail  { color: #f87171; }
+    .info  { color: #94a3b8; }
+    .head  { color: #7eb8f7; }
+    .sep   { color: #333; }
+    #summary {
+      margin-top: 20px; padding: 16px 24px;
+      border-radius: 6px; font-size: 15px; display: none;
+    }
+    #summary.all-pass {
+      background: #052e16; border: 1px solid #166534;
+      color: #4ade80; display: block;
+    }
+    #summary.has-fail {
+      background: #2d0a0a; border: 1px solid #7f1d1d;
+      color: #f87171; display: block;
+    }
+    button {
+      margin-top: 24px; padding: 10px 24px;
+      background: #1e3a5f; color: #7eb8f7;
+      border: 1px solid #2d5a8e; border-radius: 4px;
+      font-family: inherit; font-size: 13px;
+      cursor: pointer; letter-spacing: 0.05em;
+    }
+    button:hover { background: #2d5a8e; }
+  </style>
+</head>
+<body>
+
+<h1>🪪 PASSPORT — Identity Layer Test Runner</h1>
+<p class="subtitle">app/src/identity/identity.js — Profile · Membership · Referrals · Keychain · Files</p>
+
+<div id="output"><span class="info">Click "Run Tests" to begin...</span></div>
+<div id="summary"></div>
+<button onclick="runTests()">▶ Run Tests</button>
+
+<script type="module">
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VAULT.JS — inlined (crypto foundation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PBKDF2_ITERATIONS  = 600_000
+const PBKDF2_HASH        = 'SHA-256'
+const AES_KEY_LENGTH     = 256
+const SALT_LENGTH        = 32
+const IV_LENGTH          = 12
+const VAULT_VERSION      = '1.0.0'
+const ED25519_MULTICODEC = new Uint8Array([0xed, 0x01])
+
+const toBase64url = b => btoa(String.fromCharCode(...b))
+  .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+const fromBase64url = s => {
+  const p = s.replace(/-/g,'+').replace(/_/g,'/')
+    .padEnd(s.length+(4-s.length%4)%4,'=')
+  return Uint8Array.from(atob(p),c=>c.charCodeAt(0))
+}
+const toHex   = b => Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('')
+const rnd     = n => crypto.getRandomValues(new Uint8Array(n))
+const enc     = s => new TextEncoder().encode(s)
+const dec     = b => new TextDecoder().decode(b)
+
+function toBase58(bytes) {
+  const A='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let n=BigInt('0x'+toHex(bytes)),r='',B=BigInt(58)
+  while(n>0n){r=A[Number(n%B)]+r;n=n/B}
+  for(const b of bytes){if(b!==0)break;r='1'+r}
+  return r
+}
+
+async function generateIdentity() {
+  const kp  = await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify'])
+  const raw = await crypto.subtle.exportKey('raw',kp.publicKey)
+  const kb  = new Uint8Array(raw)
+  const mk  = new Uint8Array(ED25519_MULTICODEC.length+kb.length)
+  mk.set(ED25519_MULTICODEC); mk.set(kb,ED25519_MULTICODEC.length)
+  const did = 'did:key:z'+toBase58(mk)
+  const pub = await crypto.subtle.exportKey('jwk',kp.publicKey)
+  const prv = await crypto.subtle.exportKey('jwk',kp.privateKey)
+  return {did,keypair:kp,publicJwk:pub,privateJwk:prv}
+}
+
+async function deriveVaultKey(password,salt) {
+  const km = await crypto.subtle.importKey('raw',enc(password),'PBKDF2',false,['deriveKey'])
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt,iterations:PBKDF2_ITERATIONS,hash:PBKDF2_HASH},
+    km, {name:'AES-GCM',length:AES_KEY_LENGTH}, false, ['encrypt','decrypt']
+  )
+}
+
+async function encryptVault(vaultKey,plaintext) {
+  const iv  = rnd(IV_LENGTH)
+  const buf = await crypto.subtle.encrypt({name:'AES-GCM',iv},vaultKey,enc(plaintext))
+  return {iv:toBase64url(iv),ciphertext:toBase64url(new Uint8Array(buf))}
+}
+
+async function decryptVault(vaultKey,iv,ciphertext) {
+  const buf = await crypto.subtle.decrypt(
+    {name:'AES-GCM',iv:fromBase64url(iv)},vaultKey,fromBase64url(ciphertext))
+  return dec(new Uint8Array(buf))
+}
+
+async function createVault(password,handle,profile={}) {
+  const id  = await generateIdentity()
+  const salt= rnd(SALT_LENGTH)
+  const vk  = await deriveVaultKey(password,salt)
+  const n   = new Date().toISOString()
+  const v   = {
+    version:VAULT_VERSION,
+    identity:{id:id.did,handle,avatar:null,
+      profile:{name:null,bio:null,email:null,...profile},
+      location:null,virtual:true,created_at:n,updated_at:null},
+    keys:{publicKey:id.publicJwk,privateKey:id.privateJwk},
+    credentials:[],keychain:[],files:[],sessions:[],
+    memberships:[],referrals_sent:[],referrals_received:[],
+    created_at:n,updated_at:null
+  }
+  const {iv,ciphertext}=await encryptVault(vk,JSON.stringify(v))
+  return {salt:toBase64url(salt),iv,ciphertext,did:id.did,created_at:n,_vaultKey:vk}
+}
+
+async function unlockVault(password,salt,iv,ciphertext) {
+  const vk=await deriveVaultKey(password,fromBase64url(salt))
+  let pt
+  try{pt=await decryptVault(vk,iv,ciphertext)}
+  catch{const e=new Error('WRONG_PASSWORD');e.code='WRONG_PASSWORD';throw e}
+  return {vault:JSON.parse(pt),vaultKey:vk}
+}
+
+async function saveVault(vaultKey,vault,salt) {
+  vault.updated_at=new Date().toISOString()
+  const {iv,ciphertext}=await encryptVault(vaultKey,JSON.stringify(vault))
+  return {salt,iv,ciphertext,did:vault.identity.id,
+    created_at:vault.created_at,updated_at:vault.updated_at}
+}
+
+async function signData(privateKey,payload) {
+  const buf=await crypto.subtle.sign('Ed25519',privateKey,enc(JSON.stringify(payload)))
+  return toBase64url(new Uint8Array(buf))
+}
+
+async function verifyData(publicKey,payload,signature) {
+  return crypto.subtle.verify('Ed25519',publicKey,fromBase64url(signature),enc(JSON.stringify(payload)))
+}
+
+async function loadKeypair(vault) {
+  const [pub,prv]=await Promise.all([
+    crypto.subtle.importKey('jwk',vault.keys.publicKey,{name:'Ed25519'},true,['verify']),
+    crypto.subtle.importKey('jwk',vault.keys.privateKey,{name:'Ed25519'},true,['sign']),
+  ])
+  return {publicKey:pub,privateKey:prv}
+}
+
+// IndexedDB stub for tests (in-memory)
+const _db = {}
+async function persistVault(p){_db.current=p}
+async function loadPersistedVault(){return _db.current??null}
+async function vaultExists(){return !!_db.current}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED CONSTANTS — inlined
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATUS = {
+  UNKNOWN:'unknown', INVITED:'invited', TEMPORARY:'temporary',
+  CANDIDATE:'candidate', APPROVED:'approved',
+  SUSPENDED:'suspended', REVOKED:'revoked',
+}
+const STATUS_WEIGHT = {
+  unknown:0, invited:1, temporary:1, candidate:2,
+  approved:3, suspended:0, revoked:-1,
+}
+const CREDENTIAL_TYPE = {
+  MEMBERSHIP:'MembershipCredential', REFERRAL:'ReferralCredential',
+  ISSUER:'IssuerCredential', ROLE:'RoleCredential',
+}
+const LOCATION_MODE = { FIXED:'fixed', SESSION:'session', OPEN:'open' }
+
+function isActive(s){ return [STATUS.APPROVED,STATUS.CANDIDATE,STATUS.TEMPORARY].includes(s) }
+function isBlocked(s){ return [STATUS.SUSPENDED,STATUS.REVOKED].includes(s) }
+function canIssue(m){ return m?.status===STATUS.APPROVED && m?.is_issuer===true }
+
+function canInvite(inviterMembership, inviterApprovedElsewhere, node) {
+  if(inviterMembership?.status===STATUS.REVOKED) return {allowed:false,warning:null}
+  if(inviterMembership?.status===STATUS.SUSPENDED) return {allowed:false,warning:null}
+  if(inviterMembership?.status===STATUS.APPROVED) return {allowed:true,warning:null}
+  if(inviterApprovedElsewhere && node.virtual){
+    const warning = inviterMembership?.status===STATUS.INVITED
+      ? `Your referral will be recorded, but your status in this node is INVITED. Reduced weight.`
+      : null
+    return {allowed:true,warning}
+  }
+  if(inviterApprovedElsewhere && !node.virtual){
+    if(inviterMembership?.status===STATUS.INVITED)
+      return {allowed:true,warning:`You are only INVITED in this node. Reduced weight referral.`}
+    return {allowed:false,warning:null}
+  }
+  return {allowed:false,warning:null}
+}
+
+function getReferralWarning(referral, referrerMember) {
+  if(!referral) return null
+  if(referrerMember?.status===STATUS.REVOKED) return `⚠️ Referrer has been REVOKED from this node.`
+  if(referrerMember?.status===STATUS.SUSPENDED) return `⚠️ Referrer is currently SUSPENDED.`
+  if(referral.weight<=STATUS_WEIGHT[STATUS.INVITED])
+    return `ℹ️ Referrer was INVITED (not yet approved) at time of referral. Reduced weight.`
+  return null
+}
+
+function shouldPromptNaming(node) {
+  const count = (node.members??[]).filter(m=>m.status===STATUS.APPROVED).length
+  return count >= 3 && !node.display_names
+}
+
+function resolveInvitationContext({inviter,inviterMembership,inviterApprovedElsewhere,node,inviterLocation}) {
+  const {allowed,warning} = canInvite(inviterMembership,inviterApprovedElsewhere,node)
+  return {
+    allowed, warning,
+    locationWarning: null,
+    referralWeight: STATUS_WEIGHT[inviterMembership?.status ?? STATUS.UNKNOWN],
+    disclosureOptions: {
+      handle:      true,
+      memberships: true,
+      role:        inviterMembership?.is_issuer ?? false,
+      since:       !!inviterMembership?.joined_at,
+    },
+  }
+}
+
+const NAMING_PROMPT_THRESHOLD = 3
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IDENTITY.JS — inlined
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _uuid(){ return crypto.randomUUID() }
+function _now(){ return new Date().toISOString() }
+function _getMembership(vault,nodeId){ return (vault.memberships??[]).find(m=>m.node_id===nodeId)??null }
+function _isApprovedAnywhere(vault){ return (vault.memberships??[]).some(m=>m.status===STATUS.APPROVED) }
+
+function getProfile(vault){ return {...vault.identity} }
+
+async function updateProfile(vault,vaultKey,salt,updates) {
+  const allowed=['handle','avatar','location','virtual']
+  const pAllowed=['name','bio','email']
+  for(const k of allowed) if(k in updates) vault.identity[k]=updates[k]
+  if(updates.profile) for(const k of pAllowed) if(k in updates.profile) vault.identity.profile[k]=updates.profile[k]
+  vault.identity.updated_at=_now()
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+function getMemberships(vault){ return [...(vault.memberships??[])] }
+function getMembershipInNode(vault,nodeId){ return _getMembership(vault,nodeId) }
+function getApprovedMemberships(vault){ return (vault.memberships??[]).filter(m=>m.status===STATUS.APPROVED) }
+
+async function upsertMembership(vault,vaultKey,salt,membership) {
+  if(!vault.memberships) vault.memberships=[]
+  const idx=vault.memberships.findIndex(m=>m.node_id===membership.node_id)
+  const record={
+    node_id:membership.node_id, node_name:membership.node_name??'Unknown',
+    status:membership.status??STATUS.UNKNOWN,
+    referral_id:membership.referral_id??null,
+    referral_weight:membership.referral_weight??0,
+    can_invite:membership.status===STATUS.APPROVED,
+    is_issuer:membership.is_issuer??false,
+    session_id:membership.session_id??null,
+    expires_at:membership.expires_at??null,
+    joined_at:membership.joined_at??_now(),
+    updated_at:_now(),
+  }
+  if(idx>=0) vault.memberships[idx]={...vault.memberships[idx],...record}
+  else vault.memberships.push(record)
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+function getDisclosureOptions(vault,nodeId) {
+  const m=_getMembership(vault,nodeId)
+  return {
+    available:{
+      handle:!!vault.identity.handle, name:!!vault.identity.profile?.name,
+      avatar:!!vault.identity.avatar,
+      memberships:(vault.memberships??[]).length>0,
+      role:m?.is_issuer??false, since:!!m?.joined_at,
+    },
+    defaults:{handle:true,name:false,avatar:false,memberships:false,role:false,since:true},
+  }
+}
+
+function buildReferralPayload(vault,toIdentityId,nodeId,disclosures,note) {
+  const m=_getMembership(vault,nodeId)
+  const cs=m?.status??STATUS.UNKNOWN
+  const payload={
+    id:_uuid(), type:CREDENTIAL_TYPE.REFERRAL,
+    from_identity_id:vault.identity.id,
+    to_identity_id:toIdentityId, node_id:nodeId,
+    from_status_at_time:cs, weight:STATUS_WEIGHT[cs],
+    disclosed:{}, note:note??null,
+    created_at:_now(), expires_at:null,
+  }
+  if(disclosures.handle && vault.identity.handle) payload.disclosed.handle=vault.identity.handle
+  if(disclosures.name && vault.identity.profile?.name) payload.disclosed.name=vault.identity.profile.name
+  if(disclosures.role && m?.is_issuer) payload.disclosed.role='issuer'
+  if(disclosures.since && m?.joined_at) payload.disclosed.since=m.joined_at
+  if(disclosures.memberships)
+    payload.disclosed.memberships=(vault.memberships??[]).filter(m=>isActive(m.status)).map(m=>m.node_name)
+  return payload
+}
+
+async function signReferral(vault,privateKey,vaultKey,salt,payload) {
+  const signature=await signData(privateKey,payload)
+  const referral={...payload,signature}
+  if(!vault.referrals_sent) vault.referrals_sent=[]
+  vault.referrals_sent.push(referral)
+  await saveVault(vaultKey,vault,salt).then(persistVault)
+  const encoded=btoa(JSON.stringify(referral)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+  return {referral,inviteLink:`passport://invite?r=${encoded}`,qrData:encoded}
+}
+
+function checkInvitationPermission(vault,nodeId,node,currentLocation) {
+  const m=_getMembership(vault,nodeId)
+  const ae=_isApprovedAnywhere(vault)
+  return resolveInvitationContext({
+    inviter:vault.identity, inviterMembership:m,
+    inviterApprovedElsewhere:ae, node,
+    inviterLocation:currentLocation??vault.identity.location,
+  })
+}
+
+function parseInviteQR(qrData) {
+  try {
+    const p=qrData.replace(/-/g,'+').replace(/_/g,'/').padEnd(qrData.length+(4-qrData.length%4)%4,'=')
+    return JSON.parse(atob(p))
+  } catch { throw Object.assign(new Error('INVALID_INVITE'),{code:'INVALID_INVITE'}) }
+}
+
+async function acceptReferral(vault,vaultKey,salt,referral) {
+  if(!vault.referrals_received) vault.referrals_received=[]
+  if(!vault.referrals_received.some(r=>r.id===referral.id))
+    vault.referrals_received.push({...referral,received_at:_now()})
+  return upsertMembership(vault,vaultKey,salt,{
+    node_id:referral.node_id, node_name:referral.node_name??'Unknown',
+    status:STATUS.INVITED, referral_id:referral.id,
+    referral_weight:referral.weight, joined_at:_now(),
+  })
+}
+
+async function storeCredential(vault,vaultKey,salt,credential) {
+  if(!vault.credentials) vault.credentials=[]
+  if(!vault.credentials.some(c=>c.id===credential.id))
+    vault.credentials.push({...credential,stored_at:_now()})
+  if(credential.type===CREDENTIAL_TYPE.MEMBERSHIP && credential.claims)
+    await upsertMembership(vault,vaultKey,salt,{
+      node_id:credential.claims.node_id, node_name:credential.claims.memberOf,
+      status:STATUS.APPROVED, is_issuer:credential.claims.role==='issuer',
+      joined_at:credential.issued_at,
+    })
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+function getKeychain(vault){ return [...(vault.keychain??[])] }
+
+async function addKeychainItem(vault,vaultKey,salt,item) {
+  if(!vault.keychain) vault.keychain=[]
+  vault.keychain.push({
+    id:_uuid(),label:item.label,type:item.type??'password',
+    value:item.value,url:item.url??null,username:item.username??null,
+    notes:item.notes??null,created_at:_now(),updated_at:null,
+  })
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+async function updateKeychainItem(vault,vaultKey,salt,itemId,updates) {
+  const idx=(vault.keychain??[]).findIndex(k=>k.id===itemId)
+  if(idx<0) throw Object.assign(new Error('ITEM_NOT_FOUND'),{code:'ITEM_NOT_FOUND'})
+  for(const k of ['label','type','value','url','username','notes'])
+    if(k in updates) vault.keychain[idx][k]=updates[k]
+  vault.keychain[idx].updated_at=_now()
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+async function deleteKeychainItem(vault,vaultKey,salt,itemId) {
+  vault.keychain=(vault.keychain??[]).filter(k=>k.id!==itemId)
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+function getFileLinks(vault){ return [...(vault.files??[])] }
+
+async function addFileLink(vault,vaultKey,salt,fileLink) {
+  if(!vault.files) vault.files=[]
+  vault.files.push({
+    id:_uuid(),label:fileLink.label,url:fileLink.url,
+    access_token:fileLink.access_token??null,
+    shared_with:fileLink.shared_with??[],
+    expires_at:fileLink.expires_at??null,
+    node_id:fileLink.node_id??null,
+    created_at:_now(),
+  })
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+async function removeFileLink(vault,vaultKey,salt,fileId) {
+  vault.files=(vault.files??[]).filter(f=>f.id!==fileId)
+  const payload=await saveVault(vaultKey,vault,salt)
+  await persistVault(payload)
+  return payload
+}
+
+function getIdentitySummary(vault) {
+  const ms=vault.memberships??[]
+  return {
+    did:vault.identity.id, handle:vault.identity.handle,
+    avatar:vault.identity.avatar, virtual:vault.identity.virtual,
+    totalNodes:ms.length,
+    approvedNodes:ms.filter(m=>m.status===STATUS.APPROVED).length,
+    invitedNodes:ms.filter(m=>m.status===STATUS.INVITED).length,
+    isIssuerAnywhere:ms.filter(m=>m.status===STATUS.APPROVED).some(m=>m.is_issuer),
+    credentialCount:(vault.credentials??[]).length,
+    keychainCount:(vault.keychain??[]).length,
+    fileCount:(vault.files??[]).length,
+    referralsSent:(vault.referrals_sent??[]).length,
+    canInviteAnywhere:ms.filter(m=>m.status===STATUS.APPROVED).length>0,
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST RUNNER
+// ─────────────────────────────────────────────────────────────────────────────
+
+const out     = document.getElementById('output')
+const summary = document.getElementById('summary')
+let passed=0, failed=0
+
+function log(msg,cls='') {
+  const s=document.createElement('span')
+  if(cls) s.className=cls
+  s.textContent=msg+'\n'
+  out.appendChild(s)
+  out.scrollTop=out.scrollHeight
+}
+
+async function test(name,fn) {
+  try { await fn(); log(`✅  ${name}`,'pass'); passed++ }
+  catch(e) { log(`❌  ${name}`,'fail'); log(`    └─ ${e.message}`,'fail'); failed++ }
+}
+
+function assert(c,m){ if(!c) throw new Error(m??'Assertion failed') }
+function assertEqual(a,b,m){ if(a!==b) throw new Error(m??`Expected "${b}", got "${a}"`) }
+function assertNull(v,m){ if(v!==null&&v!==undefined) throw new Error(m??`Expected null, got ${JSON.stringify(v)}`) }
+
+// Helper — create a fresh unlocked vault for each test
+async function freshVault(handle='eva', password='password') {
+  const payload = await createVault(password, handle)
+  const { vault, vaultKey } = await unlockVault(password, payload.salt, payload.iv, payload.ciphertext)
+  return { vault, vaultKey, salt: payload.salt, password }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+window.runTests = async function() {
+  out.innerHTML=''
+  summary.style.display='none'
+  passed=0; failed=0
+
+  log('🪪 PASSPORT — identity.js test suite\n','head')
+
+  // ── 1. Profile ─────────────────────────────────────────────────────────────
+  log('── Profile ──────────────────────────────','sep')
+
+  await test('getProfile returns identity fields', async () => {
+    const {vault} = await freshVault('eva')
+    const p = getProfile(vault)
+    assertEqual(p.handle, 'eva', 'Handle must match')
+    assert(p.id.startsWith('did:key:z'), 'DID must be present')
+    assertEqual(p.virtual, true, 'virtual must default to true')
+  })
+
+  await test('updateProfile — handle change persists', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await updateProfile(vault,vaultKey,salt,{handle:'eva-updated'})
+    // Re-read from in-memory vault (mutated in place)
+    assertEqual(vault.identity.handle, 'eva-updated', 'Handle must update')
+    assert(vault.identity.updated_at !== null, 'updated_at must be set')
+  })
+
+  await test('updateProfile — nested profile fields', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await updateProfile(vault,vaultKey,salt,{profile:{name:'Eva Martin',bio:'Founder'}})
+    assertEqual(vault.identity.profile.name, 'Eva Martin', 'Name must update')
+    assertEqual(vault.identity.profile.bio, 'Founder', 'Bio must update')
+  })
+
+  await test('updateProfile — cannot change DID', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    const originalDID = vault.identity.id
+    await updateProfile(vault,vaultKey,salt,{id:'did:key:hacked'})
+    assertEqual(vault.identity.id, originalDID, 'DID must not change')
+  })
+
+  await test('updateProfile — virtual flag toggles', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await updateProfile(vault,vaultKey,salt,{virtual:false})
+    assertEqual(vault.identity.virtual, false, 'virtual must update to false')
+  })
+
+  // ── 2. Membership ──────────────────────────────────────────────────────────
+  log('\n── Membership ───────────────────────────','sep')
+
+  await test('upsertMembership — adds new record', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{
+      node_id:'node-1', node_name:'La Maison',
+      status:STATUS.INVITED, referral_weight:1,
+    })
+    const ms = getMemberships(vault)
+    assertEqual(ms.length, 1, 'Should have 1 membership')
+    assertEqual(ms[0].node_id, 'node-1', 'node_id must match')
+    assertEqual(ms[0].status, STATUS.INVITED, 'status must be INVITED')
+  })
+
+  await test('upsertMembership — updates existing record', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'La Maison',status:STATUS.INVITED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'La Maison',status:STATUS.APPROVED})
+    const ms = getMemberships(vault)
+    assertEqual(ms.length, 1, 'Should still have 1 membership (upsert)')
+    assertEqual(ms[0].status, STATUS.APPROVED, 'Status must update to APPROVED')
+  })
+
+  await test('getMembershipInNode — returns correct record', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-A',node_name:'A',status:STATUS.APPROVED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-B',node_name:'B',status:STATUS.INVITED})
+    const m = getMembershipInNode(vault,'node-B')
+    assertEqual(m.status, STATUS.INVITED, 'Should return node-B membership')
+  })
+
+  await test('getMembershipInNode — returns null for unknown node', async () => {
+    const {vault} = await freshVault('eva')
+    assertNull(getMembershipInNode(vault,'unknown-node'), 'Should return null')
+  })
+
+  await test('getApprovedMemberships — filters correctly', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-2',node_name:'B',status:STATUS.INVITED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-3',node_name:'C',status:STATUS.APPROVED})
+    const approved = getApprovedMemberships(vault)
+    assertEqual(approved.length, 2, 'Should return 2 approved memberships')
+    assert(approved.every(m=>m.status===STATUS.APPROVED), 'All must be APPROVED')
+  })
+
+  // ── 3. Invitation permission ───────────────────────────────────────────────
+  log('\n── Invitation permission ────────────────','sep')
+
+  const virtualNode   = {id:'node-1',virtual:true,  location_mode:LOCATION_MODE.OPEN,   location:null}
+  const physicalNode  = {id:'node-2',virtual:false, location_mode:LOCATION_MODE.FIXED,  location:{lat:45.5,lng:-73.5,radius_m:100}}
+
+  await test('APPROVED member can invite to virtual node', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    const ctx = checkInvitationPermission(vault,'node-1',virtualNode)
+    assert(ctx.allowed, 'APPROVED member must be allowed to invite')
+    assertNull(ctx.warning, 'No warning expected')
+  })
+
+  await test('INVITED-only member gets warning when inviting to virtual node', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    // Eva is APPROVED in node-X but only INVITED in node-1
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-X',node_name:'X',status:STATUS.APPROVED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.INVITED})
+    const ctx = checkInvitationPermission(vault,'node-1',virtualNode)
+    assert(ctx.allowed, 'Should still be allowed (approved elsewhere)')
+    assert(ctx.warning !== null, 'Warning must be shown for INVITED status')
+    assert(ctx.warning.includes('INVITED'), 'Warning must mention INVITED')
+  })
+
+  await test('Member with no approval anywhere cannot invite', async () => {
+    const {vault} = await freshVault('eva')
+    // Eva has no memberships at all
+    const ctx = checkInvitationPermission(vault,'node-1',virtualNode)
+    assert(!ctx.allowed, 'Member with no approvals must not be able to invite')
+  })
+
+  await test('REVOKED member cannot invite', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.REVOKED})
+    const ctx = checkInvitationPermission(vault,'node-1',virtualNode)
+    assert(!ctx.allowed, 'REVOKED member must not be allowed to invite')
+  })
+
+  await test('Referral weight reflects status at time of referral', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.INVITED})
+    // Eva is APPROVED elsewhere
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-X',node_name:'X',status:STATUS.APPROVED})
+    const payload = buildReferralPayload(vault,'did:key:zPeter','node-1',{handle:true},null)
+    assertEqual(payload.weight, STATUS_WEIGHT[STATUS.INVITED], 'Weight must reflect INVITED status')
+    assertEqual(payload.from_status_at_time, STATUS.INVITED, 'from_status_at_time must be INVITED')
+  })
+
+  // ── 4. Referral build + sign ───────────────────────────────────────────────
+  log('\n── Referral build + sign ────────────────','sep')
+
+  await test('buildReferralPayload — correct fields', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{
+      node_id:'node-1',node_name:'La Maison',
+      status:STATUS.APPROVED,joined_at:new Date().toISOString(),
+    })
+    const payload = buildReferralPayload(vault,'did:key:zPeter','node-1',
+      {handle:true,since:true,role:false},
+      'Welcome to the community!'
+    )
+    assertEqual(payload.from_identity_id, vault.identity.id, 'from must be Eva DID')
+    assertEqual(payload.to_identity_id, 'did:key:zPeter', 'to must be Peter DID')
+    assertEqual(payload.node_id, 'node-1', 'node_id must match')
+    assertEqual(payload.type, CREDENTIAL_TYPE.REFERRAL, 'type must be REFERRAL')
+    assertEqual(payload.disclosed.handle, 'eva', 'handle must be disclosed')
+    assert(payload.disclosed.since, 'since date must be disclosed')
+    assertEqual(payload.note, 'Welcome to the community!', 'note must be present')
+    assert(!('role' in payload.disclosed), 'role not selected — must not appear')
+  })
+
+  await test('buildReferralPayload — no disclosure shares nothing', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    const payload = buildReferralPayload(vault,'did:key:zPeter','node-1',{},null)
+    assertEqual(Object.keys(payload.disclosed).length, 0, 'No disclosures must produce empty object')
+  })
+
+  await test('signReferral — produces signature + invite link', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    const {keypair} = await generateIdentity()
+    // Inject a real keypair for signing
+    const kp = await loadKeypair(vault)
+    const payload = buildReferralPayload(vault,'did:key:zPeter','node-1',{handle:true},null)
+    const {referral,inviteLink,qrData} = await signReferral(vault,kp.privateKey,vaultKey,salt,payload)
+    assert(typeof referral.signature === 'string', 'Signature must be a string')
+    assert(referral.signature.length > 10, 'Signature must be non-trivial')
+    assert(inviteLink.startsWith('passport://invite?r='), 'Invite link must have correct scheme')
+    assert(typeof qrData === 'string', 'qrData must be a string')
+    assertEqual(vault.referrals_sent.length, 1, 'Referral must be stored in vault')
+  })
+
+  await test('parseInviteQR — round-trips correctly', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    const kp = await loadKeypair(vault)
+    const payload = buildReferralPayload(vault,'did:key:zPeter','node-1',{handle:true},null)
+    const {qrData} = await signReferral(vault,kp.privateKey,vaultKey,salt,payload)
+    const parsed = parseInviteQR(qrData)
+    assertEqual(parsed.from_identity_id, vault.identity.id, 'from_identity_id must survive QR round-trip')
+    assertEqual(parsed.node_id, 'node-1', 'node_id must survive QR round-trip')
+  })
+
+  await test('parseInviteQR — rejects malformed data', async () => {
+    try {
+      parseInviteQR('this-is-not-valid-base64-json!!')
+      throw new Error('Should have thrown')
+    } catch(e) { assertEqual(e.code,'INVALID_INVITE','Must throw INVALID_INVITE') }
+  })
+
+  // ── 5. Accept referral + inbound credential ────────────────────────────────
+  log('\n── Accept referral + credential ─────────','sep')
+
+  await test('acceptReferral — creates INVITED membership', async () => {
+    const {vault:eVault,vaultKey:eKey,salt:eSalt} = await freshVault('eva')
+    await upsertMembership(eVault,eKey,eSalt,{node_id:'node-1',node_name:'La Maison',status:STATUS.APPROVED})
+    const kp = await loadKeypair(eVault)
+    const pl = buildReferralPayload(eVault,'did:key:zPeter','node-1',{handle:true},null)
+    const {referral} = await signReferral(eVault,kp.privateKey,eKey,eSalt,pl)
+
+    // Peter receives it
+    const {vault:pVault,vaultKey:pKey,salt:pSalt} = await freshVault('peter')
+    await acceptReferral(pVault,pKey,pSalt,{...referral,node_name:'La Maison'})
+    const m = getMembershipInNode(pVault,'node-1')
+    assert(m !== null, 'Membership must be created')
+    assertEqual(m.status, STATUS.INVITED, 'Status must be INVITED')
+    assertEqual(m.referral_id, referral.id, 'Referral ID must be stored')
+    assertEqual(pVault.referrals_received.length, 1, 'Referral must be stored in received list')
+  })
+
+  await test('acceptReferral — no duplicate referrals', async () => {
+    const {vault:pVault,vaultKey:pKey,salt:pSalt} = await freshVault('peter')
+    const fakeReferral = {id:'ref-1',node_id:'node-1',node_name:'A',weight:1,from_identity_id:'did:key:zEva'}
+    await acceptReferral(pVault,pKey,pSalt,fakeReferral)
+    await acceptReferral(pVault,pKey,pSalt,fakeReferral) // duplicate
+    assertEqual(pVault.referrals_received.length, 1, 'Duplicate referrals must be ignored')
+  })
+
+  await test('storeCredential — MembershipCredential updates status to APPROVED', async () => {
+    const {vault,vaultKey,salt} = await freshVault('peter')
+    const credential = {
+      id:'cred-1', type:CREDENTIAL_TYPE.MEMBERSHIP,
+      issuer_did:'did:web:la-maison.org', subject_did:vault.identity.id,
+      claims:{node_id:'node-1',memberOf:'La Maison',role:'member'},
+      sd_jwt:'eyJ...', issued_at:new Date().toISOString(), expires_at:null,
+    }
+    await storeCredential(vault,vaultKey,salt,credential)
+    assertEqual(vault.credentials.length, 1, 'Credential must be stored')
+    const m = getMembershipInNode(vault,'node-1')
+    assert(m !== null, 'Membership must be created/updated')
+    assertEqual(m.status, STATUS.APPROVED, 'Status must be APPROVED from credential')
+  })
+
+  // ── 6. Referral warning ────────────────────────────────────────────────────
+  log('\n── Referral warning ─────────────────────','sep')
+
+  await test('No warning when referrer is APPROVED', async () => {
+    const referral = {id:'r1',weight:STATUS_WEIGHT[STATUS.APPROVED]}
+    const referrerMember = {status:STATUS.APPROVED}
+    assertNull(getReferralWarning(referral,referrerMember), 'No warning expected for APPROVED referrer')
+  })
+
+  await test('Warning shown when referrer was INVITED at referral time', async () => {
+    const referral = {id:'r1',weight:STATUS_WEIGHT[STATUS.INVITED]}
+    const referrerMember = {status:STATUS.APPROVED} // since promoted
+    const w = getReferralWarning(referral,referrerMember)
+    assert(w !== null, 'Warning must be shown')
+    assert(w.includes('INVITED'), 'Warning must mention INVITED')
+  })
+
+  await test('Warning shown when referrer is now REVOKED', async () => {
+    const referral = {id:'r1',weight:STATUS_WEIGHT[STATUS.APPROVED]}
+    const referrerMember = {status:STATUS.REVOKED}
+    const w = getReferralWarning(referral,referrerMember)
+    assert(w !== null, 'Warning must be shown for REVOKED referrer')
+    assert(w.includes('REVOKED'), 'Warning must mention REVOKED')
+  })
+
+  // ── 7. Keychain ────────────────────────────────────────────────────────────
+  log('\n── Keychain ─────────────────────────────','sep')
+
+  await test('addKeychainItem — item stored correctly', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await addKeychainItem(vault,vaultKey,salt,{label:'GitHub',type:'api_key',value:'ghp_secret',url:'github.com'})
+    const kc = getKeychain(vault)
+    assertEqual(kc.length, 1, 'Should have 1 item')
+    assertEqual(kc[0].label, 'GitHub', 'Label must match')
+    assertEqual(kc[0].value, 'ghp_secret', 'Value must match')
+    assertEqual(kc[0].type, 'api_key', 'Type must match')
+    assert(typeof kc[0].id === 'string', 'ID must be generated')
+  })
+
+  await test('updateKeychainItem — value changes', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await addKeychainItem(vault,vaultKey,salt,{label:'GitHub',type:'api_key',value:'old-token'})
+    const itemId = vault.keychain[0].id
+    await updateKeychainItem(vault,vaultKey,salt,itemId,{value:'new-token'})
+    assertEqual(vault.keychain[0].value, 'new-token', 'Value must update')
+    assert(vault.keychain[0].updated_at !== null, 'updated_at must be set')
+  })
+
+  await test('updateKeychainItem — throws for unknown ID', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    try {
+      await updateKeychainItem(vault,vaultKey,salt,'non-existent-id',{value:'x'})
+      throw new Error('Should have thrown')
+    } catch(e) { assertEqual(e.code,'ITEM_NOT_FOUND','Must throw ITEM_NOT_FOUND') }
+  })
+
+  await test('deleteKeychainItem — item removed', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await addKeychainItem(vault,vaultKey,salt,{label:'A',type:'password',value:'123'})
+    await addKeychainItem(vault,vaultKey,salt,{label:'B',type:'password',value:'456'})
+    const idToDelete = vault.keychain[0].id
+    await deleteKeychainItem(vault,vaultKey,salt,idToDelete)
+    assertEqual(vault.keychain.length, 1, 'Should have 1 item after delete')
+    assertEqual(vault.keychain[0].label, 'B', 'Correct item must remain')
+  })
+
+  // ── 8. File links ──────────────────────────────────────────────────────────
+  log('\n── File links ───────────────────────────','sep')
+
+  await test('addFileLink — stored correctly', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await addFileLink(vault,vaultKey,salt,{
+      label:'Garden Plan 2026',
+      url:'https://blind-spot.net/files/garden.pdf',
+      access_token:'tok_abc',
+      node_id:'node-1',
+    })
+    const fl = getFileLinks(vault)
+    assertEqual(fl.length, 1, 'Should have 1 file link')
+    assertEqual(fl[0].label, 'Garden Plan 2026', 'Label must match')
+    assertEqual(fl[0].access_token, 'tok_abc', 'Access token must be stored')
+  })
+
+  await test('removeFileLink — file removed', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await addFileLink(vault,vaultKey,salt,{label:'A',url:'https://a.com'})
+    await addFileLink(vault,vaultKey,salt,{label:'B',url:'https://b.com'})
+    const idToRemove = vault.files[0].id
+    await removeFileLink(vault,vaultKey,salt,idToRemove)
+    assertEqual(vault.files.length, 1, 'Should have 1 file after remove')
+    assertEqual(vault.files[0].label, 'B', 'Correct file must remain')
+  })
+
+  // ── 9. Identity summary ────────────────────────────────────────────────────
+  log('\n── Identity summary ─────────────────────','sep')
+
+  await test('getIdentitySummary — correct counts', async () => {
+    const {vault,vaultKey,salt} = await freshVault('eva')
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-1',node_name:'A',status:STATUS.APPROVED})
+    await upsertMembership(vault,vaultKey,salt,{node_id:'node-2',node_name:'B',status:STATUS.INVITED})
+    await addKeychainItem(vault,vaultKey,salt,{label:'X',type:'password',value:'y'})
+    await addFileLink(vault,vaultKey,salt,{label:'F',url:'https://f.com'})
+    const s = getIdentitySummary(vault)
+    assertEqual(s.totalNodes, 2, 'totalNodes must be 2')
+    assertEqual(s.approvedNodes, 1, 'approvedNodes must be 1')
+    assertEqual(s.invitedNodes, 1, 'invitedNodes must be 1')
+    assertEqual(s.keychainCount, 1, 'keychainCount must be 1')
+    assertEqual(s.fileCount, 1, 'fileCount must be 1')
+    assert(s.canInviteAnywhere, 'canInviteAnywhere must be true (has 1 approved)')
+  })
+
+  await test('getIdentitySummary — canInviteAnywhere false with no approvals', async () => {
+    const {vault} = await freshVault('peter')
+    const s = getIdentitySummary(vault)
+    assert(!s.canInviteAnywhere, 'canInviteAnywhere must be false with no approvals')
+  })
+
+  // ── Summary ────────────────────────────────────────────────────────────────
+  log(`\n${'─'.repeat(44)}`,'sep')
+  log(`  ${passed} passed    ${failed} failed`, failed===0?'pass':'fail')
+  summary.className  = failed===0 ? 'all-pass' : 'has-fail'
+  summary.textContent = failed===0
+    ? '🎉  All tests passed. Identity layer is solid. Ready for node layer.'
+    : `⚠️  ${failed} test(s) failed. Review before proceeding.`
+}
+
+</script>
+</body>
+</html>

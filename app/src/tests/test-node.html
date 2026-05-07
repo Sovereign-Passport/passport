@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passport — Node Layer Test Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f; color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 14px; padding: 32px; min-height: 100vh;
+    }
+    h1 { color: #a78bfa; font-size: 18px; margin-bottom: 4px; letter-spacing: 0.05em; }
+    .subtitle { color: #555; font-size: 12px; margin-bottom: 32px; }
+    #output {
+      background: #111118; border: 1px solid #222; border-radius: 6px;
+      padding: 24px; line-height: 2; min-height: 200px;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .pass { color: #4ade80; } .fail { color: #f87171; }
+    .info { color: #94a3b8; } .head { color: #a78bfa; } .sep { color: #333; }
+    #summary {
+      margin-top: 20px; padding: 16px 24px; border-radius: 6px;
+      font-size: 15px; display: none;
+    }
+    #summary.all-pass { background:#052e16;border:1px solid #166534;color:#4ade80;display:block; }
+    #summary.has-fail { background:#2d0a0a;border:1px solid #7f1d1d;color:#f87171;display:block; }
+    button {
+      margin-top: 24px; padding: 10px 24px; background: #2d1b69;
+      color: #a78bfa; border: 1px solid #4c1d95; border-radius: 4px;
+      font-family: inherit; font-size: 13px; cursor: pointer;
+    }
+    button:hover { background: #4c1d95; }
+  </style>
+</head>
+<body>
+
+<h1>🌿 PASSPORT — Node Layer Test Runner</h1>
+<p class="subtitle">app/src/nodes/node.js — Lifecycle · Members · Sessions · Level 2 · Naming</p>
+
+<div id="output"><span class="info">Click "Run Tests" to begin...</span></div>
+<div id="summary"></div>
+<button onclick="runTests()">▶ Run Tests</button>
+
+<script type="module">
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED — inlined constants + rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATUS = {
+  UNKNOWN:'unknown', INVITED:'invited', TEMPORARY:'temporary',
+  CANDIDATE:'candidate', APPROVED:'approved',
+  SUSPENDED:'suspended', REVOKED:'revoked',
+}
+const STATUS_WEIGHT = {
+  unknown:0,invited:1,temporary:1,candidate:2,approved:3,suspended:0,revoked:-1
+}
+const LOCATION_MODE = { FIXED:'fixed', SESSION:'session', OPEN:'open' }
+const CREDENTIAL_TYPE = {
+  MEMBERSHIP:'MembershipCredential', REFERRAL:'ReferralCredential',
+}
+const DEFAULT_DISPLAY_NAMES = {
+  identity:'Grape',node:'Cluster',network:'Vine',registry:'Vineyard',
+  referral:'Touch',session:'Gathering',invited:'Seedling',candidate:'Visitor',
+  approved:'Member',suspended:'Paused',revoked:'Removed',temporary:'Guest',
+}
+const STATUS_TRANSITIONS = {
+  unknown:  ['invited','temporary'],
+  invited:  ['candidate','approved','revoked'],
+  temporary:['invited','candidate','unknown'],
+  candidate:['approved','suspended','revoked'],
+  approved: ['suspended','revoked'],
+  suspended:['approved','revoked'],
+  revoked:  [],
+}
+function isValidTransition(f,t){ return STATUS_TRANSITIONS[f]?.includes(t)??false }
+function isActive(s){ return ['approved','candidate','temporary'].includes(s) }
+function isBlocked(s){ return ['suspended','revoked'].includes(s) }
+function canIssue(m){ return m?.status===STATUS.APPROVED && m?.is_issuer===true }
+function canPromote(m){ return canIssue(m) }
+function getReferralWarning(referral,referrerMember) {
+  if(!referral) return null
+  if(referrerMember?.status===STATUS.REVOKED) return `⚠️ Referrer has been REVOKED.`
+  if(referrerMember?.status===STATUS.SUSPENDED) return `⚠️ Referrer is SUSPENDED.`
+  if(referral.weight<=STATUS_WEIGHT[STATUS.INVITED])
+    return `ℹ️ Referrer was INVITED at time of referral. Reduced weight.`
+  return null
+}
+const NAMING_PROMPT_THRESHOLD = 3
+function shouldPromptNaming(node) {
+  return (node.members??[]).filter(m=>m.status===STATUS.APPROVED).length >= NAMING_PROMPT_THRESHOLD
+    && !node.display_names
+}
+const DEFAULT_SESSION_DURATION_MIN = 30
+const MAX_SESSION_DURATION_MIN = 480
+function isSessionActive(s) {
+  if(!s.active) return false
+  return new Date(s.expires_at) > new Date()
+}
+function resolveNetworkFormationPrompt(existingNodes, newNodeName) {
+  return {
+    trigger:'second_node_creation',
+    message:`Creating "${newNodeName}" will initiate a Level 2 Network (Vine).`,
+    existingNodes: existingNodes.map(n=>({id:n.id,name:n.name})),
+    requiresConsent:true,
+  }
+}
+function shouldPromptNetworkFormation(founderId, allNodes) {
+  return allNodes.filter(n=>n.founded_by===founderId&&!n.parent_network).length >= 2
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NODE.JS — inlined
+// ─────────────────────────────────────────────────────────────────────────────
+
+function uuid(){ return crypto.randomUUID() }
+function now(){ return new Date().toISOString() }
+function addMinutes(iso,m){ return new Date(new Date(iso).getTime()+m*60000).toISOString() }
+function getMember(node,id){ return node.members.find(m=>m.identity_id===id)??null }
+
+function assertCanIssue(node,actorId) {
+  const a=getMember(node,actorId)
+  if(!canIssue(a)) throw Object.assign(
+    new Error(`${actorId} lacks issuer rights`),{code:'INSUFFICIENT_PERMISSIONS'})
+}
+
+function createNode(founderId,options={}) {
+  const id=uuid(),ts=now()
+  const node={
+    id,name:options.name??'Cluster',description:options.description??null,
+    founded_by:founderId,parent_network:null,
+    location_mode:options.location_mode??LOCATION_MODE.OPEN,
+    location:options.location??null,
+    virtual:options.virtual??true,
+    allow_temporary:options.allow_temporary??false,
+    members:[],display_names:null,sessions:[],
+    created_at:ts,updated_at:null,
+  }
+  node.members.push({
+    identity_id:founderId,status:STATUS.APPROVED,
+    referral_id:null,referral_weight:STATUS_WEIGHT[STATUS.APPROVED],
+    can_invite:true,is_issuer:true,session_id:null,expires_at:null,
+    joined_at:ts,updated_at:null,handle:options.founderHandle??null,
+  })
+  return node
+}
+
+function updateNodeSettings(node,actorId,updates) {
+  assertCanIssue(node,actorId)
+  const allowed=['name','description','location_mode','location','virtual','allow_temporary','display_names']
+  for(const k of allowed) if(k in updates) node[k]=updates[k]
+  node.updated_at=now()
+  return node
+}
+
+function getNodeSummary(node,displayNames) {
+  const dn=displayNames??node.display_names??DEFAULT_DISPLAY_NAMES
+  const byStatus={}
+  for(const s of Object.values(STATUS)) byStatus[s]=node.members.filter(m=>m.status===s).length
+  return {
+    id:node.id,name:node.name,founded_by:node.founded_by,
+    parent_network:node.parent_network,virtual:node.virtual,
+    totalMembers:node.members.length,
+    approvedCount:byStatus[STATUS.APPROVED]??0,
+    invitedCount:byStatus[STATUS.INVITED]??0,
+    candidateCount:byStatus[STATUS.CANDIDATE]??0,
+    temporaryCount:byStatus[STATUS.TEMPORARY]??0,
+    suspendedCount:byStatus[STATUS.SUSPENDED]??0,
+    showNamingPrompt:shouldPromptNaming(node),
+    activeSessions:(node.sessions??[]).filter(isSessionActive).length,
+    displayNames:dn,
+  }
+}
+
+function addMember(node,actorId,newMember,initialStatus=STATUS.INVITED) {
+  assertCanIssue(node,actorId)
+  if(getMember(node,newMember.identity_id))
+    throw Object.assign(new Error('Already a member'),{code:'ALREADY_A_MEMBER'})
+  const ts=now()
+  node.members.push({
+    identity_id:newMember.identity_id,status:initialStatus,
+    referral_id:newMember.referral_id??null,
+    referral_weight:newMember.referral_weight??0,
+    can_invite:initialStatus===STATUS.APPROVED,
+    is_issuer:false,session_id:null,expires_at:null,
+    joined_at:ts,updated_at:null,handle:newMember.handle??null,
+  })
+  node.updated_at=now()
+  return node
+}
+
+function transitionMemberStatus(node,actorId,targetId,newStatus) {
+  assertCanIssue(node,actorId)
+  if(actorId===targetId)
+    throw Object.assign(new Error('Cannot change own status'),{code:'SELF_TRANSITION_FORBIDDEN'})
+  const member=getMember(node,targetId)
+  if(!member) throw Object.assign(new Error('Member not found'),{code:'MEMBER_NOT_FOUND'})
+  if(!isValidTransition(member.status,newStatus))
+    throw Object.assign(new Error(`Invalid: ${member.status} → ${newStatus}`),{code:'INVALID_TRANSITION'})
+  const old=member.status
+  member.status=newStatus
+  member.can_invite=newStatus===STATUS.APPROVED
+  member.updated_at=now()
+  if(old===STATUS.TEMPORARY && newStatus!==STATUS.TEMPORARY){
+    member.session_id=null; member.expires_at=null
+  }
+  node.updated_at=now()
+  let warning=null
+  if(newStatus===STATUS.CANDIDATE && member.referral_id){
+    const referrerMember=getMember(node,member.referral_id)
+    warning=getReferralWarning({id:member.referral_id,weight:member.referral_weight},referrerMember)
+  }
+  return {node,warning}
+}
+
+function grantIssuerRights(node,actorId,targetId) {
+  assertCanIssue(node,actorId)
+  if(actorId===targetId)
+    throw Object.assign(new Error('Cannot grant to self'),{code:'SELF_GRANT_FORBIDDEN'})
+  const t=getMember(node,targetId)
+  if(!t) throw Object.assign(new Error('Member not found'),{code:'MEMBER_NOT_FOUND'})
+  if(t.status!==STATUS.APPROVED)
+    throw Object.assign(new Error('Must be APPROVED first'),{code:'MEMBER_NOT_APPROVED'})
+  t.is_issuer=true; t.updated_at=now(); node.updated_at=now()
+  return node
+}
+
+function revokeIssuerRights(node,actorId,targetId) {
+  assertCanIssue(node,actorId)
+  const issuers=node.members.filter(m=>m.is_issuer&&m.status===STATUS.APPROVED)
+  if(issuers.length<=1)
+    throw Object.assign(new Error('Cannot revoke last issuer'),{code:'LAST_ISSUER'})
+  const t=getMember(node,targetId)
+  if(!t) throw Object.assign(new Error('Not found'),{code:'MEMBER_NOT_FOUND'})
+  t.is_issuer=false; t.updated_at=now(); node.updated_at=now()
+  return node
+}
+
+function getCandidateArrivalWarning(node,candidateId) {
+  const c=getMember(node,candidateId)
+  if(!c||!c.referral_id) return null
+  const referrerMember=getMember(node,c.referral_id)
+  return getReferralWarning({id:c.referral_id,weight:c.referral_weight},referrerMember)
+}
+
+function checkNamingPrompt(node) {
+  if(!shouldPromptNaming(node)) return null
+  return {
+    trigger:'member_threshold',threshold:NAMING_PROMPT_THRESHOLD,
+    message:`Your community has grown to ${NAMING_PROMPT_THRESHOLD}+ members. What would you like to call things?`,
+    fields:[
+      {key:'identity',label:'What do you call a member?',placeholder:'Grape, Villager...'},
+      {key:'node',label:'What do you call your community?',placeholder:'Cluster, Grove...'},
+      {key:'network',label:'What do you call a group of communities?',placeholder:'Vine, Nation...'},
+    ],
+  }
+}
+
+function setDisplayNames(node,actorId,names) {
+  assertCanIssue(node,actorId)
+  node.display_names={...(node.display_names??{}),...names}
+  node.updated_at=now()
+  return node
+}
+
+function checkNetworkFormationPrompt(founderId,allNodes,newNodeName) {
+  const existing=allNodes.filter(n=>n.founded_by===founderId&&!n.parent_network)
+  if(existing.length===0) return null
+  return resolveNetworkFormationPrompt(existing,newNodeName)
+}
+
+function formNetwork(networkName,nodes,founderIds) {
+  const networkId=uuid(),ts=now()
+  const network={
+    id:networkId,name:networkName??'Vine',description:null,
+    nodes:nodes.map(n=>n.id),founded_by:[...new Set(founderIds)],
+    parent_registry:null,display_names:null,created_at:ts,updated_at:null,
+  }
+  for(const n of nodes){ n.parent_network=networkId; n.updated_at=ts }
+  return {network,nodes}
+}
+
+function createSession(node,creatorId,options={}) {
+  if(!node.allow_temporary)
+    throw Object.assign(new Error('Sessions disabled'),{code:'SESSIONS_DISABLED'})
+  const c=getMember(node,creatorId)
+  if(!c||c.status!==STATUS.APPROVED)
+    throw Object.assign(new Error('Must be APPROVED to create session'),{code:'INSUFFICIENT_PERMISSIONS'})
+  const duration=Math.min(options.duration_min??DEFAULT_SESSION_DURATION_MIN,MAX_SESSION_DURATION_MIN)
+  const ts=now()
+  const session={
+    id:uuid(),created_by:creatorId,node_id:node.id,
+    location:options.location??null,duration_min:duration,
+    created_at:ts,expires_at:addMinutes(ts,duration),
+    members:[],purpose:options.purpose??null,active:true,
+  }
+  if(!node.sessions) node.sessions=[]
+  node.sessions.push(session)
+  node.updated_at=now()
+  return session
+}
+
+function addSessionMember(node,session,creatorId,newMember) {
+  if(!isSessionActive(session))
+    throw Object.assign(new Error('Session expired'),{code:'SESSION_EXPIRED'})
+  const c=getMember(node,creatorId)
+  if(!c||c.status!==STATUS.APPROVED)
+    throw Object.assign(new Error('Must be APPROVED'),{code:'INSUFFICIENT_PERMISSIONS'})
+  const existing=getMember(node,newMember.identity_id)
+  if(existing&&isActive(existing.status)){
+    if(!session.members.includes(newMember.identity_id)) session.members.push(newMember.identity_id)
+    return node
+  }
+  const ts=now()
+  if(existing){
+    existing.status=STATUS.TEMPORARY; existing.session_id=session.id
+    existing.expires_at=session.expires_at; existing.updated_at=ts
+  } else {
+    node.members.push({
+      identity_id:newMember.identity_id,status:STATUS.TEMPORARY,
+      referral_id:null,referral_weight:0,can_invite:false,is_issuer:false,
+      session_id:session.id,expires_at:session.expires_at,
+      joined_at:ts,updated_at:null,handle:newMember.handle??null,
+    })
+  }
+  if(!session.members.includes(newMember.identity_id)) session.members.push(newMember.identity_id)
+  node.updated_at=now()
+  return node
+}
+
+function expireSessions(node) {
+  if(!node.sessions) return {node,expiredCount:0}
+  let expiredCount=0
+  for(const session of node.sessions){
+    if(!session.active||isSessionActive(session)) continue
+    session.active=false; expiredCount++
+    for(const mid of session.members){
+      const m=getMember(node,mid)
+      if(m&&m.status===STATUS.TEMPORARY&&m.session_id===session.id){
+        m.status=STATUS.UNKNOWN; m.session_id=null; m.expires_at=null; m.updated_at=now()
+      }
+    }
+  }
+  if(expiredCount>0) node.updated_at=now()
+  return {node,expiredCount}
+}
+
+function closeSession(node,sessionId,actorId) {
+  const session=(node.sessions??[]).find(s=>s.id===sessionId)
+  if(!session) throw Object.assign(new Error('Session not found'),{code:'SESSION_NOT_FOUND'})
+  const actor=getMember(node,actorId)
+  if(session.created_by!==actorId&&!canIssue(actor))
+    throw Object.assign(new Error('Insufficient permissions'),{code:'INSUFFICIENT_PERMISSIONS'})
+  session.active=false; session.closed_at=now()
+  for(const mid of session.members){
+    const m=getMember(node,mid)
+    if(m&&m.status===STATUS.TEMPORARY&&m.session_id===sessionId){
+      m.status=STATUS.UNKNOWN; m.session_id=null; m.expires_at=null; m.updated_at=now()
+    }
+  }
+  node.updated_at=now()
+  return node
+}
+
+function getMembers(node,status){ return status?node.members.filter(m=>m.status===status):[...node.members] }
+function getIssuers(node){ return node.members.filter(m=>m.status===STATUS.APPROVED&&m.is_issuer) }
+function getMemberWithContext(node,identityId) {
+  const m=getMember(node,identityId)
+  if(!m) return null
+  let arrivalWarning=null
+  if(m.status===STATUS.CANDIDATE) arrivalWarning=getCandidateArrivalWarning(node,identityId)
+  return {...m,arrivalWarning,isActive:isActive(m.status),isBlocked:isBlocked(m.status)}
+}
+function hasMemberStatus(node,identityId,minimumStatus) {
+  const m=getMember(node,identityId)
+  if(!m) return false
+  return STATUS_WEIGHT[m.status]>=STATUS_WEIGHT[minimumStatus]
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST RUNNER
+// ─────────────────────────────────────────────────────────────────────────────
+
+const out=document.getElementById('output')
+const summary=document.getElementById('summary')
+let passed=0,failed=0
+
+function log(msg,cls=''){
+  const s=document.createElement('span')
+  if(cls) s.className=cls
+  s.textContent=msg+'\n'; out.appendChild(s); out.scrollTop=out.scrollHeight
+}
+async function test(name,fn){
+  try{await fn();log(`✅  ${name}`,'pass');passed++}
+  catch(e){log(`❌  ${name}`,'fail');log(`    └─ ${e.message}`,'fail');failed++}
+}
+function assert(c,m){if(!c)throw new Error(m??'Assertion failed')}
+function assertEqual(a,b,m){if(a!==b)throw new Error(m??`Expected "${b}", got "${a}"`)}
+function assertNull(v,m){if(v!==null&&v!==undefined)throw new Error(m??`Expected null, got ${JSON.stringify(v)}`)}
+function assertThrows(fn,code){
+  try{fn();throw new Error('Should have thrown')}
+  catch(e){if(e.code!==code)throw new Error(`Expected code ${code}, got ${e.code??e.message}`)}
+}
+
+// Helpers
+const EVA   = 'did:key:zEva'
+const PETER = 'did:key:zPeter'
+const MARIA = 'did:key:zMaria'
+const LOUIS = 'did:key:zLouis'
+
+function freshNode(founderId=EVA, options={}) {
+  return createNode(founderId, {name:'La Maison', ...options})
+}
+
+
+window.runTests = async function() {
+  out.innerHTML=''; summary.style.display='none'; passed=0; failed=0
+  log('🌿 PASSPORT — node.js test suite\n','head')
+
+  // ── 1. Node creation ────────────────────────────────────────────────────────
+  log('── Node creation ────────────────────────','sep')
+
+  await test('createNode — founder is APPROVED + issuer', async () => {
+    const node=freshNode()
+    const founder=getMember(node,EVA)
+    assert(founder!==null,'Founder must be a member')
+    assertEqual(founder.status,STATUS.APPROVED,'Founder must be APPROVED')
+    assert(founder.is_issuer,'Founder must be issuer')
+    assert(founder.can_invite,'Founder must be able to invite')
+  })
+
+  await test('createNode — defaults are correct', async () => {
+    const node=freshNode()
+    assertEqual(node.name,'La Maison','Name must match')
+    assertEqual(node.virtual,true,'Virtual must default true')
+    assertEqual(node.allow_temporary,false,'allow_temporary must default false')
+    assert(node.id,'ID must be generated')
+    assertEqual(node.parent_network,null,'No parent network initially')
+  })
+
+  await test('createNode — location options set correctly', async () => {
+    const loc={lat:45.5,lng:-73.5,radius_m:200}
+    const node=createNode(EVA,{location_mode:LOCATION_MODE.FIXED,location:loc,virtual:false})
+    assertEqual(node.location_mode,LOCATION_MODE.FIXED,'location_mode must be FIXED')
+    assertEqual(node.location.lat,45.5,'lat must match')
+    assertEqual(node.virtual,false,'virtual must be false')
+  })
+
+  // ── 2. Node settings ────────────────────────────────────────────────────────
+  log('\n── Node settings ────────────────────────','sep')
+
+  await test('updateNodeSettings — issuer can update name', async () => {
+    const node=freshNode()
+    updateNodeSettings(node,EVA,{name:'Nouveau Nom',description:'Une description'})
+    assertEqual(node.name,'Nouveau Nom','Name must update')
+    assertEqual(node.description,'Une description','Description must update')
+    assert(node.updated_at!==null,'updated_at must be set')
+  })
+
+  await test('updateNodeSettings — non-issuer cannot update', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    assertThrows(()=>updateNodeSettings(node,PETER,{name:'Hacked'}),'INSUFFICIENT_PERMISSIONS')
+  })
+
+  // ── 3. Member management ────────────────────────────────────────────────────
+  log('\n── Member management ────────────────────','sep')
+
+  await test('addMember — adds with INVITED status by default', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER,handle:'peter'})
+    const m=getMember(node,PETER)
+    assert(m!==null,'Member must be added')
+    assertEqual(m.status,STATUS.INVITED,'Default status must be INVITED')
+    assertEqual(m.handle,'peter','Handle must be stored')
+    assert(!m.is_issuer,'New member must not be issuer')
+  })
+
+  await test('addMember — rejects duplicate', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    assertThrows(()=>addMember(node,EVA,{identity_id:PETER}),'ALREADY_A_MEMBER')
+  })
+
+  await test('addMember — non-issuer cannot add', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    assertThrows(()=>addMember(node,PETER,{identity_id:MARIA}),'INSUFFICIENT_PERMISSIONS')
+  })
+
+  await test('addMember — with referral stores weight', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER,referral_id:EVA,referral_weight:STATUS_WEIGHT[STATUS.APPROVED]})
+    const m=getMember(node,PETER)
+    assertEqual(m.referral_id,EVA,'Referral ID must be stored')
+    assertEqual(m.referral_weight,STATUS_WEIGHT[STATUS.APPROVED],'Weight must be stored')
+  })
+
+  // ── 4. Status transitions ───────────────────────────────────────────────────
+  log('\n── Status transitions ───────────────────','sep')
+
+  await test('INVITED → CANDIDATE transition succeeds', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    const {node:n,warning}=transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    assertEqual(getMember(n,PETER).status,STATUS.CANDIDATE,'Status must be CANDIDATE')
+  })
+
+  await test('CANDIDATE → APPROVED transition succeeds', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    assertEqual(getMember(node,PETER).status,STATUS.APPROVED,'Status must be APPROVED')
+    assert(getMember(node,PETER).can_invite,'can_invite must be true after APPROVED')
+  })
+
+  await test('APPROVED → REVOKED is terminal', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    transitionMemberStatus(node,EVA,PETER,STATUS.REVOKED)
+    assertThrows(()=>transitionMemberStatus(node,EVA,PETER,STATUS.INVITED),'INVALID_TRANSITION')
+  })
+
+  await test('Invalid transition throws INVALID_TRANSITION', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    // INVITED cannot go directly to APPROVED (must go through CANDIDATE first)
+    // Actually INVITED → APPROVED IS valid per our state machine — let's test a truly invalid one
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    transitionMemberStatus(node,EVA,PETER,STATUS.SUSPENDED)
+    // SUSPENDED → INVITED is invalid
+    assertThrows(()=>transitionMemberStatus(node,EVA,PETER,STATUS.INVITED),'INVALID_TRANSITION')
+  })
+
+  await test('Cannot change own status', async () => {
+    const node=freshNode()
+    assertThrows(()=>transitionMemberStatus(node,EVA,EVA,STATUS.SUSPENDED),'SELF_TRANSITION_FORBIDDEN')
+  })
+
+  await test('Non-issuer cannot transition member', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    addMember(node,EVA,{identity_id:MARIA})
+    assertThrows(()=>transitionMemberStatus(node,PETER,MARIA,STATUS.CANDIDATE),'INSUFFICIENT_PERMISSIONS')
+  })
+
+  await test('Referral warning shows when referrer is INVITED', async () => {
+    const node=freshNode()
+    // Peter is INVITED (referrer)
+    addMember(node,EVA,{identity_id:PETER,referral_id:EVA,referral_weight:STATUS_WEIGHT[STATUS.APPROVED]})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    // Maria is referred by Peter (while Peter was INVITED — simulated via low weight)
+    addMember(node,EVA,{identity_id:MARIA,referral_id:PETER,referral_weight:STATUS_WEIGHT[STATUS.INVITED]})
+    const {warning}=transitionMemberStatus(node,EVA,MARIA,STATUS.CANDIDATE)
+    assert(warning!==null,'Warning must be shown for low-weight referral')
+    assert(warning.includes('INVITED'),'Warning must mention INVITED')
+  })
+
+  // ── 5. Issuer rights ────────────────────────────────────────────────────────
+  log('\n── Issuer rights ────────────────────────','sep')
+
+  await test('grantIssuerRights — APPROVED member becomes issuer', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    grantIssuerRights(node,EVA,PETER)
+    assert(getMember(node,PETER).is_issuer,'Peter must be issuer')
+  })
+
+  await test('grantIssuerRights — cannot grant to non-APPROVED', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    assertThrows(()=>grantIssuerRights(node,EVA,PETER),'MEMBER_NOT_APPROVED')
+  })
+
+  await test('grantIssuerRights — cannot grant to self', async () => {
+    const node=freshNode()
+    assertThrows(()=>grantIssuerRights(node,EVA,EVA),'SELF_GRANT_FORBIDDEN')
+  })
+
+  await test('revokeIssuerRights — succeeds with multiple issuers', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    grantIssuerRights(node,EVA,PETER)
+    revokeIssuerRights(node,EVA,PETER)
+    assert(!getMember(node,PETER).is_issuer,'Peter must no longer be issuer')
+  })
+
+  await test('revokeIssuerRights — cannot revoke last issuer', async () => {
+    const node=freshNode()
+    assertThrows(()=>revokeIssuerRights(node,EVA,EVA),'LAST_ISSUER')
+  })
+
+  // ── 6. Naming prompt ────────────────────────────────────────────────────────
+  log('\n── Naming prompt ────────────────────────','sep')
+
+  await test('checkNamingPrompt — null below threshold', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    // Only 2 approved — below threshold of 3
+    assertNull(checkNamingPrompt(node),'No prompt below threshold')
+  })
+
+  await test('checkNamingPrompt — fires at threshold', async () => {
+    const node=freshNode()
+    for(const id of [PETER,MARIA,LOUIS]){
+      addMember(node,EVA,{identity_id:id})
+      transitionMemberStatus(node,EVA,id,STATUS.CANDIDATE)
+      transitionMemberStatus(node,EVA,id,STATUS.APPROVED)
+    }
+    const prompt=checkNamingPrompt(node)
+    assert(prompt!==null,'Prompt must fire at threshold')
+    assert(prompt.fields.length>0,'Prompt must have fields')
+  })
+
+  await test('setDisplayNames — stored and prompt clears', async () => {
+    const node=freshNode()
+    for(const id of [PETER,MARIA,LOUIS]){
+      addMember(node,EVA,{identity_id:id})
+      transitionMemberStatus(node,EVA,id,STATUS.CANDIDATE)
+      transitionMemberStatus(node,EVA,id,STATUS.APPROVED)
+    }
+    setDisplayNames(node,EVA,{identity:'Villager',node:'Grove',approved:'Rooted'})
+    assertNull(checkNamingPrompt(node),'Prompt must not fire after names set')
+    assertEqual(node.display_names.identity,'Villager','Custom name must be stored')
+  })
+
+  // ── 7. Level 2 network formation ────────────────────────────────────────────
+  log('\n── Level 2 network formation ────────────','sep')
+
+  await test('checkNetworkFormationPrompt — null for first node', async () => {
+    const allNodes=[]
+    assertNull(checkNetworkFormationPrompt(EVA,allNodes,'Node B'),'No prompt for first node')
+  })
+
+  await test('checkNetworkFormationPrompt — fires for second node', async () => {
+    const nodeA=freshNode()
+    const prompt=checkNetworkFormationPrompt(EVA,[nodeA],'Node B')
+    assert(prompt!==null,'Prompt must fire for second node')
+    assert(prompt.message.includes('Node B'),'Prompt must mention new node name')
+    assert(prompt.requiresConsent,'Must require consent')
+  })
+
+  await test('formNetwork — links nodes and creates network', async () => {
+    const nodeA=freshNode(EVA,{name:'Node A'})
+    const nodeB=createNode(EVA,{name:'Node B'})
+    const {network,nodes}=formNetwork('La Maison Network',[nodeA,nodeB],[EVA])
+    assertEqual(network.name,'La Maison Network','Network name must match')
+    assertEqual(network.nodes.length,2,'Network must contain 2 nodes')
+    assert(network.nodes.includes(nodeA.id),'Node A must be in network')
+    assert(network.nodes.includes(nodeB.id),'Node B must be in network')
+    assertEqual(nodeA.parent_network,network.id,'Node A must be linked')
+    assertEqual(nodeB.parent_network,network.id,'Node B must be linked')
+    assert(network.founded_by.includes(EVA),'Founder must be in founded_by')
+  })
+
+  await test('formNetwork — deduplicates founders', async () => {
+    const nodeA=freshNode(EVA,{name:'A'})
+    const nodeB=createNode(EVA,{name:'B'})
+    const {network}=formNetwork('Vine',[nodeA,nodeB],[EVA,EVA,EVA])
+    assertEqual(network.founded_by.length,1,'Duplicate founders must be deduped')
+  })
+
+  // ── 8. Sessions ─────────────────────────────────────────────────────────────
+  log('\n── Sessions ─────────────────────────────','sep')
+
+  await test('createSession — fails if allow_temporary is false', async () => {
+    const node=freshNode(EVA,{allow_temporary:false})
+    assertThrows(()=>createSession(node,EVA,{}),'SESSIONS_DISABLED')
+  })
+
+  await test('createSession — APPROVED member creates session', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    const session=createSession(node,EVA,{duration_min:45,purpose:'Workshop'})
+    assert(session.id,'Session must have ID')
+    assertEqual(session.duration_min,45,'Duration must be 45 min')
+    assertEqual(session.purpose,'Workshop','Purpose must be stored')
+    assert(session.active,'Session must be active')
+    assertEqual(node.sessions.length,1,'Session must be in node')
+  })
+
+  await test('createSession — duration capped at MAX', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    const session=createSession(node,EVA,{duration_min:99999})
+    assertEqual(session.duration_min,MAX_SESSION_DURATION_MIN,'Duration must be capped')
+  })
+
+  await test('addSessionMember — adds TEMPORARY member', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    const session=createSession(node,EVA,{duration_min:30})
+    addSessionMember(node,session,EVA,{identity_id:PETER,handle:'peter'})
+    const m=getMember(node,PETER)
+    assert(m!==null,'Member must be added')
+    assertEqual(m.status,STATUS.TEMPORARY,'Status must be TEMPORARY')
+    assertEqual(m.session_id,session.id,'Session ID must be stored')
+    assert(session.members.includes(PETER),'Member must be in session roster')
+  })
+
+  await test('addSessionMember — APPROVED member not downgraded', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    const session=createSession(node,EVA,{duration_min:30})
+    addSessionMember(node,session,EVA,{identity_id:PETER})
+    assertEqual(getMember(node,PETER).status,STATUS.APPROVED,'APPROVED must not be downgraded')
+  })
+
+  await test('expireSessions — TEMPORARY members revert to UNKNOWN', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    // Create an already-expired session (past expiry)
+    const ts=new Date(Date.now()-60_000).toISOString()
+    const session={
+      id:uuid(),created_by:EVA,node_id:node.id,
+      location:null,duration_min:1,
+      created_at:ts,expires_at:ts, // already expired
+      members:[PETER],purpose:null,active:true,
+    }
+    node.sessions=[session]
+    node.members.push({
+      identity_id:PETER,status:STATUS.TEMPORARY,
+      referral_id:null,referral_weight:0,can_invite:false,is_issuer:false,
+      session_id:session.id,expires_at:session.expires_at,
+      joined_at:ts,updated_at:null,handle:null,
+    })
+    const {expiredCount}=expireSessions(node)
+    assertEqual(expiredCount,1,'1 session must expire')
+    assertEqual(getMember(node,PETER).status,STATUS.UNKNOWN,'TEMPORARY must revert to UNKNOWN')
+    assert(!getMember(node,PETER).session_id,'session_id must be cleared')
+  })
+
+  await test('closeSession — reverts TEMPORARY members', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    const session=createSession(node,EVA,{duration_min:60})
+    addSessionMember(node,session,EVA,{identity_id:PETER})
+    closeSession(node,session.id,EVA)
+    assert(!session.active,'Session must be inactive')
+    assertEqual(getMember(node,PETER).status,STATUS.UNKNOWN,'Member must revert to UNKNOWN')
+  })
+
+  await test('closeSession — non-creator non-issuer cannot close', async () => {
+    const node=freshNode(EVA,{allow_temporary:true})
+    const session=createSession(node,EVA,{duration_min:60})
+    addSessionMember(node,session,EVA,{identity_id:PETER})
+    // Peter is TEMPORARY — not an issuer
+    assertThrows(()=>closeSession(node,session.id,PETER),'INSUFFICIENT_PERMISSIONS')
+  })
+
+  // ── 9. Member queries ────────────────────────────────────────────────────────
+  log('\n── Member queries ───────────────────────','sep')
+
+  await test('getMembers — filters by status', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    addMember(node,EVA,{identity_id:MARIA})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    const approved=getMembers(node,STATUS.APPROVED)
+    assertEqual(approved.length,2,'Eva+Peter must be APPROVED') // Eva is founder
+    const invited=getMembers(node,STATUS.INVITED)
+    assertEqual(invited.length,1,'Maria must be INVITED')
+  })
+
+  await test('getIssuers — returns only issuers', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    transitionMemberStatus(node,EVA,PETER,STATUS.APPROVED)
+    grantIssuerRights(node,EVA,PETER)
+    const issuers=getIssuers(node)
+    assertEqual(issuers.length,2,'Eva+Peter must be issuers')
+    assert(issuers.every(m=>m.is_issuer),'All returned must be issuers')
+  })
+
+  await test('hasMemberStatus — minimum status check', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})
+    assert(hasMemberStatus(node,PETER,STATUS.INVITED),'INVITED >= INVITED')
+    assert(!hasMemberStatus(node,PETER,STATUS.CANDIDATE),'INVITED < CANDIDATE')
+    assert(!hasMemberStatus(node,PETER,STATUS.APPROVED),'INVITED < APPROVED')
+    assert(hasMemberStatus(node,EVA,STATUS.APPROVED),'APPROVED >= APPROVED')
+  })
+
+  await test('getMemberWithContext — includes arrival warning', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER,referral_id:EVA,referral_weight:STATUS_WEIGHT[STATUS.INVITED]})
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    const ctx=getMemberWithContext(node,PETER)
+    assert(ctx!==null,'Context must be returned')
+    assert(ctx.arrivalWarning!==null,'Arrival warning must be present for low-weight referral')
+    assert(ctx.isActive,'CANDIDATE must be isActive')
+    assert(!ctx.isBlocked,'CANDIDATE must not be isBlocked')
+  })
+
+  await test('getNodeSummary — correct counts', async () => {
+    const node=freshNode()
+    addMember(node,EVA,{identity_id:PETER})   // INVITED
+    addMember(node,EVA,{identity_id:MARIA})   // INVITED
+    transitionMemberStatus(node,EVA,PETER,STATUS.CANDIDATE)
+    const s=getNodeSummary(node)
+    assertEqual(s.approvedCount,1,'1 approved (Eva)')
+    assertEqual(s.invitedCount,1,'1 invited (Maria)')
+    assertEqual(s.candidateCount,1,'1 candidate (Peter)')
+    assertEqual(s.totalMembers,3,'3 total members')
+    assertEqual(s.showNamingPrompt,false,'No naming prompt yet')
+  })
+
+  // ── Summary ────────────────────────────────────────────────────────────────
+  log(`\n${'─'.repeat(44)}`,'sep')
+  log(`  ${passed} passed    ${failed} failed`,failed===0?'pass':'fail')
+  summary.className=failed===0?'all-pass':'has-fail'
+  summary.textContent=failed===0
+    ? '🎉  All tests passed. Node layer is solid. Ready for credentials layer.'
+    : `⚠️  ${failed} test(s) failed. Review before proceeding.`
+}
+</script>
+</body>
+</html>

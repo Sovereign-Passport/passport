@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passport — Vault Test Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 32px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #7eb8f7;
+      font-size: 18px;
+      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 12px;
+      margin-bottom: 32px;
+    }
+
+    #output {
+      background: #111118;
+      border: 1px solid #222;
+      border-radius: 6px;
+      padding: 24px;
+      line-height: 2;
+      min-height: 200px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .pass  { color: #4ade80; }
+    .fail  { color: #f87171; }
+    .info  { color: #94a3b8; }
+    .head  { color: #7eb8f7; }
+    .warn  { color: #fbbf24; }
+    .sep   { color: #333; }
+
+    #summary {
+      margin-top: 20px;
+      padding: 16px 24px;
+      border-radius: 6px;
+      font-size: 15px;
+      display: none;
+    }
+
+    #summary.all-pass {
+      background: #052e16;
+      border: 1px solid #166534;
+      color: #4ade80;
+      display: block;
+    }
+
+    #summary.has-fail {
+      background: #2d0a0a;
+      border: 1px solid #7f1d1d;
+      color: #f87171;
+      display: block;
+    }
+
+    button {
+      margin-top: 24px;
+      padding: 10px 24px;
+      background: #1e3a5f;
+      color: #7eb8f7;
+      border: 1px solid #2d5a8e;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+    }
+
+    button:hover { background: #2d5a8e; }
+  </style>
+</head>
+<body>
+
+  <h1>🔐 PASSPORT — Vault Crypto Test Runner</h1>
+  <p class="subtitle">app/src/crypto/vault.js — WebCrypto API — Zero dependencies</p>
+
+  <div id="output"><span class="info">Click "Run Tests" to begin...</span></div>
+  <div id="summary"></div>
+  <button onclick="runTests()">▶ Run Tests</button>
+
+<script type="module">
+
+// ─── Inline vault.js ─────────────────────────────────────────────────────────
+// (Inlined here so the test runner is a single self-contained file.
+//  In the real app, vault.js is imported as a module from its own file.)
+
+const PBKDF2_ITERATIONS  = 600_000
+const PBKDF2_HASH        = 'SHA-256'
+const AES_KEY_LENGTH     = 256
+const SALT_LENGTH        = 32
+const IV_LENGTH          = 12
+const VAULT_VERSION      = '1.0.0'
+const ED25519_MULTICODEC = new Uint8Array([0xed, 0x01])
+
+function toBase64url(bytes) {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64url(str) {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/')
+    .padEnd(str.length + (4 - (str.length % 4)) % 4, '=')
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0))
+}
+
+function toHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function randomBytes(length) {
+  return crypto.getRandomValues(new Uint8Array(length))
+}
+
+function encode(str) { return new TextEncoder().encode(str) }
+function decode(bytes) { return new TextDecoder().decode(bytes) }
+
+function toBase58(bytes) {
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let num = BigInt('0x' + toHex(bytes))
+  let result = ''
+  const base = BigInt(58)
+  while (num > 0n) { result = ALPHABET[Number(num % base)] + result; num = num / base }
+  for (const byte of bytes) { if (byte !== 0) break; result = '1' + result }
+  return result
+}
+
+async function generateKeypair() {
+  return crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])
+}
+
+async function exportKey(key) {
+  return crypto.subtle.exportKey('jwk', key)
+}
+
+async function importKey(jwk, usage) {
+  return crypto.subtle.importKey('jwk', jwk, { name: 'Ed25519' }, true, [usage])
+}
+
+async function deriveDID(publicKey) {
+  const rawBytes = await crypto.subtle.exportKey('raw', publicKey)
+  const keyBytes = new Uint8Array(rawBytes)
+  const multicodecKey = new Uint8Array(ED25519_MULTICODEC.length + keyBytes.length)
+  multicodecKey.set(ED25519_MULTICODEC)
+  multicodecKey.set(keyBytes, ED25519_MULTICODEC.length)
+  return 'did:key:z' + toBase58(multicodecKey)
+}
+
+async function generateIdentity() {
+  const keypair    = await generateKeypair()
+  const did        = await deriveDID(keypair.publicKey)
+  const publicJwk  = await exportKey(keypair.publicKey)
+  const privateJwk = await exportKey(keypair.privateKey)
+  return { did, keypair, publicJwk, privateJwk }
+}
+
+async function deriveVaultKey(password, salt) {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encode(password), 'PBKDF2', false, ['deriveKey']
+  )
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: PBKDF2_HASH },
+    keyMaterial,
+    { name: 'AES-GCM', length: AES_KEY_LENGTH },
+    false, ['encrypt', 'decrypt']
+  )
+}
+
+function generateSalt() { return randomBytes(SALT_LENGTH) }
+
+async function encryptVault(vaultKey, plaintext) {
+  const iv = randomBytes(IV_LENGTH)
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, vaultKey, encode(plaintext)
+  )
+  return { iv: toBase64url(iv), ciphertext: toBase64url(new Uint8Array(cipherBuffer)) }
+}
+
+async function decryptVault(vaultKey, iv, ciphertext) {
+  const plainBuffer = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromBase64url(iv) }, vaultKey, fromBase64url(ciphertext)
+  )
+  return decode(new Uint8Array(plainBuffer))
+}
+
+async function createVault(password, handle, profile = {}) {
+  const identity = await generateIdentity()
+  const salt     = generateSalt()
+  const vaultKey = await deriveVaultKey(password, salt)
+  const now      = new Date().toISOString()
+  const vault = {
+    version: VAULT_VERSION,
+    identity: { id: identity.did, handle, avatar: null,
+      profile: { name: null, bio: null, email: null, ...profile },
+      location: null, virtual: true, created_at: now, updated_at: null },
+    keys: { publicKey: identity.publicJwk, privateKey: identity.privateJwk },
+    credentials: [], keychain: [], files: [], sessions: [],
+    created_at: now, updated_at: null,
+  }
+  const { iv, ciphertext } = await encryptVault(vaultKey, JSON.stringify(vault))
+  return { salt: toBase64url(salt), iv, ciphertext, did: identity.did, created_at: now }
+}
+
+async function unlockVault(password, salt, iv, ciphertext) {
+  const vaultKey = await deriveVaultKey(password, fromBase64url(salt))
+  let plaintext
+  try {
+    plaintext = await decryptVault(vaultKey, iv, ciphertext)
+  } catch {
+    const err = new Error('WRONG_PASSWORD'); err.code = 'WRONG_PASSWORD'; throw err
+  }
+  return { vault: JSON.parse(plaintext), vaultKey }
+}
+
+async function saveVault(vaultKey, vault, salt) {
+  vault.updated_at = new Date().toISOString()
+  const { iv, ciphertext } = await encryptVault(vaultKey, JSON.stringify(vault))
+  return { salt, iv, ciphertext, did: vault.identity.id,
+    created_at: vault.created_at, updated_at: vault.updated_at }
+}
+
+async function changePassword(oldPassword, newPassword, stored) {
+  const { vault } = await unlockVault(oldPassword, stored.salt, stored.iv, stored.ciphertext)
+  const newSalt   = generateSalt()
+  const newKey    = await deriveVaultKey(newPassword, newSalt)
+  vault.updated_at = new Date().toISOString()
+  const { iv, ciphertext } = await encryptVault(newKey, JSON.stringify(vault))
+  return { salt: toBase64url(newSalt), iv, ciphertext, did: vault.identity.id,
+    created_at: vault.created_at, updated_at: vault.updated_at }
+}
+
+async function sign(privateKey, payload) {
+  const sigBuffer = await crypto.subtle.sign('Ed25519', privateKey, encode(JSON.stringify(payload)))
+  return toBase64url(new Uint8Array(sigBuffer))
+}
+
+async function verify(publicKey, payload, signature) {
+  return crypto.subtle.verify('Ed25519', publicKey, fromBase64url(signature), encode(JSON.stringify(payload)))
+}
+
+async function loadKeypair(vault) {
+  const [publicKey, privateKey] = await Promise.all([
+    importKey(vault.keys.publicKey, 'verify'),
+    importKey(vault.keys.privateKey, 'sign'),
+  ])
+  return { publicKey, privateKey }
+}
+
+function exportBackup(payload) {
+  const data = { format: 'passport-vault', version: VAULT_VERSION,
+    exported_at: new Date().toISOString(), payload }
+  return new Blob([JSON.stringify(data, null, 2)], { type: 'application/x-passport-vault' })
+}
+
+async function importBackup(file) {
+  const text = await file.text()
+  let parsed
+  try { parsed = JSON.parse(text) } catch {
+    throw Object.assign(new Error('INVALID_BACKUP'), { code: 'INVALID_BACKUP' })
+  }
+  if (parsed.format !== 'passport-vault' || !parsed.payload)
+    throw Object.assign(new Error('INVALID_BACKUP'), { code: 'INVALID_BACKUP' })
+  return parsed.payload
+}
+
+function exportDIDDocument(vault) {
+  const did = vault.identity.id
+  return {
+    '@context': ['https://www.w3.org/ns/did/v1'],
+    id: did,
+    verificationMethod: [{ id: `${did}#key-1`, type: 'JsonWebKey2020',
+      controller: did, publicKeyJwk: vault.keys.publicKey }],
+    authentication: [`${did}#key-1`],
+    assertionMethod: [`${did}#key-1`],
+  }
+}
+
+// ─── IndexedDB ───────────────────────────────────────────────────────────────
+
+const DB_NAME = 'passport', DB_VERSION = 1, STORE_NAME = 'vault'
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = e => {
+      const db = e.target.result
+      if (!db.objectStoreNames.contains(STORE_NAME))
+        db.createObjectStore(STORE_NAME, { keyPath: 'key' })
+    }
+    req.onsuccess = e => resolve(e.target.result)
+    req.onerror   = e => reject(e.target.error)
+  })
+}
+
+async function persistVault(payload) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).put({ key: 'current', ...payload })
+    tx.oncomplete = resolve; tx.onerror = e => reject(e.target.error)
+  })
+}
+
+async function loadPersistedVault() {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE_NAME, 'readonly')
+    const req = tx.objectStore(STORE_NAME).get('current')
+    req.onsuccess = e => resolve(e.target.result ?? null)
+    req.onerror   = e => reject(e.target.error)
+  })
+}
+
+async function vaultExists() {
+  return (await loadPersistedVault()) !== null
+}
+
+// ─── Test runner UI ──────────────────────────────────────────────────────────
+
+const out     = document.getElementById('output')
+const summary = document.getElementById('summary')
+let passed = 0, failed = 0
+
+function log(msg, cls = '') {
+  const span = document.createElement('span')
+  if (cls) span.className = cls
+  span.textContent = msg + '\n'
+  out.appendChild(span)
+  out.scrollTop = out.scrollHeight
+}
+
+async function test(name, fn) {
+  try {
+    await fn()
+    log(`✅  ${name}`, 'pass')
+    passed++
+  } catch (err) {
+    log(`❌  ${name}`, 'fail')
+    log(`    └─ ${err.message}`, 'fail')
+    failed++
+  }
+}
+
+function assert(cond, msg) { if (!cond) throw new Error(msg ?? 'Assertion failed') }
+function assertEqual(a, b, msg) {
+  if (a !== b) throw new Error(msg ?? `Expected "${b}", got "${a}"`)
+}
+
+window.runTests = async function () {
+  out.innerHTML = ''
+  summary.style.display = 'none'
+  passed = 0; failed = 0
+
+  log('🔐 PASSPORT — vault.js test suite\n', 'head')
+
+  // 1. Identity
+  log('── Identity generation ──────────────────', 'sep')
+
+  await test('generateIdentity returns a valid did:key', async () => {
+    const id = await generateIdentity()
+    assert(id.did.startsWith('did:key:z'), `DID should start with did:key:z — got: ${id.did}`)
+    assert(id.keypair.publicKey instanceof CryptoKey, 'publicKey must be CryptoKey')
+    assert(id.keypair.privateKey instanceof CryptoKey, 'privateKey must be CryptoKey')
+    assertEqual(id.publicJwk.kty, 'OKP', 'JWK key type must be OKP')
+  })
+
+  await test('Two identities have unique DIDs', async () => {
+    const [a, b] = await Promise.all([generateIdentity(), generateIdentity()])
+    assert(a.did !== b.did, 'DIDs must be unique')
+  })
+
+  // 2. Vault creation
+  log('\n── Vault creation ───────────────────────', 'sep')
+
+  await test('createVault returns encrypted payload', async () => {
+    const p = await createVault('hunter2', 'testuser')
+    assert(typeof p.salt === 'string', 'salt must be string')
+    assert(typeof p.iv === 'string', 'iv must be string')
+    assert(typeof p.ciphertext === 'string', 'ciphertext must be string')
+    assert(p.did.startsWith('did:key:z'), 'did must be present')
+  })
+
+  await test('Ciphertext does not contain plaintext (sanity)', async () => {
+    const p = await createVault('hunter2', 'testuser')
+    assert(!p.ciphertext.includes('testuser'), 'Username must not appear in ciphertext')
+    assert(!p.ciphertext.includes('did:key'), 'DID must not appear in ciphertext')
+  })
+
+  // 3. Vault unlock
+  log('\n── Vault unlock ─────────────────────────', 'sep')
+
+  await test('unlockVault with correct password returns vault', async () => {
+    const p = await createVault('correct', 'eva')
+    const { vault } = await unlockVault('correct', p.salt, p.iv, p.ciphertext)
+    assertEqual(vault.identity.handle, 'eva', 'Handle must survive round-trip')
+    assert(vault.identity.id.startsWith('did:key:z'), 'DID must be in vault')
+  })
+
+  await test('Wrong password throws WRONG_PASSWORD', async () => {
+    const p = await createVault('correct', 'eva')
+    try {
+      await unlockVault('wrong', p.salt, p.iv, p.ciphertext)
+      throw new Error('Should have thrown')
+    } catch (err) { assertEqual(err.code, 'WRONG_PASSWORD', 'Error code must be WRONG_PASSWORD') }
+  })
+
+  await test('Tampered ciphertext fails decryption (integrity)', async () => {
+    const p = await createVault('password', 'eva')
+    const tampered = p.ciphertext.slice(0, -4) + 'XXXX'
+    try {
+      await unlockVault('password', p.salt, p.iv, tampered)
+      throw new Error('Should have thrown')
+    } catch (err) {
+      assert(err.code === 'WRONG_PASSWORD' || err.message.includes('decrypt'),
+        'Tampered ciphertext must fail')
+    }
+  })
+
+  // 4. Save vault
+  log('\n── Save vault ───────────────────────────', 'sep')
+
+  await test('saveVault persists modifications', async () => {
+    const p = await createVault('password', 'eva')
+    const { vault, vaultKey } = await unlockVault('password', p.salt, p.iv, p.ciphertext)
+    vault.identity.handle = 'eva-updated'
+    vault.keychain.push({ id: '1', label: 'GitHub', type: 'api_key', value: 'ghp_test' })
+    const p2 = await saveVault(vaultKey, vault, p.salt)
+    const { vault: v2 } = await unlockVault('password', p2.salt, p2.iv, p2.ciphertext)
+    assertEqual(v2.identity.handle, 'eva-updated', 'Handle update must persist')
+    assertEqual(v2.keychain[0].value, 'ghp_test', 'Keychain must persist')
+  })
+
+  // 5. Password change
+  log('\n── Password change ──────────────────────', 'sep')
+
+  await test('changePassword works with new password', async () => {
+    const p  = await createVault('old', 'eva')
+    const p2 = await changePassword('old', 'new', p)
+    const { vault } = await unlockVault('new', p2.salt, p2.iv, p2.ciphertext)
+    assertEqual(vault.identity.handle, 'eva', 'Identity must survive password change')
+  })
+
+  await test('Old password rejected after change', async () => {
+    const p  = await createVault('old', 'eva')
+    const p2 = await changePassword('old', 'new', p)
+    try {
+      await unlockVault('old', p2.salt, p2.iv, p2.ciphertext)
+      throw new Error('Old password should fail')
+    } catch (err) { assertEqual(err.code, 'WRONG_PASSWORD', 'Old password must be rejected') }
+  })
+
+  // 6. Signatures
+  log('\n── Signatures ───────────────────────────', 'sep')
+
+  await test('sign + verify round-trip succeeds', async () => {
+    const p = await createVault('password', 'eva')
+    const { vault } = await unlockVault('password', p.salt, p.iv, p.ciphertext)
+    const { publicKey, privateKey } = await loadKeypair(vault)
+    const data = { type: 'ReferralCredential', to: 'did:key:z6MkPeter' }
+    const sig  = await sign(privateKey, data)
+    const valid = await verify(publicKey, data, sig)
+    assert(valid, 'Signature must verify')
+  })
+
+  await test('Tampered payload fails signature check', async () => {
+    const p = await createVault('password', 'eva')
+    const { vault } = await unlockVault('password', p.salt, p.iv, p.ciphertext)
+    const { publicKey, privateKey } = await loadKeypair(vault)
+    const data = { type: 'ReferralCredential', to: 'did:key:z6MkPeter' }
+    const sig  = await sign(privateKey, data)
+    assert(!(await verify(publicKey, { ...data, to: 'did:key:z6MkEVIL' }, sig)),
+      'Tampered payload must not verify')
+  })
+
+  await test('Cross-identity forgery fails', async () => {
+    const [pA, pB] = await Promise.all([
+      createVault('password', 'eva'),
+      createVault('password', 'mallory'),
+    ])
+    const { vault: vA } = await unlockVault('password', pA.salt, pA.iv, pA.ciphertext)
+    const { vault: vB } = await unlockVault('password', pB.salt, pB.iv, pB.ciphertext)
+    const { publicKey: pubA } = await loadKeypair(vA)
+    const { privateKey: privB } = await loadKeypair(vB)
+    const data = { claim: 'I am Eva' }
+    const sig  = await sign(privB, data)
+    assert(!(await verify(pubA, data, sig)), 'Cross-identity forgery must fail')
+  })
+
+  // 7. Backup
+  log('\n── Backup export / import ───────────────', 'sep')
+
+  await test('exportBackup produces a Blob', async () => {
+    const p    = await createVault('password', 'eva')
+    const blob = exportBackup(p)
+    assert(blob instanceof Blob, 'Must return a Blob')
+    assertEqual(blob.type, 'application/x-passport-vault', 'MIME type must be set')
+  })
+
+  await test('Backup round-trip survives unlock', async () => {
+    const p    = await createVault('password', 'eva')
+    const blob = exportBackup(p)
+    const file = new File([blob], 'backup.passport', { type: blob.type })
+    const restored = await importBackup(file)
+    const { vault } = await unlockVault('password', restored.salt, restored.iv, restored.ciphertext)
+    assertEqual(vault.identity.handle, 'eva', 'Identity must survive backup round-trip')
+  })
+
+  await test('Invalid backup file rejected', async () => {
+    const bad = new File(['not valid json {{{'], 'bad.passport')
+    try {
+      await importBackup(bad)
+      throw new Error('Should have thrown')
+    } catch (err) { assertEqual(err.code, 'INVALID_BACKUP', 'Must throw INVALID_BACKUP') }
+  })
+
+  // 8. DID Document
+  log('\n── DID Document ─────────────────────────', 'sep')
+
+  await test('exportDIDDocument — no private key exposed', async () => {
+    const p = await createVault('password', 'eva')
+    const { vault } = await unlockVault('password', p.salt, p.iv, p.ciphertext)
+    const doc = exportDIDDocument(vault)
+    assertEqual(doc.id, vault.identity.id, 'DID must match identity')
+    assert(!JSON.stringify(doc).includes('"d"'), 'Private key (d) must NOT appear in DID doc')
+  })
+
+  // 9. IndexedDB
+  log('\n── IndexedDB persistence ────────────────', 'sep')
+
+  await test('persistVault + loadPersistedVault round-trip', async () => {
+    const p = await createVault('password', 'eva')
+    await persistVault(p)
+    const loaded = await loadPersistedVault()
+    assert(loaded !== null, 'Must load a vault')
+    assertEqual(loaded.did, p.did, 'DID must survive persistence')
+    assertEqual(loaded.ciphertext, p.ciphertext, 'Ciphertext must survive persistence')
+  })
+
+  await test('vaultExists returns true after persist', async () => {
+    const p = await createVault('password', 'eva')
+    await persistVault(p)
+    assert(await vaultExists(), 'vaultExists must return true')
+  })
+
+  // ── Summary ──────────────────────────────────────────────────────────────
+
+  log(`\n${'─'.repeat(44)}`, 'sep')
+  log(`  ${passed} passed    ${failed} failed`, failed === 0 ? 'pass' : 'fail')
+
+  summary.className  = failed === 0 ? 'all-pass' : 'has-fail'
+  summary.textContent = failed === 0
+    ? '🎉  All tests passed. Crypto foundation is solid. Ready for identity layer.'
+    : `⚠️  ${failed} test(s) failed. Review before proceeding.`
+}
+
+</script>
+</body>
+</html>
