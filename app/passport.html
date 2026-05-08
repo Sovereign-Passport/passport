@@ -701,11 +701,12 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-2" onclick="showToast('Credential scanner coming soon')">
-      <div class="menu-icon">📷</div>
+    <!-- Receive Credential — opens the paste dialog screen -->
+    <div class="menu-item fade-up fade-up-2" onclick="openReceiveCredential()">
+      <div class="menu-icon">📨</div>
       <div class="menu-text">
-        <strong>Scan Invite</strong>
-        <small>Join a community</small>
+        <strong>Receive Credential</strong>
+        <small>Paste an offer link or JSON</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -844,6 +845,21 @@
         Restore →
       </button>
 
+      <!--
+        Debug info panel — shows restore error details.
+        Visible only when an error occurs.
+        Helps diagnose backup/password issues across versions.
+      -->
+      <div id="restore-debug" style="display:none;margin-top:12px;
+        background:var(--bg-lift);border:1px solid var(--ink-faint);
+        border-radius:8px;padding:12px;font-size:10px;
+        color:var(--ink-dim);word-break:break-all;line-height:1.6;">
+        <strong style="color:var(--gold);display:block;margin-bottom:4px;">
+          Debug info
+        </strong>
+        <span id="restore-debug-text"></span>
+      </div>
+
       <div class="divider">or</div>
 
       <button class="btn btn-ghost" onclick="goBack()">← Go back</button>
@@ -851,7 +867,61 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 8 — CREDENTIAL OFFER
+       SCREEN 8 — RECEIVE CREDENTIAL
+       The user pastes an offer URL or raw offer JSON here.
+       This is the entry point for joining a community —
+       reachable from the home screen "Receive Credential" button.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-receive">
+
+    <h1 class="display fade-up" style="margin-bottom:8px;">
+      Receive a<br><em>credential.</em>
+    </h1>
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
+      Paste an offer link from a community issuer,
+      or the full offer JSON. The issuer will sign
+      and return your credential instantly.
+    </p>
+
+    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
+
+      <div class="field">
+        <label>Offer URL or JSON</label>
+        <!--
+          Accepts two formats:
+          1. A URL: https://mdusl.sovereign-passport.id/offer
+             → wallet fetches the offer from the issuer
+          2. Raw JSON: { "issuer": "did:web:...", "nonce": "...", ... }
+             → wallet uses it directly (for offline / QR encoded offers)
+        -->
+        <textarea
+          id="input-offer-paste"
+          placeholder="https://mdusl.sovereign-passport.id/offer&#10;&#10;— or paste the offer JSON directly —"
+          style="min-height:120px;"
+          oninput="validateOfferInput()"
+        ></textarea>
+      </div>
+
+      <div class="notice" id="receive-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" id="receive-error-text" style="color:var(--red);"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-load-offer" disabled onclick="loadOfferFromInput()">
+        Load offer →
+      </button>
+
+      <div class="divider">or</div>
+
+      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN 9 — CREDENTIAL OFFER
+       Populated by loadOfferFromInput() or the URL hash flow.
+       Shows community name, issuer DID, and Accept / Decline.
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-offer">
     <div class="shield fade-up">
@@ -1378,10 +1448,15 @@ async function tryRestore() {
   err.style.display = 'none'
 
   try {
+    // Step 1 — parse the .passport file (catches malformed JSON)
     const payload = await importBackup(file)
-    const {vault,vaultKey} = await unlockVault(
+
+    // Step 2 — decrypt with password (catches wrong password)
+    const {vault, vaultKey} = await unlockVault(
       password, payload.salt, payload.iv, payload.ciphertext
     )
+
+    // Step 3 — persist and load
     await persist(payload)
     appState.stored   = payload
     appState.vault    = vault
@@ -1389,11 +1464,36 @@ async function tryRestore() {
     populateHome()
     showToast('Passport restored')
     goTo('screen-home')
+
   } catch (e) {
+    // Show the REAL error — not a generic message
+    // This is critical for debugging — the exact error tells us what failed
     err.style.display = 'flex'
-    etxt.textContent  = e.code === 'INVALID_BACKUP'
-      ? 'Invalid backup file.'
-      : 'Wrong password for this backup.'
+
+    if (e.code === 'INVALID_BACKUP') {
+      etxt.textContent = 'Invalid backup file — make sure you selected a .passport file.'
+    } else if (e.code === 'WRONG_PASSWORD') {
+      etxt.textContent = 'Wrong password for this backup.'
+    } else {
+      // Show the actual error message so we can diagnose it
+      etxt.textContent = 'Restore failed: ' + (e.message ?? e.toString())
+    }
+
+    // Log full error to console for debugging
+    console.error('[Restore] Failed:', e)
+
+    // Show debug details in the UI panel
+    const debugEl = document.getElementById('restore-debug')
+    const debugTxt = document.getElementById('restore-debug-text')
+    if (debugEl && debugTxt) {
+      debugEl.style.display = 'block'
+      debugTxt.textContent  =
+        'Error code: ' + (e.code ?? 'none') + '\n' +
+        'Message: '    + (e.message ?? e.toString()) + '\n' +
+        'File name: '  + (file?.name ?? 'unknown') + '\n' +
+        'File size: '  + (file?.size ?? 0) + ' bytes'
+    }
+
     btn.textContent = 'Restore →'
     btn.disabled    = false
   }
@@ -1439,6 +1539,105 @@ function isIOS() {
 function isInStandaloneMode() {
   return window.matchMedia('(display-mode: standalone)').matches ||
     window.navigator.standalone === true
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECEIVE CREDENTIAL — home screen entry point
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the receive credential screen.
+ * Called from the home screen "Receive Credential" menu item.
+ * Clears any previous input and error state before navigating.
+ */
+function openReceiveCredential() {
+  // Clear previous state
+  document.getElementById('input-offer-paste').value = ''
+  document.getElementById('receive-error').style.display = 'none'
+  document.getElementById('btn-load-offer').disabled = true
+  goTo('screen-receive')
+}
+
+/**
+ * Validate the offer input field in real time.
+ * Enables the Load button only when there is non-empty input.
+ * Called on every keystroke via oninput.
+ */
+function validateOfferInput() {
+  const val = document.getElementById('input-offer-paste').value.trim()
+  document.getElementById('btn-load-offer').disabled = val.length === 0
+}
+
+/**
+ * Load an offer from the paste input.
+ *
+ * Handles two input formats:
+ *   1. URL string  → fetch the offer JSON from the issuer
+ *   2. JSON string → parse directly without a network call
+ *
+ * On success → navigates to screen-offer (populated with community details).
+ * On failure → shows inline error, stays on screen-receive.
+ */
+async function loadOfferFromInput() {
+  const input  = document.getElementById('input-offer-paste').value.trim()
+  const errEl  = document.getElementById('receive-error')
+  const errTxt = document.getElementById('receive-error-text')
+  const btn    = document.getElementById('btn-load-offer')
+
+  // Reset error state
+  errEl.style.display = 'none'
+  btn.textContent     = 'Loading...'
+  btn.disabled        = true
+
+  try {
+    let offer
+
+    if (input.startsWith('http://') || input.startsWith('https://')) {
+      // ── Format 1: URL ─────────────────────────────────────────────────────
+      // Fetch the offer JSON from the issuer endpoint.
+      // The issuer returns a fresh offer with a new nonce each time.
+      const res = await fetch(input)
+      if (!res.ok) throw new Error(`Issuer returned ${res.status} — is the URL correct?`)
+      offer = await res.json()
+
+    } else {
+      // ── Format 2: Raw JSON ────────────────────────────────────────────────
+      // Parse the pasted JSON directly.
+      // Useful for QR-encoded offers or offline distribution.
+      try {
+        offer = JSON.parse(input)
+      } catch {
+        throw new Error('Not a valid URL or JSON. Paste the full offer link or JSON object.')
+      }
+    }
+
+    // Validate the offer has required fields
+    if (!offer.issuer || !offer.nonce || !offer.issue_endpoint) {
+      throw new Error('Offer is missing required fields. Make sure you copied the full offer.')
+    }
+
+    // Store offer globally for acceptOffer()
+    _pendingOffer = offer
+
+    // Populate the offer screen with community details
+    document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id ?? 'Unknown community'
+    document.getElementById('offer-issuer-did').textContent = offer.issuer
+    document.getElementById('offer-type').textContent       = offer.credential_type ?? 'membership'
+    document.getElementById('offer-expires').textContent    = offer.expires_at
+      ? new Date(offer.expires_at).toLocaleDateString()
+      : '1 year'
+
+    // Navigate to the offer confirmation screen
+    goTo('screen-offer')
+
+  } catch (err) {
+    // Show error inline — don't navigate away
+    errEl.style.display  = 'flex'
+    errTxt.textContent   = err.message
+    btn.textContent      = 'Load offer →'
+    btn.disabled         = false
+  }
 }
 
 
@@ -1643,7 +1842,20 @@ function populateHome() {
   }
 }
 
-window.addEventListener('hashchange', boot)
+// ─────────────────────────────────────────────────────────────────────────────
+// URL HASH LISTENER
+// Re-runs boot() when the hash changes — handles the case where the user
+// is already on the page and a new #offer= link is tapped or pasted.
+// This is needed because GitHub Pages and static hosts strip query strings
+// but preserve the hash fragment, so we use #offer= for offer delivery.
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('hashchange', () => {
+  // Only re-run if there's actually an offer in the new hash
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  if (hashParams.get('offer') || hashParams.get('r')) {
+    boot()
+  }
+})
 
 boot()
 </script>
