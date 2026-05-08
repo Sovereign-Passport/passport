@@ -670,7 +670,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SCREEN 5 — HOME
   ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-home" style="justify-content:flex-start;padding-top:48px;">
+  <div class="screen" id="screen-home" style="justify-content:flex-start;padding-top:48px;overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:center;">
     <div class="home-header fade-up">
       <div>
         <p class="logotype" style="margin-bottom:2px;">Passport</p>
@@ -702,7 +702,7 @@
     </div>
 
     <!-- Receive Credential — opens the paste dialog screen -->
-    <div class="menu-item fade-up fade-up-2" onclick="openReceiveCredential()">
+    <div class="menu-item fade-up fade-up-3" onclick="openReceiveCredential()">
       <div class="menu-icon">📨</div>
       <div class="menu-text">
         <strong>Receive Credential</strong>
@@ -711,9 +711,9 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label fade-up fade-up-3">Vault</p>
+    <p class="section-label fade-up fade-up-4">Vault</p>
 
-    <div class="menu-item fade-up fade-up-3" onclick="showToast('Credentials viewer coming soon')">
+    <div class="menu-item fade-up fade-up-4" onclick="showToast('Credentials viewer coming soon')">
       <div class="menu-icon">🎫</div>
       <div class="menu-text">
         <strong>Credentials</strong>
@@ -722,7 +722,7 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-3" onclick="showToast('Keychain coming soon')">
+    <div class="menu-item fade-up fade-up-4" onclick="showToast('Keychain coming soon')">
       <div class="menu-icon">🔐</div>
       <div class="menu-text">
         <strong>Keychain</strong>
@@ -731,7 +731,7 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-4" onclick="showToast('File links coming soon')">
+    <div class="menu-item fade-up fade-up-5" onclick="showToast('File links coming soon')">
       <div class="menu-icon">📎</div>
       <div class="menu-text">
         <strong>File Links</strong>
@@ -740,9 +740,9 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label fade-up fade-up-4">Security</p>
+    <p class="section-label fade-up fade-up-5">Security</p>
 
-    <div class="menu-item fade-up fade-up-4" onclick="downloadBackup()">
+    <div class="menu-item fade-up fade-up-5" onclick="downloadBackup()">
       <div class="menu-icon">💾</div>
       <div class="menu-text">
         <strong>Backup Vault</strong>
