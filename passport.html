@@ -1604,13 +1604,6 @@ async function boot() {
       showToast('Credential offer waiting — unlock your Passport')
     }
 
-    // If vault is already unlocked in memory (e.g. restore just completed),
-    // fire the offer immediately without going through unlock screen
-    if (appState.vault && (offerUrl || offerData)) {
-      populateHome()
-      return
-    }
-
     goTo('screen-unlock')
 
   } else if (offerUrl || offerData) {
@@ -1651,6 +1644,7 @@ function populateHome() {
 }
 
 window.addEventListener('hashchange', boot)
+
 boot()
 </script>
 </body>
