@@ -1367,6 +1367,7 @@ async function tryUnlock() {
     appState.vault    = vault
     appState.vaultKey = vaultKey
     populateHome()
+    checkPendingOffer()
     goTo('screen-home')
   } catch (e) {
     err.style.display = 'flex'
@@ -1462,6 +1463,7 @@ async function tryRestore() {
     appState.vault    = vault
     appState.vaultKey = vaultKey
     populateHome()
+    checkPendingOffer()
     showToast('Passport restored')
     goTo('screen-home')
 
@@ -1821,11 +1823,13 @@ async function boot() {
 }
 
 // Override populateHome to also trigger pending offers
-const _origPopulateHome = populateHome
-function populateHome() {
-  _origPopulateHome()
-
-  // Handle pending offer after vault is unlocked
+// ─────────────────────────────────────────────────────────────────────────────
+// PENDING OFFER CHECK
+// Called after vault is unlocked (from tryUnlock and tryRestore).
+// Checks if a credential offer was waiting and triggers it.
+// Kept separate from populateHome() to avoid recursive override patterns.
+// ─────────────────────────────────────────────────────────────────────────────
+function checkPendingOffer() {
   if (appState.pendingOfferUrl) {
     const url = appState.pendingOfferUrl
     appState.pendingOfferUrl = null
