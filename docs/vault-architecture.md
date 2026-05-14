@@ -278,3 +278,7 @@ Vault contents above this minimum are implementation-specific. A Pokemon SPID fo
 ---
 
 *Salted. Signed. Alive.*
+
+© 2026 JF Bertrand — Sovereign Passport ID
+Built in Saint-Léon-de-Standon, Quebec, Canada
+Prior use established publicly: May 2026
