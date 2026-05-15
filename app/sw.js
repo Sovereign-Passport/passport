@@ -7,7 +7,7 @@
  * This service worker only caches the app code, never user data.
  */
 
-const CACHE_NAME    = 'sovereign-passport-v1'
+const CACHE_NAME    = 'sovereign-passport-v2'
 const SHELL_FILES   = [
   '/passport.html',
   '/manifest.json',
