@@ -900,6 +900,15 @@
         onclick="switchVaultTab('shared')">Shared</button>
     </div>
 
+    <!-- Add file -->
+    <div style="width:100%;max-width:380px;margin-bottom:12px;">
+      <input type="file" id="vf-file-input" style="display:none"
+        onchange="addVaultFile(this)">
+      <button class="btn btn-ghost" onclick="document.getElementById('vf-file-input').click()">
+        + Add file to vault
+      </button>
+    </div>
+
     <div id="vf-file-list" class="file-list"></div>
 
     <div id="vf-pad-overlay" class="pad-overlay">
@@ -1162,26 +1171,18 @@
       Receive a<br><em>credential.</em>
     </h1>
     <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
-      Paste an offer link from a community issuer,
-      or the full offer JSON. The issuer will sign
-      and return your credential instantly.
+      Paste an invite link from a community.<br>
+      Your credential will be issued instantly.
     </p>
 
     <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
 
       <div class="field">
-        <label>Offer URL or JSON</label>
-        <!--
-          Accepts two formats:
-          1. A URL: https://mdusl.sovereign-passport.id/offer
-             → wallet fetches the offer from the issuer
-          2. Raw JSON: { "issuer": "did:web:...", "nonce": "...", ... }
-             → wallet uses it directly (for offline / QR encoded offers)
-        -->
+        <label>Paste invite link</label>
         <textarea
           id="input-offer-paste"
-          placeholder="https://mdusl.sovereign-passport.id/offer&#10;&#10;— or paste the offer JSON directly —"
-          style="min-height:120px;"
+          placeholder="https://mdusl.sovereign-passport.id/offer/..."
+          style="min-height:100px;"
           oninput="validateOfferInput()"
         ></textarea>
       </div>
@@ -1196,6 +1197,12 @@
       </button>
 
       <div class="divider">or</div>
+
+      <button class="btn btn-ghost" onclick="showToast('QR scanner coming soon')">
+        📷 Scan QR code
+      </button>
+
+      <div class="divider"></div>
 
       <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
 
@@ -1297,17 +1304,17 @@
       -->
       <div id="nodes-list"></div>
 
-      <!-- Empty state — shown when no memberships exist -->
+      <!-- Empty state — shown when no clusters exist -->
       <div id="nodes-empty" style="display:none;text-align:center;padding:40px 0;">
         <p style="font-size:32px;margin-bottom:12px;">🌱</p>
         <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
-          You are not a member of any cluster yet.<br>
-          Receive a credential from a community issuer<br>
-          to join your first cluster.
+          You haven't created any clusters yet.<br>
+          Clusters are free forever — start one<br>
+          and invite your first grape.
         </p>
-        <button class="btn btn-primary" onclick="openReceiveCredential()"
+        <button class="btn btn-primary" onclick="showToast('Cluster creation coming in next build')"
           style="margin-top:20px;">
-          Receive a credential →
+          Create a Cluster →
         </button>
       </div>
     </div>
@@ -1810,7 +1817,16 @@ function goTo(screenId) {
 
 function goBack() {
   if (_prevScreen) goTo(_prevScreen)
+  else goTo('screen-home')
 }
+
+// Intercept browser back button — stay in app, never go blank
+window.addEventListener('popstate', (e) => {
+  e.preventDefault()
+  goBack()
+  history.pushState(null, '', location.href)
+})
+history.pushState(null, '', location.href)
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2076,6 +2092,39 @@ let _vfTab = 'private'
 function openVaultFiles() {
   goTo('screen-vault-files')
   renderVFList()
+}
+
+async function addVaultFile(input) {
+  const file = input.files[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const content = e.target.result
+    const vault   = appState.vault
+    if (!vault.files) vault.files = []
+
+    vault.files.push({
+      name:       file.name,
+      path:       file.name,
+      visibility: 'private',
+      date:       new Date().toLocaleDateString('en-CA'),
+      size:       `${Math.round(file.size / 1024 * 10) / 10}kb`,
+      content,
+    })
+
+    // Save vault
+    try {
+      await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      showToast(`${file.name} added to vault`)
+      populateHome()
+      renderVFList()
+    } catch {
+      showToast('Failed to save file to vault')
+    }
+  }
+  reader.readAsText(file)
+  input.value = '' // reset input
 }
 
 function switchVaultTab(tab) {
@@ -2718,15 +2767,20 @@ function validateOfferInput() {
  * On failure → shows inline error, stays on screen-receive.
  */
 async function loadOfferFromInput() {
-  const input  = document.getElementById('input-offer-paste').value.trim()
+  let input    = document.getElementById('input-offer-paste').value.trim()
   const errEl  = document.getElementById('receive-error')
   const errTxt = document.getElementById('receive-error-text')
   const btn    = document.getElementById('btn-load-offer')
 
-  // Reset error state
   errEl.style.display = 'none'
   btn.textContent     = 'Loading...'
   btn.disabled        = true
+
+  // If a full passport URL was pasted, extract the #offer= fragment
+  if (input.includes('#offer=')) {
+    const hashPart = input.split('#offer=')[1]
+    input = decodeURIComponent(hashPart.split('&')[0])
+  }
 
   try {
     let offer
