@@ -679,6 +679,7 @@
       <div class="avatar" id="home-avatar">—</div>
     </div>
 
+    <!-- ── IDENTITY ─────────────────────────────────────────── -->
     <p class="section-label fade-up fade-up-1">Identity</p>
 
     <div class="menu-item fade-up fade-up-1" onclick="showDID()">
@@ -690,13 +691,14 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label fade-up fade-up-2">Community</p>
+    <!-- ── COMMUNITIES I OWN ────────────────────────────────── -->
+    <p class="section-label fade-up fade-up-2">Communities I Own</p>
 
-    <div class="menu-item fade-up fade-up-2" onclick="showToast('Coming in next build — Nodes layer')">
-      <div class="menu-icon">🌿</div>
+    <div class="menu-item fade-up fade-up-2" onclick="showToast('Cluster creation coming in next build')">
+      <div class="menu-icon">🌱</div>
       <div class="menu-text">
-        <strong>My Nodes</strong>
-        <small>Communities & memberships</small>
+        <strong>My Clusters</strong>
+        <small id="own-cluster-count">0 clusters — free forever</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -705,64 +707,249 @@
       <div class="menu-icon">📷</div>
       <div class="menu-text">
         <strong>Scan Invite</strong>
-        <small>Join a community</small>
+        <small>Join a community via QR</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label fade-up fade-up-3">Vault</p>
+    <!-- ── COMMUNITIES I'M PART OF ──────────────────────────── -->
+    <p class="section-label fade-up fade-up-3">Communities I'm Part Of</p>
 
-    <div class="menu-item fade-up fade-up-3" onclick="showToast('Credentials viewer coming soon')">
+    <div id="credentials-list" class="fade-up fade-up-3">
+      <!-- populated by populateHome() -->
+    </div>
+
+    <div class="menu-item fade-up fade-up-3" id="no-credentials-msg" style="display:none;">
       <div class="menu-icon">🎫</div>
       <div class="menu-text">
-        <strong>Credentials</strong>
-        <small id="cred-count">0 credentials</small>
+        <strong>No memberships yet</strong>
+        <small>Accept an invite to join a community</small>
       </div>
-      <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-3" onclick="showToast('Keychain coming soon')">
-      <div class="menu-icon">🔐</div>
+    <!-- ── VAULT FILES ───────────────────────────────────────── -->
+    <p class="section-label fade-up fade-up-3">Vault Files</p>
+
+    <div class="menu-item fade-up fade-up-3" onclick="goTo('screen-vault-files')">
+      <div class="menu-icon">🗄</div>
       <div class="menu-text">
-        <strong>Keychain</strong>
-        <small>Passwords & API keys</small>
+        <strong>Files</strong>
+        <small id="vault-file-count">0 files</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-4" onclick="showToast('File links coming soon')">
-      <div class="menu-icon">📎</div>
-      <div class="menu-text">
-        <strong>File Links</strong>
-        <small>Shared access & tokens</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
+    <!-- ── SETTINGS ──────────────────────────────────────────── -->
+    <p class="section-label fade-up fade-up-4">Settings</p>
 
-    <p class="section-label fade-up fade-up-4">Security</p>
-
-    <div class="menu-item fade-up fade-up-4" onclick="downloadBackup()">
-      <div class="menu-icon">💾</div>
-      <div class="menu-text">
-        <strong>Backup Vault</strong>
-        <small>Download encrypted .passport file</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <div class="menu-item fade-up fade-up-5" onclick="confirmReset()" style="margin-bottom:40px;">
+    <div class="menu-item fade-up fade-up-4" onclick="goTo('screen-settings')">
       <div class="menu-icon">⚙️</div>
       <div class="menu-text">
         <strong>Settings</strong>
-        <small>Change password · Reset</small>
+        <small>Handle · Language · Backup · Restore</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
+
+    <!-- ── HEALTH ────────────────────────────────────────────── -->
+    <p class="section-label fade-up fade-up-4">Health</p>
+
+    <div class="menu-item fade-up fade-up-4" onclick="goTo('screen-health')" style="margin-bottom:40px;">
+      <div class="menu-icon">💚</div>
+      <div class="menu-text">
+        <strong>Passport Health</strong>
+        <small id="health-summary">checking…</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 6 — UNLOCK (returning user)
+       SCREEN — VAULT FILES
   ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-vault-files" style="justify-content:flex-start;padding-top:48px;">
+    <div style="width:100%;max-width:380px;display:flex;align-items:center;
+                gap:12px;margin-bottom:24px;">
+      <button onclick="goBack()" style="background:none;border:none;
+              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
+      <p class="logotype" style="margin:0;">Vault Files</p>
+    </div>
+
+    <!-- Tab bar -->
+    <div style="width:100%;max-width:380px;display:flex;margin-bottom:16px;">
+      <button id="tab-btn-private" onclick="switchVaultTab('private')"
+        style="flex:1;padding:8px;border:1px solid var(--gold);
+               border-radius:8px 0 0 8px;background:var(--gold-glow);
+               color:var(--gold);font-family:'DM Mono',monospace;
+               font-size:11px;cursor:pointer;">Private</button>
+      <button id="tab-btn-shared" onclick="switchVaultTab('shared')"
+        style="flex:1;padding:8px;border:1px solid var(--ink-faint);
+               border-left:none;border-radius:0 8px 8px 0;
+               background:var(--bg-card);color:var(--ink-dim);
+               font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">Shared</button>
+    </div>
+
+    <!-- File list -->
+    <div id="vault-file-list" style="width:100%;max-width:380px;"></div>
+
+    <!-- Pad viewer overlay -->
+    <div id="passport-pad-overlay" style="display:none;
+      position:fixed;inset:0;background:rgba(0,0,0,0.85);
+      z-index:999;display:none;flex-direction:column;">
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:16px 20px;border-bottom:1px solid var(--ink-faint);">
+        <span id="pad-filename" style="font-size:11px;color:var(--ink-dim);"></span>
+        <button onclick="closePad()"
+          style="background:none;border:none;color:var(--ink-dim);
+                 font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div id="pad-content" style="flex:1;overflow-y:auto;padding:20px;
+           font-size:12px;line-height:1.8;color:var(--ink);
+           white-space:pre-wrap;word-break:break-word;"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — SETTINGS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-settings" style="justify-content:flex-start;padding-top:48px;">
+    <div style="width:100%;max-width:380px;display:flex;align-items:center;
+                gap:12px;margin-bottom:24px;">
+      <button onclick="goBack()" style="background:none;border:none;
+              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
+      <p class="logotype" style="margin:0;">Settings</p>
+    </div>
+
+    <p class="section-label">Identity</p>
+
+    <div class="menu-item" onclick="showToast('Handle change coming soon')">
+      <div class="menu-icon">✏️</div>
+      <div class="menu-text">
+        <strong>Change Handle</strong>
+        <small id="settings-handle">—</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <div class="menu-item" onclick="showToast('Language toggle coming soon — EN/FR')">
+      <div class="menu-icon">🌐</div>
+      <div class="menu-text">
+        <strong>Language</strong>
+        <small>English (EN/FR coming soon)</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <p class="section-label">Backup & Restore</p>
+
+    <div class="menu-item" onclick="downloadBackup()">
+      <div class="menu-icon">💾</div>
+      <div class="menu-text">
+        <strong>Download Backup</strong>
+        <small>Save encrypted .passport file</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <div class="menu-item" onclick="goTo('screen-restore')">
+      <div class="menu-icon">↩</div>
+      <div class="menu-text">
+        <strong>Restore from Backup</strong>
+        <small>Import a .passport file</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <p class="section-label" style="color:var(--red);">Danger Zone</p>
+
+    <div class="menu-item" onclick="confirmReset()"
+      style="border-color:rgba(192,57,43,0.3);margin-bottom:40px;">
+      <div class="menu-icon">🗑</div>
+      <div class="menu-text">
+        <strong style="color:var(--red);">Reset Passport</strong>
+        <small>Delete all local data — irreversible</small>
+      </div>
+      <span class="menu-arrow" style="color:var(--red);">›</span>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — HEALTH
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-health" style="justify-content:flex-start;padding-top:48px;">
+    <div style="width:100%;max-width:380px;display:flex;align-items:center;
+                gap:12px;margin-bottom:24px;">
+      <button onclick="goBack()" style="background:none;border:none;
+              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
+      <p class="logotype" style="margin:0;">Health</p>
+    </div>
+
+    <p class="section-label">Passport</p>
+
+    <div class="menu-item" style="cursor:default;">
+      <div class="menu-icon">🔑</div>
+      <div class="menu-text">
+        <strong>Vault</strong>
+        <small>Unlocked · AES-256-GCM encrypted</small>
+      </div>
+      <span class="badge badge-green">✓ OK</span>
+    </div>
+
+    <div class="menu-item" style="cursor:default;">
+      <div class="menu-icon">🆔</div>
+      <div class="menu-text">
+        <strong>DID</strong>
+        <small id="health-did">—</small>
+      </div>
+      <span class="badge badge-green">✓ Valid</span>
+    </div>
+
+    <div class="menu-item" style="cursor:default;">
+      <div class="menu-icon">🎫</div>
+      <div class="menu-text">
+        <strong>Credentials</strong>
+        <small id="health-cred-count">—</small>
+      </div>
+      <span class="badge badge-gold" id="health-cred-badge">—</span>
+    </div>
+
+    <div class="menu-item" style="cursor:default;">
+      <div class="menu-icon">🗄</div>
+      <div class="menu-text">
+        <strong>Vault Files</strong>
+        <small id="health-file-count">—</small>
+      </div>
+      <span class="badge badge-gold" id="health-file-badge">—</span>
+    </div>
+
+    <p class="section-label">Backup</p>
+
+    <div class="menu-item" onclick="downloadBackup()">
+      <div class="menu-icon">💾</div>
+      <div class="menu-text">
+        <strong>Last Backup</strong>
+        <small id="health-backup">No backup downloaded yet</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <p class="section-label">Device</p>
+
+    <div class="menu-item" style="cursor:default;margin-bottom:40px;">
+      <div class="menu-icon">📱</div>
+      <div class="menu-text">
+        <strong>Storage</strong>
+        <small id="health-storage">IndexedDB · local only</small>
+      </div>
+      <span class="badge badge-green">✓ Active</span>
+    </div>
+  </div>
+
+
+
   <div class="screen" id="screen-unlock">
     <div class="shield fade-up">
       <svg viewBox="0 0 56 56" fill="none">
@@ -1126,6 +1313,14 @@ function goTo(screenId) {
     el.style.animation = 'none'
     requestAnimationFrame(() => { el.style.animation = '' })
   })
+
+  // Screen-specific init
+  if (screenId === 'screen-vault-files') renderVaultFileList()
+  if (screenId === 'screen-health')      populateHome()
+  if (screenId === 'screen-settings') {
+    const sh = document.getElementById('settings-handle')
+    if (sh) sh.textContent = appState.vault?.identity?.handle ?? '—'
+  }
 }
 
 function goBack() {
@@ -1315,16 +1510,169 @@ async function tryUnlock() {
 function populateHome() {
   const v = appState.vault
   if (!v) return
-  const handle = v.identity.handle
 
+  const handle = v.identity.handle
   document.getElementById('home-handle').textContent = handle
   document.getElementById('home-avatar').textContent = handle.charAt(0).toUpperCase()
-  document.getElementById('cred-count').textContent  =
-    `${(v.credentials||[]).length} credential${(v.credentials||[]).length!==1?'s':''}`
+  document.getElementById('settings-handle') && (
+    document.getElementById('settings-handle').textContent = handle
+  )
 
   const did = v.identity.id
   document.getElementById('did-short').textContent =
     did.slice(0,16) + '…' + did.slice(-8)
+
+  // Communities I'm Part Of — credential list
+  const creds     = v.credentials ?? []
+  const credList  = document.getElementById('credentials-list')
+  const noCredMsg = document.getElementById('no-credentials-msg')
+
+  if (creds.length === 0) {
+    credList.innerHTML = ''
+    noCredMsg.style.display = 'flex'
+  } else {
+    noCredMsg.style.display = 'none'
+    credList.innerHTML = creds.map(c => {
+      const subject = c.credentialSubject ?? {}
+      const issuer  = c.issuer ?? '—'
+      const name    = subject.clusterName ?? subject.vineName ?? issuer.slice(0,20) + '…'
+      const status  = subject.status ?? 'member'
+      const date    = c.issuanceDate
+        ? new Date(c.issuanceDate).toLocaleDateString('en-CA')
+        : '—'
+      return `
+        <div class="menu-item" style="margin-bottom:8px;"
+          onclick="showToast('Present credential — coming soon')">
+          <div class="menu-icon">🎫</div>
+          <div class="menu-text">
+            <strong>${escHtml(name)}</strong>
+            <small>${escHtml(status)} · ${date}</small>
+          </div>
+          <span class="badge badge-gold">✓</span>
+        </div>`
+    }).join('')
+  }
+
+  // Vault files count
+  const files = v.files ?? []
+  document.getElementById('vault-file-count').textContent =
+    `${files.length} file${files.length !== 1 ? 's' : ''}`
+
+  // Own clusters count (stub)
+  const ownClusters = v.ownClusters ?? []
+  document.getElementById('own-cluster-count').textContent =
+    ownClusters.length > 0
+      ? `${ownClusters.length} cluster${ownClusters.length !== 1 ? 's' : ''} — free forever`
+      : '0 clusters — free forever'
+
+  // Health summary
+  const issues = []
+  if (creds.length === 0) issues.push('no memberships')
+  if (files.length === 0)  issues.push('no files')
+  document.getElementById('health-summary').textContent =
+    issues.length === 0 ? 'All good ✓' : issues.join(' · ')
+
+  // Health screen details
+  const hDid   = document.getElementById('health-did')
+  const hCred  = document.getElementById('health-cred-count')
+  const hCredB = document.getElementById('health-cred-badge')
+  const hFile  = document.getElementById('health-file-count')
+  const hFileB = document.getElementById('health-file-badge')
+  if (hDid)   hDid.textContent   = did.slice(0,20) + '…'
+  if (hCred)  hCred.textContent  = `${creds.length} membership credential${creds.length !== 1 ? 's' : ''}`
+  if (hCredB) hCredB.textContent = creds.length > 0 ? `${creds.length}` : '0'
+  if (hFile)  hFile.textContent  = `${files.length} file${files.length !== 1 ? 's' : ''} in vault`
+  if (hFileB) hFileB.textContent = `${files.length}`
+}
+
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VAULT FILES
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _vaultTab = 'private'
+
+function switchVaultTab(tab) {
+  _vaultTab = tab
+  const btnPrivate = document.getElementById('tab-btn-private')
+  const btnShared  = document.getElementById('tab-btn-shared')
+  if (tab === 'private') {
+    btnPrivate.style.background   = 'var(--gold-glow)'
+    btnPrivate.style.color        = 'var(--gold)'
+    btnPrivate.style.borderColor  = 'var(--gold)'
+    btnShared.style.background    = 'var(--bg-card)'
+    btnShared.style.color         = 'var(--ink-dim)'
+    btnShared.style.borderColor   = 'var(--ink-faint)'
+  } else {
+    btnShared.style.background    = 'var(--gold-glow)'
+    btnShared.style.color         = 'var(--gold)'
+    btnShared.style.borderColor   = 'var(--gold)'
+    btnPrivate.style.background   = 'var(--bg-card)'
+    btnPrivate.style.color        = 'var(--ink-dim)'
+    btnPrivate.style.borderColor  = 'var(--ink-faint)'
+  }
+  renderVaultFileList()
+}
+
+function renderVaultFileList() {
+  const v     = appState.vault
+  const el    = document.getElementById('vault-file-list')
+  if (!el) return
+
+  const all     = v?.files ?? []
+  const files   = all.filter(f => (f.visibility ?? 'private') === _vaultTab)
+
+  if (files.length === 0) {
+    el.innerHTML = `
+      <div class="menu-item" style="cursor:default;">
+        <div class="menu-icon">${_vaultTab === 'private' ? '🔒' : '🌐'}</div>
+        <div class="menu-text">
+          <strong>No ${_vaultTab} files yet</strong>
+          <small>${_vaultTab === 'private'
+            ? 'Files you store here are yours alone'
+            : 'Files you share with clusters appear here'}</small>
+        </div>
+      </div>`
+    return
+  }
+
+  el.innerHTML = files.map((f, i) => `
+    <div class="menu-item" style="margin-bottom:8px;"
+      onclick="openPassportPad(${i})">
+      <div class="menu-icon">📄</div>
+      <div class="menu-text">
+        <strong>${escHtml(f.name ?? f.path ?? 'untitled')}</strong>
+        <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>`
+  ).join('')
+}
+
+function openPassportPad(index) {
+  const all   = appState.vault?.files ?? []
+  const files = all.filter(f => (f.visibility ?? 'private') === _vaultTab)
+  const f     = files[index]
+  if (!f) return
+
+  const overlay  = document.getElementById('passport-pad-overlay')
+  const filename = document.getElementById('pad-filename')
+  const content  = document.getElementById('pad-content')
+
+  filename.textContent = f.name ?? f.path ?? 'file'
+  content.textContent  = f.content ?? '(empty)'
+  overlay.style.display = 'flex'
+}
+
+function closePad() {
+  const overlay = document.getElementById('passport-pad-overlay')
+  if (overlay) overlay.style.display = 'none'
 }
 
 function showDID() {
