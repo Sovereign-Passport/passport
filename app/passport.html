@@ -1820,13 +1820,11 @@ function goBack() {
   else goTo('screen-home')
 }
 
-// Intercept browser back button — stay in app, never go blank
-window.addEventListener('popstate', (e) => {
-  e.preventDefault()
+// Intercept browser back — always stay inside the app
+window.addEventListener('popstate', () => {
   goBack()
   history.pushState(null, '', location.href)
 })
-history.pushState(null, '', location.href)
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2529,15 +2527,21 @@ function openInvite() {
   btn.disabled             = true
   document.getElementById('invite-note').value = ''
 
-  // Populate cluster dropdown from approved memberships only
-  // Only approved members can invite — this is the governance rule
-  const approved = (vault?.memberships ?? []).filter(m => m.status === 'approved')
+  // Populate cluster dropdown from:
+  // 1. Clusters the grape owns (vault.ownClusters)
+  // 2. Approved memberships in other clusters
+  const ownClusters = (vault?.ownClusters ?? [])
+  const approved    = (vault?.memberships ?? []).filter(m => m.status === 'approved')
+  const allClusters = [
+    ...ownClusters.map(c => ({ node_id: c.id, node_name: c.name, own: true })),
+    ...approved.map(m => ({ node_id: m.node_id, node_name: m.node_name, own: false })),
+  ]
 
   select.innerHTML = '<option value="">— select a cluster —</option>'
-  approved.forEach(m => {
+  allClusters.forEach(c => {
     const opt = document.createElement('option')
-    opt.value       = JSON.stringify({ node_id: m.node_id, node_name: m.node_name })
-    opt.textContent = m.node_name ?? m.node_id
+    opt.value       = JSON.stringify({ node_id: c.node_id, node_name: c.node_name })
+    opt.textContent = (c.node_name ?? c.node_id) + (c.own ? ' ✦' : '')
     select.appendChild(opt)
   })
 
@@ -2550,10 +2554,10 @@ function openInvite() {
     result.style.display      = 'none'
   }
 
-  // If no approved memberships — explain why
-  if (approved.length === 0) {
+  // If no clusters available — explain and offer to create
+  if (allClusters.length === 0) {
     select.innerHTML =
-      '<option value="">No approved memberships — receive a credential first</option>'
+      '<option value="">No clusters yet — create one or receive a credential first</option>'
     btn.disabled = true
   }
 
@@ -3025,14 +3029,20 @@ function checkPendingOffer() {
     appState.pendingOfferUrl = null
     setTimeout(() => loadOffer(url), 500)
   } else if (appState.pendingOfferData) {
+    // pendingOfferData is a raw offer JSON string (not a URL)
+    // Only parse if it looks like JSON, not a URL or ref token
+    const data = appState.pendingOfferData
+    appState.pendingOfferData = null
     try {
-      const offer = JSON.parse(appState.pendingOfferData)
-      appState.pendingOfferData = null
+      const offer = JSON.parse(data)
       _pendingOffer = offer
       document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id
       document.getElementById('offer-issuer-did').textContent = offer.issuer
       setTimeout(() => goTo('screen-offer'), 500)
-    } catch { appState.pendingOfferData = null }
+    } catch {
+      // Not JSON — ignore silently (was a ref token or malformed data)
+      console.warn('[SPID] pendingOfferData was not valid JSON — ignored')
+    }
   }
 }
 
@@ -3052,6 +3062,8 @@ window.addEventListener('hashchange', () => {
 })
 
 boot()
+// After boot — push a history entry so browser back is interceptable
+history.pushState(null, '', location.href)
 </script>
 </body>
 </html>
