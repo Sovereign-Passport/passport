@@ -1799,10 +1799,10 @@ function goTo(screenId) {
   const next    = document.getElementById(screenId)
   if (!next || screenId === _currentScreen) return
 
-  current.classList.add('exit')
-  setTimeout(() => {
-    current.classList.remove('active','exit')
-  }, 300)
+  if (current) {
+    current.classList.add('exit')
+    setTimeout(() => { current.classList.remove('active','exit') }, 300)
+  }
 
   next.classList.add('active')
   _prevScreen    = _currentScreen
@@ -1813,6 +1813,14 @@ function goTo(screenId) {
     el.style.animation = 'none'
     requestAnimationFrame(() => { el.style.animation = '' })
   })
+
+  // Screen-specific init
+  if (screenId === 'screen-vault-files') renderVFList()
+  if (screenId === 'screen-health')      populateHome()
+  if (screenId === 'screen-settings') {
+    const sh = document.getElementById('settings-handle-display')
+    if (sh) sh.textContent = appState.vault?.identity?.handle ?? '—'
+  }
 }
 
 function goBack() {
@@ -1820,11 +1828,6 @@ function goBack() {
   else goTo('screen-home')
 }
 
-// Intercept browser back — always stay inside the app
-window.addEventListener('popstate', () => {
-  goBack()
-  history.pushState(null, '', location.href)
-})
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2111,18 +2114,19 @@ async function addVaultFile(input) {
       content,
     })
 
-    // Save vault
     try {
-      await saveVault(appState.vaultKey, vault, appState.stored.salt)
-      showToast(`${file.name} added to vault`)
+      const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      await persist(newPayload)
+      appState.stored = newPayload
+      showToast(`${file.name} saved to vault`)
       populateHome()
       renderVFList()
-    } catch {
-      showToast('Failed to save file to vault')
+    } catch (err) {
+      showToast('Failed to save: ' + err.message)
     }
   }
   reader.readAsText(file)
-  input.value = '' // reset input
+  input.value = ''
 }
 
 function switchVaultTab(tab) {
@@ -3062,8 +3066,6 @@ window.addEventListener('hashchange', () => {
 })
 
 boot()
-// After boot — push a history entry so browser back is interceptable
-history.pushState(null, '', location.href)
 </script>
 </body>
 </html>

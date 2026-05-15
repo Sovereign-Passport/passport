@@ -1,24 +1,25 @@
 {
-  "name": "Sovereign Passport",
-  "short_name": "Passport",
+  "name": "SPID - Sovereign Passport ID",
+  "short_name": "SPID",
   "description": "Your sovereign digital identity. No central server. Your keys, your data.",
-  "start_url": "/passport.html",
+  "start_url": "./passport.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#080b12",
-  "theme_color": "#080b12",
+  "theme_color": "#c9a84c",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "../spid-logo.jpg",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/jpeg",
+      "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "../spid-logo.jpg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/jpeg",
+      "purpose": "any"
     }
   ],
   "categories": ["productivity", "utilities"],
