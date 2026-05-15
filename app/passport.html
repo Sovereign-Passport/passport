@@ -679,7 +679,6 @@
       <div class="avatar" id="home-avatar">—</div>
     </div>
 
-    <!-- ── IDENTITY ─────────────────────────────────────────── -->
     <p class="section-label fade-up fade-up-1">Identity</p>
 
     <div class="menu-item fade-up fade-up-1" onclick="showDID()">
@@ -691,265 +690,102 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── COMMUNITIES I OWN ────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-2">Communities I Own</p>
+    <p class="section-label fade-up fade-up-2">Community</p>
 
-    <div class="menu-item fade-up fade-up-2" onclick="showToast('Cluster creation coming in next build')">
-      <div class="menu-icon">🌱</div>
+    <!-- My Nodes — shows cluster memberships from vault -->
+    <div class="menu-item fade-up fade-up-2" onclick="openNodes()">
+      <div class="menu-icon">🌿</div>
       <div class="menu-text">
         <strong>My Clusters</strong>
-        <small id="own-cluster-count">0 clusters — free forever</small>
+        <small id="nodes-count">0 memberships</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-2" onclick="showToast('Credential scanner coming soon')">
-      <div class="menu-icon">📷</div>
+    <!-- Invite Someone — generate a signed invite link for a grape -->
+    <div class="menu-item fade-up fade-up-2" onclick="openInvite()">
+      <div class="menu-icon">🍇</div>
       <div class="menu-text">
-        <strong>Scan Invite</strong>
-        <small>Join a community via QR</small>
+        <strong>Invite a Grape</strong>
+        <small>Share a signed invite link</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── COMMUNITIES I'M PART OF ──────────────────────────── -->
-    <p class="section-label fade-up fade-up-3">Communities I'm Part Of</p>
-
-    <div id="credentials-list" class="fade-up fade-up-3">
-      <!-- populated by populateHome() -->
-    </div>
-
-    <div class="menu-item fade-up fade-up-3" id="no-credentials-msg" style="display:none;">
-      <div class="menu-icon">🎫</div>
+    <!-- Receive Credential — opens the paste dialog screen -->
+    <div class="menu-item fade-up fade-up-2" onclick="openReceiveCredential()">
+      <div class="menu-icon">📨</div>
       <div class="menu-text">
-        <strong>No memberships yet</strong>
-        <small>Accept an invite to join a community</small>
-      </div>
-    </div>
-
-    <!-- ── VAULT FILES ───────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-3">Vault Files</p>
-
-    <div class="menu-item fade-up fade-up-3" onclick="goTo('screen-vault-files')">
-      <div class="menu-icon">🗄</div>
-      <div class="menu-text">
-        <strong>Files</strong>
-        <small id="vault-file-count">0 files</small>
+        <strong>Receive Credential</strong>
+        <small>Paste an offer link or JSON</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── SETTINGS ──────────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-4">Settings</p>
-
-    <div class="menu-item fade-up fade-up-4" onclick="goTo('screen-settings')">
-      <div class="menu-icon">⚙️</div>
+    <!-- Officialize — explains the vine path, $100 upgrade -->
+    <div class="menu-item fade-up fade-up-2" onclick="openOfficialize()">
+      <div class="menu-icon">🏛️</div>
       <div class="menu-text">
-        <strong>Settings</strong>
-        <small>Handle · Language · Backup · Restore</small>
+        <strong>Officialize my Cluster</strong>
+        <small>Join the network · Become a Vine</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── HEALTH ────────────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-4">Health</p>
+    <p class="section-label fade-up fade-up-3">Vault</p>
 
-    <div class="menu-item fade-up fade-up-4" onclick="goTo('screen-health')" style="margin-bottom:40px;">
-      <div class="menu-icon">💚</div>
-      <div class="menu-text">
-        <strong>Passport Health</strong>
-        <small id="health-summary">checking…</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════
-       SCREEN — VAULT FILES
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-vault-files" style="justify-content:flex-start;padding-top:48px;">
-    <div style="width:100%;max-width:380px;display:flex;align-items:center;
-                gap:12px;margin-bottom:24px;">
-      <button onclick="goBack()" style="background:none;border:none;
-              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
-      <p class="logotype" style="margin:0;">Vault Files</p>
-    </div>
-
-    <!-- Tab bar -->
-    <div style="width:100%;max-width:380px;display:flex;margin-bottom:16px;">
-      <button id="tab-btn-private" onclick="switchVaultTab('private')"
-        style="flex:1;padding:8px;border:1px solid var(--gold);
-               border-radius:8px 0 0 8px;background:var(--gold-glow);
-               color:var(--gold);font-family:'DM Mono',monospace;
-               font-size:11px;cursor:pointer;">Private</button>
-      <button id="tab-btn-shared" onclick="switchVaultTab('shared')"
-        style="flex:1;padding:8px;border:1px solid var(--ink-faint);
-               border-left:none;border-radius:0 8px 8px 0;
-               background:var(--bg-card);color:var(--ink-dim);
-               font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">Shared</button>
-    </div>
-
-    <!-- File list -->
-    <div id="vault-file-list" style="width:100%;max-width:380px;"></div>
-
-    <!-- Pad viewer overlay -->
-    <div id="passport-pad-overlay" style="display:none;
-      position:fixed;inset:0;background:rgba(0,0,0,0.85);
-      z-index:999;display:none;flex-direction:column;">
-      <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:16px 20px;border-bottom:1px solid var(--ink-faint);">
-        <span id="pad-filename" style="font-size:11px;color:var(--ink-dim);"></span>
-        <button onclick="closePad()"
-          style="background:none;border:none;color:var(--ink-dim);
-                 font-size:20px;cursor:pointer;">✕</button>
-      </div>
-      <div id="pad-content" style="flex:1;overflow-y:auto;padding:20px;
-           font-size:12px;line-height:1.8;color:var(--ink);
-           white-space:pre-wrap;word-break:break-word;"></div>
-    </div>
-  </div>
-
-
-  <!-- ══════════════════════════════════════════════════════════════
-       SCREEN — SETTINGS
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-settings" style="justify-content:flex-start;padding-top:48px;">
-    <div style="width:100%;max-width:380px;display:flex;align-items:center;
-                gap:12px;margin-bottom:24px;">
-      <button onclick="goBack()" style="background:none;border:none;
-              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
-      <p class="logotype" style="margin:0;">Settings</p>
-    </div>
-
-    <p class="section-label">Identity</p>
-
-    <div class="menu-item" onclick="showToast('Handle change coming soon')">
-      <div class="menu-icon">✏️</div>
-      <div class="menu-text">
-        <strong>Change Handle</strong>
-        <small id="settings-handle">—</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <div class="menu-item" onclick="showToast('Language toggle coming soon — EN/FR')">
-      <div class="menu-icon">🌐</div>
-      <div class="menu-text">
-        <strong>Language</strong>
-        <small>English (EN/FR coming soon)</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <p class="section-label">Backup & Restore</p>
-
-    <div class="menu-item" onclick="downloadBackup()">
-      <div class="menu-icon">💾</div>
-      <div class="menu-text">
-        <strong>Download Backup</strong>
-        <small>Save encrypted .passport file</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <div class="menu-item" onclick="goTo('screen-restore')">
-      <div class="menu-icon">↩</div>
-      <div class="menu-text">
-        <strong>Restore from Backup</strong>
-        <small>Import a .passport file</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <p class="section-label" style="color:var(--red);">Danger Zone</p>
-
-    <div class="menu-item" onclick="confirmReset()"
-      style="border-color:rgba(192,57,43,0.3);margin-bottom:40px;">
-      <div class="menu-icon">🗑</div>
-      <div class="menu-text">
-        <strong style="color:var(--red);">Reset Passport</strong>
-        <small>Delete all local data — irreversible</small>
-      </div>
-      <span class="menu-arrow" style="color:var(--red);">›</span>
-    </div>
-  </div>
-
-
-  <!-- ══════════════════════════════════════════════════════════════
-       SCREEN — HEALTH
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-health" style="justify-content:flex-start;padding-top:48px;">
-    <div style="width:100%;max-width:380px;display:flex;align-items:center;
-                gap:12px;margin-bottom:24px;">
-      <button onclick="goBack()" style="background:none;border:none;
-              color:var(--ink-dim);font-size:20px;cursor:pointer;padding:0;">‹</button>
-      <p class="logotype" style="margin:0;">Health</p>
-    </div>
-
-    <p class="section-label">Passport</p>
-
-    <div class="menu-item" style="cursor:default;">
-      <div class="menu-icon">🔑</div>
-      <div class="menu-text">
-        <strong>Vault</strong>
-        <small>Unlocked · AES-256-GCM encrypted</small>
-      </div>
-      <span class="badge badge-green">✓ OK</span>
-    </div>
-
-    <div class="menu-item" style="cursor:default;">
-      <div class="menu-icon">🆔</div>
-      <div class="menu-text">
-        <strong>DID</strong>
-        <small id="health-did">—</small>
-      </div>
-      <span class="badge badge-green">✓ Valid</span>
-    </div>
-
-    <div class="menu-item" style="cursor:default;">
+    <!-- Credentials — shows stored SD-JWTs from vault -->
+    <div class="menu-item fade-up fade-up-3" onclick="openCredentials()">
       <div class="menu-icon">🎫</div>
       <div class="menu-text">
         <strong>Credentials</strong>
-        <small id="health-cred-count">—</small>
-      </div>
-      <span class="badge badge-gold" id="health-cred-badge">—</span>
-    </div>
-
-    <div class="menu-item" style="cursor:default;">
-      <div class="menu-icon">🗄</div>
-      <div class="menu-text">
-        <strong>Vault Files</strong>
-        <small id="health-file-count">—</small>
-      </div>
-      <span class="badge badge-gold" id="health-file-badge">—</span>
-    </div>
-
-    <p class="section-label">Backup</p>
-
-    <div class="menu-item" onclick="downloadBackup()">
-      <div class="menu-icon">💾</div>
-      <div class="menu-text">
-        <strong>Last Backup</strong>
-        <small id="health-backup">No backup downloaded yet</small>
+        <small id="cred-count">0 credentials</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label">Device</p>
-
-    <div class="menu-item" style="cursor:default;margin-bottom:40px;">
-      <div class="menu-icon">📱</div>
+    <div class="menu-item fade-up fade-up-3" onclick="showToast('Keychain coming soon')">
+      <div class="menu-icon">🔐</div>
       <div class="menu-text">
-        <strong>Storage</strong>
-        <small id="health-storage">IndexedDB · local only</small>
+        <strong>Keychain</strong>
+        <small>Passwords & API keys</small>
       </div>
-      <span class="badge badge-green">✓ Active</span>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <div class="menu-item fade-up fade-up-4" onclick="showToast('File links coming soon')">
+      <div class="menu-icon">📎</div>
+      <div class="menu-text">
+        <strong>File Links</strong>
+        <small>Shared access & tokens</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <p class="section-label fade-up fade-up-4">Security</p>
+
+    <div class="menu-item fade-up fade-up-4" onclick="downloadBackup()">
+      <div class="menu-icon">💾</div>
+      <div class="menu-text">
+        <strong>Backup Vault</strong>
+        <small>Download encrypted .passport file</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <div class="menu-item fade-up fade-up-5" onclick="confirmReset()" style="margin-bottom:40px;">
+      <div class="menu-icon">⚙️</div>
+      <div class="menu-text">
+        <strong>Settings</strong>
+        <small>Change password · Reset</small>
+      </div>
+      <span class="menu-arrow">›</span>
     </div>
   </div>
 
-
-
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN 6 — UNLOCK (returning user)
+  ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-unlock">
     <div class="shield fade-up">
       <svg viewBox="0 0 56 56" fill="none">
@@ -1031,6 +867,21 @@
         Restore →
       </button>
 
+      <!--
+        Debug info panel — shows restore error details.
+        Visible only when an error occurs.
+        Helps diagnose backup/password issues across versions.
+      -->
+      <div id="restore-debug" style="display:none;margin-top:12px;
+        background:var(--bg-lift);border:1px solid var(--ink-faint);
+        border-radius:8px;padding:12px;font-size:10px;
+        color:var(--ink-dim);word-break:break-all;line-height:1.6;">
+        <strong style="color:var(--gold);display:block;margin-bottom:4px;">
+          Debug info
+        </strong>
+        <span id="restore-debug-text"></span>
+      </div>
+
       <div class="divider">or</div>
 
       <button class="btn btn-ghost" onclick="goBack()">← Go back</button>
@@ -1038,7 +889,61 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 8 — CREDENTIAL OFFER
+       SCREEN 8 — RECEIVE CREDENTIAL
+       The user pastes an offer URL or raw offer JSON here.
+       This is the entry point for joining a community —
+       reachable from the home screen "Receive Credential" button.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-receive">
+
+    <h1 class="display fade-up" style="margin-bottom:8px;">
+      Receive a<br><em>credential.</em>
+    </h1>
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
+      Paste an offer link from a community issuer,
+      or the full offer JSON. The issuer will sign
+      and return your credential instantly.
+    </p>
+
+    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
+
+      <div class="field">
+        <label>Offer URL or JSON</label>
+        <!--
+          Accepts two formats:
+          1. A URL: https://mdusl.sovereign-passport.id/offer
+             → wallet fetches the offer from the issuer
+          2. Raw JSON: { "issuer": "did:web:...", "nonce": "...", ... }
+             → wallet uses it directly (for offline / QR encoded offers)
+        -->
+        <textarea
+          id="input-offer-paste"
+          placeholder="https://mdusl.sovereign-passport.id/offer&#10;&#10;— or paste the offer JSON directly —"
+          style="min-height:120px;"
+          oninput="validateOfferInput()"
+        ></textarea>
+      </div>
+
+      <div class="notice" id="receive-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" id="receive-error-text" style="color:var(--red);"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-load-offer" disabled onclick="loadOfferFromInput()">
+        Load offer →
+      </button>
+
+      <div class="divider">or</div>
+
+      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN 9 — CREDENTIAL OFFER
+       Populated by loadOfferFromInput() or the URL hash flow.
+       Shows community name, issuer DID, and Accept / Decline.
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-offer">
     <div class="shield fade-up">
@@ -1103,6 +1008,332 @@
       <button class="btn btn-primary fade-up fade-up-4" onclick="goTo('screen-home')">
         Open my Passport →
       </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — MY CLUSTERS
+       Shows all cluster memberships stored in the vault.
+       Each entry shows the community name, issuer DID,
+       member status, and when the credential was issued.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-nodes" style="justify-content:flex-start;padding-top:48px;">
+
+    <div style="width:100%;max-width:380px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button onclick="goTo('screen-home')"
+          style="background:none;border:none;color:var(--ink-dim);
+                 font-size:20px;cursor:pointer;padding:0;">←</button>
+        <h2 style="font-family:'DM Serif Display',serif;font-size:24px;">
+          My Clusters
+        </h2>
+      </div>
+
+      <!--
+        Cluster list — populated by openNodes() from vault.memberships
+        Each card shows: community name, issuer, status, issued date
+      -->
+      <div id="nodes-list"></div>
+
+      <!-- Empty state — shown when no memberships exist -->
+      <div id="nodes-empty" style="display:none;text-align:center;padding:40px 0;">
+        <p style="font-size:32px;margin-bottom:12px;">🌱</p>
+        <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
+          You are not a member of any cluster yet.<br>
+          Receive a credential from a community issuer<br>
+          to join your first cluster.
+        </p>
+        <button class="btn btn-primary" onclick="openReceiveCredential()"
+          style="margin-top:20px;">
+          Receive a credential →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — MY CREDENTIALS
+       Shows all SD-JWT credentials stored in the vault.
+       Tap a credential to see details and copy the SD-JWT
+       for presenting to a verifier.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-credentials" style="justify-content:flex-start;padding-top:48px;">
+
+    <div style="width:100%;max-width:380px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button onclick="goTo('screen-home')"
+          style="background:none;border:none;color:var(--ink-dim);
+                 font-size:20px;cursor:pointer;padding:0;">←</button>
+        <h2 style="font-family:'DM Serif Display',serif;font-size:24px;">
+          Credentials
+        </h2>
+      </div>
+
+      <!--
+        Credential list — populated by openCredentials() from vault.credentials
+        Each card shows: type, community, issuer DID, expiry
+        Tap → expands to show SD-JWT + copy button
+      -->
+      <div id="credentials-list"></div>
+
+      <!-- Empty state -->
+      <div id="credentials-empty" style="display:none;text-align:center;padding:40px 0;">
+        <p style="font-size:32px;margin-bottom:12px;">🎫</p>
+        <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
+          No credentials in your vault yet.<br>
+          Join a community to receive your first credential.
+        </p>
+        <button class="btn btn-primary" onclick="openReceiveCredential()"
+          style="margin-top:20px;">
+          Receive a credential →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — INVITE A GRAPE
+       Generates a signed invite link for someone to join
+       one of your clusters. The link is pre-filled with
+       the offer URL so the new grape just taps and accepts.
+       The referral is signed with your DID key.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-invite">
+
+    <h1 class="display fade-up" style="margin-bottom:8px;">
+      Invite a<br><em>Grape.</em>
+    </h1>
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
+      Share a signed invite link. The new grape opens it,
+      creates their Passport, and receives a credential.
+      Your referral is recorded.
+    </p>
+
+    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
+
+      <!--
+        Step 1 — choose which cluster to invite to.
+        Populated from vault.memberships where status === approved.
+        Only approved members can invite.
+      -->
+      <div class="field">
+        <label>Invite to which cluster?</label>
+        <select id="invite-cluster-select"
+          style="width:100%;background:var(--bg-lift);border:1px solid var(--ink-faint);
+                 border-radius:8px;padding:12px 14px;color:var(--ink);
+                 font-family:'DM Mono',monospace;font-size:14px;outline:none;">
+          <option value="">— select a cluster —</option>
+        </select>
+      </div>
+
+      <!--
+        Step 2 — choose what to disclose in the referral.
+        These fields appear in the signed referral payload.
+        The invitee sees them when they open the link.
+      -->
+      <div class="field" id="invite-disclosures" style="display:none;">
+        <label>Share with the invitee</label>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;
+                        font-size:12px;color:var(--ink);text-transform:none;
+                        letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" id="disclose-handle" checked>
+            Your handle
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;
+                        font-size:12px;color:var(--ink);text-transform:none;
+                        letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" id="disclose-since">
+            Member since date
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;
+                        font-size:12px;color:var(--ink);text-transform:none;
+                        letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" id="disclose-role">
+            Your role in the cluster
+          </label>
+        </div>
+      </div>
+
+      <!--
+        Optional personal note to the invitee
+      -->
+      <div class="field" id="invite-note-field" style="display:none;">
+        <label>Personal note (optional)</label>
+        <textarea id="invite-note"
+          placeholder="Welcome to the community!"
+          style="min-height:60px;"></textarea>
+      </div>
+
+      <!--
+        The generated invite link — shown after Generate is tapped.
+        Contains the offer URL + signed referral encoded in the hash.
+      -->
+      <div id="invite-result" style="display:none;margin-bottom:16px;">
+        <div class="did-display">
+          <span class="did-label">Invite Link</span>
+          <span class="did-value" id="invite-link-display"
+            style="font-size:10px;word-break:break-all;"></span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="copyInviteLink()"
+            style="flex:1;">
+            Copy link
+          </button>
+          <button class="btn btn-ghost" onclick="shareInviteLink()"
+            style="flex:1;" id="btn-share-invite">
+            Share
+          </button>
+        </div>
+      </div>
+
+      <div id="invite-error" class="notice"
+        style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" id="invite-error-text" style="color:var(--red);"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-generate-invite"
+        onclick="generateInvite()" style="margin-bottom:10px;" disabled>
+        Generate invite link →
+      </button>
+      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — OFFICIALIZE MY CLUSTER
+       Explains the path from a free cluster to a Vine.
+       Requirements: 3 grapes in admin cluster.
+       Cost: $100 CAD one-time.
+       Reward: SPID.app, network membership, subdomain.
+       No payment processing here yet — links to
+       sovereign-passport.com when ready.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-officialize">
+
+    <div class="shield fade-up">
+      <svg viewBox="0 0 56 56" fill="none">
+        <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
+          fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
+        <path d="M20 20L28 14L36 20V30C36 34 32 37 28 38C24 37 20 34 20 30V20Z"
+          stroke="#c9a84c" stroke-width="1.5" fill="none"/>
+        <circle cx="28" cy="27" r="3" fill="#c9a84c"/>
+      </svg>
+    </div>
+
+    <p class="logotype fade-up fade-up-1">Sovereign Passport</p>
+    <h1 class="display fade-up fade-up-2" style="margin-bottom:8px;">
+      Become a<br><em>Vine.</em>
+    </h1>
+    <p class="body-text fade-up fade-up-2" style="margin-bottom:24px;">
+      Your cluster is thriving. Ready to join the network,
+      federate with other communities, and carry your
+      piece of the distributed backbone?
+    </p>
+
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
+
+      <!-- What you get -->
+      <div class="card" style="margin-bottom:16px;">
+        <p class="card-title">What you get</p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🌿</span>
+            <div>
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
+                Network membership
+              </strong>
+              <span style="font-size:11px;color:var(--ink-dim);">
+                Your cluster joins the sovereign network.
+                Federate with other vines.
+              </span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🌐</span>
+            <div>
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
+                Your domain
+              </strong>
+              <span style="font-size:11px;color:var(--ink-dim);">
+                yourcluster.sovereign-passport.org
+                — or point your own domain.
+              </span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">💾</span>
+            <div>
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
+                SPID.app — the vine engine
+              </strong>
+              <span style="font-size:11px;color:var(--ink-dim);">
+                Desktop app. Runs on any PC.
+                Manages your grapes, clusters, federation.
+                Peer backup mesh. AI agent.
+              </span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🔒</span>
+            <div>
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
+                Distributed backup
+              </strong>
+              <span style="font-size:11px;color:var(--ink-dim);">
+                Your community's data is held in
+                encrypted fragments across the network.
+                No single point of failure.
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Requirements -->
+      <div class="card" style="margin-bottom:16px;">
+        <p class="card-title">Requirements</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+
+          <div class="claim-row">
+            <span class="claim-key">Admin cluster</span>
+            <span class="claim-val">3 grapes minimum</span>
+          </div>
+          <div class="claim-row">
+            <span class="claim-key">Your cluster</span>
+            <span class="claim-val" id="officialize-cluster-name">—</span>
+          </div>
+          <div class="claim-row">
+            <span class="claim-key">Your status</span>
+            <span class="claim-val" id="officialize-status">—</span>
+          </div>
+          <div class="claim-row" style="border:none;">
+            <span class="claim-key">One-time fee</span>
+            <span class="claim-val" style="color:var(--gold);">$100 CAD</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Coming soon notice -->
+      <div class="notice" style="margin-bottom:20px;">
+        <span class="notice-icon">ℹ️</span>
+        <span class="notice-text">
+          Officialisation is coming soon at
+          <strong style="color:var(--ink);">sovereign-passport.com</strong>.
+          Your cluster is already growing. We'll be ready when you are.
+        </span>
+      </div>
+
+      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
+
     </div>
   </div>
 
@@ -1313,14 +1544,6 @@ function goTo(screenId) {
     el.style.animation = 'none'
     requestAnimationFrame(() => { el.style.animation = '' })
   })
-
-  // Screen-specific init
-  if (screenId === 'screen-vault-files') renderVaultFileList()
-  if (screenId === 'screen-health')      populateHome()
-  if (screenId === 'screen-settings') {
-    const sh = document.getElementById('settings-handle')
-    if (sh) sh.textContent = appState.vault?.identity?.handle ?? '—'
-  }
 }
 
 function goBack() {
@@ -1483,17 +1706,36 @@ async function tryUnlock() {
   err.style.display = 'none'
 
   try {
-    const {vault,vaultKey} = await unlockVault(
+    // Safety check — appState.stored must be populated from IndexedDB
+    // If it's null, reload from IndexedDB before attempting unlock
+    if (!appState.stored) {
+      appState.stored = await loadStored()
+    }
+
+    if (!appState.stored) {
+      // No vault found at all — send to welcome screen
+      console.warn('[Unlock] No vault found in IndexedDB')
+      goTo('screen-welcome')
+      return
+    }
+
+    const {vault, vaultKey} = await unlockVault(
       password,
       appState.stored.salt,
       appState.stored.iv,
       appState.stored.ciphertext
     )
+
     appState.vault    = vault
     appState.vaultKey = vaultKey
     populateHome()
+    checkPendingOffer()
     goTo('screen-home')
+
   } catch (e) {
+    // Log real error to console
+    console.error('[Unlock] Failed:', e.code ?? e.message, e)
+
     err.style.display = 'flex'
     btn.textContent   = 'Unlock →'
     btn.disabled      = false
@@ -1510,169 +1752,24 @@ async function tryUnlock() {
 function populateHome() {
   const v = appState.vault
   if (!v) return
-
   const handle = v.identity.handle
+
   document.getElementById('home-handle').textContent = handle
   document.getElementById('home-avatar').textContent = handle.charAt(0).toUpperCase()
-  document.getElementById('settings-handle') && (
-    document.getElementById('settings-handle').textContent = handle
-  )
+
+  // Update credential count
+  const credCount = (v.credentials ?? []).length
+  document.getElementById('cred-count').textContent =
+    `${credCount} credential${credCount !== 1 ? 's' : ''}`
+
+  // Update nodes/cluster count
+  const nodeCount = (v.memberships ?? []).length
+  document.getElementById('nodes-count').textContent =
+    `${nodeCount} membership${nodeCount !== 1 ? 's' : ''}`
 
   const did = v.identity.id
   document.getElementById('did-short').textContent =
     did.slice(0,16) + '…' + did.slice(-8)
-
-  // Communities I'm Part Of — credential list
-  const creds     = v.credentials ?? []
-  const credList  = document.getElementById('credentials-list')
-  const noCredMsg = document.getElementById('no-credentials-msg')
-
-  if (creds.length === 0) {
-    credList.innerHTML = ''
-    noCredMsg.style.display = 'flex'
-  } else {
-    noCredMsg.style.display = 'none'
-    credList.innerHTML = creds.map(c => {
-      const subject = c.credentialSubject ?? {}
-      const issuer  = c.issuer ?? '—'
-      const name    = subject.clusterName ?? subject.vineName ?? issuer.slice(0,20) + '…'
-      const status  = subject.status ?? 'member'
-      const date    = c.issuanceDate
-        ? new Date(c.issuanceDate).toLocaleDateString('en-CA')
-        : '—'
-      return `
-        <div class="menu-item" style="margin-bottom:8px;"
-          onclick="showToast('Present credential — coming soon')">
-          <div class="menu-icon">🎫</div>
-          <div class="menu-text">
-            <strong>${escHtml(name)}</strong>
-            <small>${escHtml(status)} · ${date}</small>
-          </div>
-          <span class="badge badge-gold">✓</span>
-        </div>`
-    }).join('')
-  }
-
-  // Vault files count
-  const files = v.files ?? []
-  document.getElementById('vault-file-count').textContent =
-    `${files.length} file${files.length !== 1 ? 's' : ''}`
-
-  // Own clusters count (stub)
-  const ownClusters = v.ownClusters ?? []
-  document.getElementById('own-cluster-count').textContent =
-    ownClusters.length > 0
-      ? `${ownClusters.length} cluster${ownClusters.length !== 1 ? 's' : ''} — free forever`
-      : '0 clusters — free forever'
-
-  // Health summary
-  const issues = []
-  if (creds.length === 0) issues.push('no memberships')
-  if (files.length === 0)  issues.push('no files')
-  document.getElementById('health-summary').textContent =
-    issues.length === 0 ? 'All good ✓' : issues.join(' · ')
-
-  // Health screen details
-  const hDid   = document.getElementById('health-did')
-  const hCred  = document.getElementById('health-cred-count')
-  const hCredB = document.getElementById('health-cred-badge')
-  const hFile  = document.getElementById('health-file-count')
-  const hFileB = document.getElementById('health-file-badge')
-  if (hDid)   hDid.textContent   = did.slice(0,20) + '…'
-  if (hCred)  hCred.textContent  = `${creds.length} membership credential${creds.length !== 1 ? 's' : ''}`
-  if (hCredB) hCredB.textContent = creds.length > 0 ? `${creds.length}` : '0'
-  if (hFile)  hFile.textContent  = `${files.length} file${files.length !== 1 ? 's' : ''} in vault`
-  if (hFileB) hFileB.textContent = `${files.length}`
-}
-
-function escHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VAULT FILES
-// ─────────────────────────────────────────────────────────────────────────────
-
-let _vaultTab = 'private'
-
-function switchVaultTab(tab) {
-  _vaultTab = tab
-  const btnPrivate = document.getElementById('tab-btn-private')
-  const btnShared  = document.getElementById('tab-btn-shared')
-  if (tab === 'private') {
-    btnPrivate.style.background   = 'var(--gold-glow)'
-    btnPrivate.style.color        = 'var(--gold)'
-    btnPrivate.style.borderColor  = 'var(--gold)'
-    btnShared.style.background    = 'var(--bg-card)'
-    btnShared.style.color         = 'var(--ink-dim)'
-    btnShared.style.borderColor   = 'var(--ink-faint)'
-  } else {
-    btnShared.style.background    = 'var(--gold-glow)'
-    btnShared.style.color         = 'var(--gold)'
-    btnShared.style.borderColor   = 'var(--gold)'
-    btnPrivate.style.background   = 'var(--bg-card)'
-    btnPrivate.style.color        = 'var(--ink-dim)'
-    btnPrivate.style.borderColor  = 'var(--ink-faint)'
-  }
-  renderVaultFileList()
-}
-
-function renderVaultFileList() {
-  const v     = appState.vault
-  const el    = document.getElementById('vault-file-list')
-  if (!el) return
-
-  const all     = v?.files ?? []
-  const files   = all.filter(f => (f.visibility ?? 'private') === _vaultTab)
-
-  if (files.length === 0) {
-    el.innerHTML = `
-      <div class="menu-item" style="cursor:default;">
-        <div class="menu-icon">${_vaultTab === 'private' ? '🔒' : '🌐'}</div>
-        <div class="menu-text">
-          <strong>No ${_vaultTab} files yet</strong>
-          <small>${_vaultTab === 'private'
-            ? 'Files you store here are yours alone'
-            : 'Files you share with clusters appear here'}</small>
-        </div>
-      </div>`
-    return
-  }
-
-  el.innerHTML = files.map((f, i) => `
-    <div class="menu-item" style="margin-bottom:8px;"
-      onclick="openPassportPad(${i})">
-      <div class="menu-icon">📄</div>
-      <div class="menu-text">
-        <strong>${escHtml(f.name ?? f.path ?? 'untitled')}</strong>
-        <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>`
-  ).join('')
-}
-
-function openPassportPad(index) {
-  const all   = appState.vault?.files ?? []
-  const files = all.filter(f => (f.visibility ?? 'private') === _vaultTab)
-  const f     = files[index]
-  if (!f) return
-
-  const overlay  = document.getElementById('passport-pad-overlay')
-  const filename = document.getElementById('pad-filename')
-  const content  = document.getElementById('pad-content')
-
-  filename.textContent = f.name ?? f.path ?? 'file'
-  content.textContent  = f.content ?? '(empty)'
-  overlay.style.display = 'flex'
-}
-
-function closePad() {
-  const overlay = document.getElementById('passport-pad-overlay')
-  if (overlay) overlay.style.display = 'none'
 }
 
 function showDID() {
@@ -1726,22 +1823,53 @@ async function tryRestore() {
   err.style.display = 'none'
 
   try {
+    // Step 1 — parse the .passport file (catches malformed JSON)
     const payload = await importBackup(file)
-    const {vault,vaultKey} = await unlockVault(
+
+    // Step 2 — decrypt with password (catches wrong password)
+    const {vault, vaultKey} = await unlockVault(
       password, payload.salt, payload.iv, payload.ciphertext
     )
+
+    // Step 3 — persist and load
     await persist(payload)
     appState.stored   = payload
     appState.vault    = vault
     appState.vaultKey = vaultKey
     populateHome()
+    checkPendingOffer()
     showToast('Passport restored')
     goTo('screen-home')
+
   } catch (e) {
+    // Show the REAL error — not a generic message
+    // This is critical for debugging — the exact error tells us what failed
     err.style.display = 'flex'
-    etxt.textContent  = e.code === 'INVALID_BACKUP'
-      ? 'Invalid backup file.'
-      : 'Wrong password for this backup.'
+
+    if (e.code === 'INVALID_BACKUP') {
+      etxt.textContent = 'Invalid backup file — make sure you selected a .passport file.'
+    } else if (e.code === 'WRONG_PASSWORD') {
+      etxt.textContent = 'Wrong password for this backup.'
+    } else {
+      // Show the actual error message so we can diagnose it
+      etxt.textContent = 'Restore failed: ' + (e.message ?? e.toString())
+    }
+
+    // Log full error to console for debugging
+    console.error('[Restore] Failed:', e)
+
+    // Show debug details in the UI panel
+    const debugEl = document.getElementById('restore-debug')
+    const debugTxt = document.getElementById('restore-debug-text')
+    if (debugEl && debugTxt) {
+      debugEl.style.display = 'block'
+      debugTxt.textContent  =
+        'Error code: ' + (e.code ?? 'none') + '\n' +
+        'Message: '    + (e.message ?? e.toString()) + '\n' +
+        'File name: '  + (file?.name ?? 'unknown') + '\n' +
+        'File size: '  + (file?.size ?? 0) + ' bytes'
+    }
+
     btn.textContent = 'Restore →'
     btn.disabled    = false
   }
@@ -1787,6 +1915,499 @@ function isIOS() {
 function isInStandaloneMode() {
   return window.matchMedia('(display-mode: standalone)').matches ||
     window.navigator.standalone === true
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY CLUSTERS — screen-nodes
+// Shows all cluster memberships stored in vault.memberships
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the clusters screen.
+ * Reads vault.memberships and renders a card for each one.
+ * Shows empty state if no memberships exist.
+ */
+function openNodes() {
+  const vault       = appState.vault
+  const list        = document.getElementById('nodes-list')
+  const empty       = document.getElementById('nodes-empty')
+  const memberships = vault?.memberships ?? []
+
+  list.innerHTML = ''
+
+  if (memberships.length === 0) {
+    empty.style.display = 'block'
+    list.style.display  = 'none'
+  } else {
+    empty.style.display = 'none'
+    list.style.display  = 'block'
+
+    memberships.forEach(m => {
+      const card = document.createElement('div')
+      card.className = 'cred-card'
+      card.style.marginBottom = '12px'
+      card.innerHTML = `
+        <p class="cred-type">${m.status?.toUpperCase() ?? 'UNKNOWN'}</p>
+        <div class="cred-title">${m.node_name ?? m.node_id ?? 'Unknown cluster'}</div>
+        <div class="cred-sub" style="font-size:10px;word-break:break-all;">
+          ${m.node_id ?? ''}
+        </div>
+        <div class="cred-meta" style="margin-top:12px;">
+          <div class="cred-meta-item">
+            Joined <span>${m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</span>
+          </div>
+          <div class="cred-meta-item">
+            Issuer <span>${m.is_issuer ? 'Yes' : 'No'}</span>
+          </div>
+        </div>
+      `
+      list.appendChild(card)
+    })
+  }
+
+  goTo('screen-nodes')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY CREDENTIALS — screen-credentials
+// Shows all SD-JWT credentials stored in vault.credentials
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the credentials screen.
+ * Reads vault.credentials and renders a card for each one.
+ * Tapping a card copies the SD-JWT to clipboard.
+ */
+function openCredentials() {
+  const vault       = appState.vault
+  const list        = document.getElementById('credentials-list')
+  const empty       = document.getElementById('credentials-empty')
+  const credentials = vault?.credentials ?? []
+
+  list.innerHTML = ''
+
+  // Update home screen count
+  document.getElementById('cred-count').textContent =
+    `${credentials.length} credential${credentials.length !== 1 ? 's' : ''}`
+
+  if (credentials.length === 0) {
+    empty.style.display = 'block'
+    list.style.display  = 'none'
+  } else {
+    empty.style.display = 'none'
+    list.style.display  = 'block'
+
+    credentials.forEach((c, idx) => {
+      const card = document.createElement('div')
+      card.className = 'cred-card'
+      card.style.marginBottom = '12px'
+      card.style.cursor = 'pointer'
+
+      // Determine display name from type
+      const typeLabel = c.type === 'MembershipCredential'
+        ? 'Membership' : c.type ?? 'Credential'
+
+      // Expiry display
+      const expiry = c.expires_at
+        ? new Date(c.expires_at).toLocaleDateString()
+        : 'No expiry'
+
+      // Revoked indicator
+      const revokedBadge = c.revoked
+        ? `<span class="badge" style="background:rgba(192,57,43,0.1);
+            color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
+        : `<span class="badge badge-green">✓ Valid</span>`
+
+      card.innerHTML = `
+        <p class="cred-type">${typeLabel.toUpperCase()}</p>
+        <div class="cred-title">${c.node_name ?? c.issuer_did ?? 'Unknown issuer'}</div>
+        <div class="cred-sub" style="font-size:10px;word-break:break-all;">
+          ${c.issuer_did ?? ''}
+        </div>
+        <div class="cred-meta" style="margin-top:12px;">
+          <div class="cred-meta-item">
+            Issued <span>${c.issued_at ? new Date(c.issued_at).toLocaleDateString() : '—'}</span>
+          </div>
+          <div class="cred-meta-item">
+            Expires <span>${expiry}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          ${revokedBadge}
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-primary"
+            onclick="copyCredential(${idx})"
+            style="flex:1;padding:8px;">
+            Copy SD-JWT
+          </button>
+          <button class="btn btn-ghost"
+            onclick="presentCredential(${idx})"
+            style="flex:1;padding:8px;">
+            Present QR
+          </button>
+        </div>
+      `
+      list.appendChild(card)
+    })
+  }
+
+  goTo('screen-credentials')
+}
+
+/**
+ * Copy a credential's SD-JWT to clipboard.
+ * @param {number} idx - index in vault.credentials
+ */
+function copyCredential(idx) {
+  const cred = appState.vault?.credentials?.[idx]
+  if (!cred?.sd_jwt) return
+  navigator.clipboard?.writeText(cred.sd_jwt)
+    .then(() => showToast('SD-JWT copied — paste it into the verifier'))
+    .catch(() => showToast('Copy failed — open browser console to get SD-JWT'))
+  console.log('[Credential] SD-JWT:', cred.sd_jwt)
+}
+
+/**
+ * Present a credential as a QR code.
+ * For now — copies the SD-JWT and shows a toast with instructions.
+ * Full QR presentation screen comes in next build.
+ * @param {number} idx - index in vault.credentials
+ */
+function presentCredential(idx) {
+  const cred = appState.vault?.credentials?.[idx]
+  if (!cred?.sd_jwt) return
+  // Copy SD-JWT and instruct user to paste in verifier
+  navigator.clipboard?.writeText(cred.sd_jwt)
+  showToast('SD-JWT copied — paste at mdusl.sovereign-passport.id/verify')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVITE A GRAPE — screen-invite
+// Generates a signed invite link for someone to join a cluster
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the invite screen.
+ * Populates the cluster selector from approved memberships.
+ * Resets all fields to clean state.
+ */
+function openInvite() {
+  const vault       = appState.vault
+  const select      = document.getElementById('invite-cluster-select')
+  const disclosures = document.getElementById('invite-disclosures')
+  const noteField   = document.getElementById('invite-note-field')
+  const result      = document.getElementById('invite-result')
+  const errEl       = document.getElementById('invite-error')
+  const btn         = document.getElementById('btn-generate-invite')
+
+  // Reset state
+  result.style.display    = 'none'
+  errEl.style.display     = 'none'
+  disclosures.style.display = 'none'
+  noteField.style.display  = 'none'
+  btn.disabled             = true
+  document.getElementById('invite-note').value = ''
+
+  // Populate cluster dropdown from approved memberships only
+  // Only approved members can invite — this is the governance rule
+  const approved = (vault?.memberships ?? []).filter(m => m.status === 'approved')
+
+  select.innerHTML = '<option value="">— select a cluster —</option>'
+  approved.forEach(m => {
+    const opt = document.createElement('option')
+    opt.value       = JSON.stringify({ node_id: m.node_id, node_name: m.node_name })
+    opt.textContent = m.node_name ?? m.node_id
+    select.appendChild(opt)
+  })
+
+  // Show disclosures and note when a cluster is selected
+  select.onchange = () => {
+    const hasSelection = select.value !== ''
+    disclosures.style.display = hasSelection ? 'block' : 'none'
+    noteField.style.display   = hasSelection ? 'block' : 'none'
+    btn.disabled              = !hasSelection
+    result.style.display      = 'none'
+  }
+
+  // If no approved memberships — explain why
+  if (approved.length === 0) {
+    select.innerHTML =
+      '<option value="">No approved memberships — receive a credential first</option>'
+    btn.disabled = true
+  }
+
+  goTo('screen-invite')
+}
+
+/**
+ * Generate a signed invite link.
+ *
+ * Flow:
+ *   1. Read selected cluster and disclosures
+ *   2. Build referral payload (from identity.js model)
+ *   3. Sign with holder's Ed25519 key
+ *   4. Encode as base64url
+ *   5. Build full invite URL:
+ *      passport.html#offer=<issuer_url>&ref=<signed_referral>
+ *   6. Display link + share button
+ */
+async function generateInvite() {
+  const vault      = appState.vault
+  const select     = document.getElementById('invite-cluster-select')
+  const note       = document.getElementById('invite-note').value.trim()
+  const errEl      = document.getElementById('invite-error')
+  const errTxt     = document.getElementById('invite-error-text')
+  const result     = document.getElementById('invite-result')
+  const btn        = document.getElementById('btn-generate-invite')
+
+  errEl.style.display   = 'none'
+  result.style.display  = 'none'
+  btn.textContent       = 'Generating...'
+  btn.disabled          = true
+
+  try {
+    // Parse selected cluster
+    const cluster = JSON.parse(select.value)
+
+    // Read disclosure choices
+    const disclosures = {
+      handle:  document.getElementById('disclose-handle').checked,
+      since:   document.getElementById('disclose-since').checked,
+      role:    document.getElementById('disclose-role').checked,
+    }
+
+    // Find this membership for status + weight
+    const membership = (vault.memberships ?? []).find(
+      m => m.node_id === cluster.node_id
+    )
+
+    // Build the referral payload
+    const payload = {
+      id:                  crypto.randomUUID(),
+      type:                'ReferralCredential',
+      from_identity_id:    vault.identity.id,
+      to_identity_id:      null,            // unknown until grape creates Passport
+      node_id:             cluster.node_id,
+      node_name:           cluster.node_name,
+      from_status_at_time: membership?.status ?? 'unknown',
+      weight:              membership?.status === 'approved' ? 3 : 1,
+      disclosed:           {},
+      note:                note || null,
+      created_at:          new Date().toISOString(),
+      expires_at:          null,
+    }
+
+    // Apply disclosures
+    if (disclosures.handle && vault.identity.handle)
+      payload.disclosed.handle = vault.identity.handle
+    if (disclosures.since && membership?.joined_at)
+      payload.disclosed.since = membership.joined_at
+    if (disclosures.role && membership?.is_issuer)
+      payload.disclosed.role = 'issuer'
+
+    // Sign the referral with the holder's private key
+    const privateKey = await crypto.subtle.importKey(
+      'jwk', vault.keys.privateKey, {name:'Ed25519'}, false, ['sign']
+    )
+    const sigData   = JSON.stringify(payload)
+    const sigBuf    = await crypto.subtle.sign(
+      'Ed25519', privateKey, new TextEncoder().encode(sigData)
+    )
+    const signature = toB64(sigBuf)
+    payload.signature = signature
+
+    // Encode the signed referral as base64url
+    const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
+
+    // Build the invite URL
+    // Points to the wallet with the offer URL + signed referral
+    // The offer URL is derived from the node_id convention
+    // In production this comes from the issuer's known endpoint
+    const offerBase  = `https://mdusl.sovereign-passport.id/offer`
+    const walletBase = `https://sovereign-passport.github.io/passport/app/passport.html`
+    const inviteUrl  = `${walletBase}#offer=${offerBase}&ref=${encodedRef}`
+
+    // Display the link
+    document.getElementById('invite-link-display').textContent = inviteUrl
+
+    // Show share button only if Web Share API available
+    const shareBtn = document.getElementById('btn-share-invite')
+    shareBtn.style.display = navigator.share ? 'block' : 'none'
+
+    result.style.display = 'block'
+
+    // Store in vault referrals_sent
+    if (!vault.referrals_sent) vault.referrals_sent = []
+    vault.referrals_sent.push(payload)
+    await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      .then(persist)
+
+    showToast('Invite link generated')
+
+  } catch (err) {
+    console.error('[Invite] Failed:', err)
+    errEl.style.display  = 'flex'
+    errTxt.textContent   = err.message
+  } finally {
+    btn.textContent = 'Generate invite link →'
+    btn.disabled    = false
+  }
+}
+
+/**
+ * Copy the generated invite link to clipboard.
+ */
+function copyInviteLink() {
+  const link = document.getElementById('invite-link-display').textContent
+  navigator.clipboard?.writeText(link)
+    .then(() => showToast('Invite link copied'))
+    .catch(() => showToast('Copy failed'))
+}
+
+/**
+ * Share the invite link via the Web Share API.
+ * Falls back gracefully if not supported.
+ */
+async function shareInviteLink() {
+  const link   = document.getElementById('invite-link-display').textContent
+  const handle = appState.vault?.identity?.handle ?? 'Someone'
+  try {
+    await navigator.share({
+      title: 'Join my cluster on Sovereign Passport',
+      text:  `${handle} has invited you to join their community on SPID.`,
+      url:   link,
+    })
+  } catch (err) {
+    if (err.name !== 'AbortError') showToast('Share failed — copy the link instead')
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OFFICIALIZE — screen-officialize
+// Explains the vine path and $100 upgrade
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the officialize screen.
+ * Populates current cluster name and member status.
+ */
+function openOfficialize() {
+  const vault       = appState.vault
+  const memberships = vault?.memberships ?? []
+  const approved    = memberships.filter(m => m.status === 'approved')
+
+  // Show first approved cluster name and status
+  const primary = approved[0]
+  document.getElementById('officialize-cluster-name').textContent =
+    primary?.node_name ?? 'No approved cluster yet'
+  document.getElementById('officialize-status').textContent =
+    primary ? 'Approved member ✓' : 'Not yet approved in any cluster'
+
+  goTo('screen-officialize')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECEIVE CREDENTIAL — home screen entry point
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Open the receive credential screen.
+ * Called from the home screen "Receive Credential" menu item.
+ * Clears any previous input and error state before navigating.
+ */
+function openReceiveCredential() {
+  // Clear previous state
+  document.getElementById('input-offer-paste').value = ''
+  document.getElementById('receive-error').style.display = 'none'
+  document.getElementById('btn-load-offer').disabled = true
+  goTo('screen-receive')
+}
+
+/**
+ * Validate the offer input field in real time.
+ * Enables the Load button only when there is non-empty input.
+ * Called on every keystroke via oninput.
+ */
+function validateOfferInput() {
+  const val = document.getElementById('input-offer-paste').value.trim()
+  document.getElementById('btn-load-offer').disabled = val.length === 0
+}
+
+/**
+ * Load an offer from the paste input.
+ *
+ * Handles two input formats:
+ *   1. URL string  → fetch the offer JSON from the issuer
+ *   2. JSON string → parse directly without a network call
+ *
+ * On success → navigates to screen-offer (populated with community details).
+ * On failure → shows inline error, stays on screen-receive.
+ */
+async function loadOfferFromInput() {
+  const input  = document.getElementById('input-offer-paste').value.trim()
+  const errEl  = document.getElementById('receive-error')
+  const errTxt = document.getElementById('receive-error-text')
+  const btn    = document.getElementById('btn-load-offer')
+
+  // Reset error state
+  errEl.style.display = 'none'
+  btn.textContent     = 'Loading...'
+  btn.disabled        = true
+
+  try {
+    let offer
+
+    if (input.startsWith('http://') || input.startsWith('https://')) {
+      // ── Format 1: URL ─────────────────────────────────────────────────────
+      // Fetch the offer JSON from the issuer endpoint.
+      // The issuer returns a fresh offer with a new nonce each time.
+      const res = await fetch(input)
+      if (!res.ok) throw new Error(`Issuer returned ${res.status} — is the URL correct?`)
+      offer = await res.json()
+
+    } else {
+      // ── Format 2: Raw JSON ────────────────────────────────────────────────
+      // Parse the pasted JSON directly.
+      // Useful for QR-encoded offers or offline distribution.
+      try {
+        offer = JSON.parse(input)
+      } catch {
+        throw new Error('Not a valid URL or JSON. Paste the full offer link or JSON object.')
+      }
+    }
+
+    // Validate the offer has required fields
+    if (!offer.issuer || !offer.nonce || !offer.issue_endpoint) {
+      throw new Error('Offer is missing required fields. Make sure you copied the full offer.')
+    }
+
+    // Store offer globally for acceptOffer()
+    _pendingOffer = offer
+
+    // Populate the offer screen with community details
+    document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id ?? 'Unknown community'
+    document.getElementById('offer-issuer-did').textContent = offer.issuer
+    document.getElementById('offer-type').textContent       = offer.credential_type ?? 'membership'
+    document.getElementById('offer-expires').textContent    = offer.expires_at
+      ? new Date(offer.expires_at).toLocaleDateString()
+      : '1 year'
+
+    // Navigate to the offer confirmation screen
+    goTo('screen-offer')
+
+  } catch (err) {
+    // Show error inline — don't navigate away
+    errEl.style.display  = 'flex'
+    errTxt.textContent   = err.message
+    btn.textContent      = 'Load offer →'
+    btn.disabled         = false
+  }
 }
 
 
@@ -1970,11 +2591,13 @@ async function boot() {
 }
 
 // Override populateHome to also trigger pending offers
-const _origPopulateHome = populateHome
-function populateHome() {
-  _origPopulateHome()
-
-  // Handle pending offer after vault is unlocked
+// ─────────────────────────────────────────────────────────────────────────────
+// PENDING OFFER CHECK
+// Called after vault is unlocked (from tryUnlock and tryRestore).
+// Checks if a credential offer was waiting and triggers it.
+// Kept separate from populateHome() to avoid recursive override patterns.
+// ─────────────────────────────────────────────────────────────────────────────
+function checkPendingOffer() {
   if (appState.pendingOfferUrl) {
     const url = appState.pendingOfferUrl
     appState.pendingOfferUrl = null
@@ -1991,7 +2614,20 @@ function populateHome() {
   }
 }
 
-window.addEventListener('hashchange', boot)
+// ─────────────────────────────────────────────────────────────────────────────
+// URL HASH LISTENER
+// Re-runs boot() when the hash changes — handles the case where the user
+// is already on the page and a new #offer= link is tapped or pasted.
+// This is needed because GitHub Pages and static hosts strip query strings
+// but preserve the hash fragment, so we use #offer= for offer delivery.
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('hashchange', () => {
+  // Only re-run if there's actually an offer in the new hash
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  if (hashParams.get('offer') || hashParams.get('r')) {
+    boot()
+  }
+})
 
 boot()
 </script>
