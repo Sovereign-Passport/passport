@@ -2128,15 +2128,34 @@ async function addVaultFile(input) {
   const file = input.files[0]
   if (!file) return
 
-  const isImage = file.type.startsWith('image/')
-  const reader  = new FileReader()
+  const isImage   = file.type.startsWith('image/')
+  const MAX_TEXT  = 2 * 1024 * 1024   // 2 MB for text files
+  const MAX_IMAGE = 512 * 1024         // 512 KB for images (base64 ~4x overhead in vault)
+
+  if (isImage && file.size > MAX_IMAGE) {
+    showToast(`Image too large — max 512 KB (this file is ${Math.round(file.size/1024)}KB)`)
+    input.value = ''
+    return
+  }
+  if (!isImage && file.size > MAX_TEXT) {
+    showToast(`File too large — max 2 MB`)
+    input.value = ''
+    return
+  }
+
+  const reader = new FileReader()
+
+  reader.onerror = () => {
+    showToast('Could not read file — try a different file')
+    input.value = ''
+  }
 
   reader.onload = async (e) => {
     const content = e.target.result
     const vault   = appState.vault
     if (!vault.files) vault.files = []
 
-    vault.files.push({
+    const entry = {
       name:       file.name,
       path:       file.name,
       mime:       file.type || 'text/plain',
@@ -2144,7 +2163,9 @@ async function addVaultFile(input) {
       date:       new Date().toLocaleDateString('en-CA'),
       size:       `${Math.round(file.size / 1024 * 10) / 10}kb`,
       content,
-    })
+    }
+
+    vault.files.push(entry)
 
     try {
       const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
@@ -2154,9 +2175,9 @@ async function addVaultFile(input) {
       populateHome()
       renderVFList()
     } catch (err) {
-      // Remove the file we just pushed since save failed
       vault.files.pop()
-      showToast('Failed to save: ' + err.message)
+      showToast('Could not save — ' + (err.message ?? 'storage error'))
+      console.error('[VaultFile] Save failed:', err)
     }
   }
 
@@ -2198,17 +2219,27 @@ function renderVFList() {
     return
   }
 
-  el.innerHTML = files.map((f, i) => `
-    <div class="menu-item" style="margin-bottom:8px;"
-      onclick="openVFPad(${i})">
-      <div class="menu-icon">📄</div>
+  el.innerHTML = files.map((f, i) => {
+    const isImage = (f.mime ?? '').startsWith('image/') ||
+                    (f.content ?? '').startsWith('data:image/')
+    const icon = isImage ? '🖼' : '📄'
+    return `
+    <div class="menu-item" style="margin-bottom:8px;" data-vf-index="${i}">
+      <div class="menu-icon">${icon}</div>
       <div class="menu-text">
         <strong>${escHtmlP(f.name ?? f.path ?? 'untitled')}</strong>
         <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>`
-  ).join('')
+  }).join('')
+
+  // Attach click handlers via JS — no inline onclick, no quoting issues
+  el.querySelectorAll('[data-vf-index]').forEach(row => {
+    row.addEventListener('click', () => {
+      openVFPad(parseInt(row.dataset.vfIndex, 10))
+    })
+  })
 }
 
 function openVFPad(index) {
@@ -2716,8 +2747,9 @@ async function generateInvite() {
     // Store in vault referrals_sent
     if (!vault.referrals_sent) vault.referrals_sent = []
     vault.referrals_sent.push(payload)
-    await saveVault(appState.vaultKey, vault, appState.stored.salt)
-      .then(persist)
+    const refPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(refPayload)
+    appState.stored = refPayload
 
     showToast('Invite link generated')
 
