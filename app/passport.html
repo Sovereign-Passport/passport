@@ -8,7 +8,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Passport</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="../images/spid-logo.jpg">
   <meta name="apple-mobile-web-app-title" content="SPID">
@@ -26,7 +25,7 @@
       navigator.serviceWorker.register('sw.js')
     }
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <!-- No external font calls — system fonts only. Sovereign by design. -->
   <style>
     /* ── TOKENS ─────────────────────────────────────────────────── */
     :root {
@@ -51,7 +50,7 @@
       height: 100%; overflow: hidden;
       background: var(--bg);
       color: var(--ink);
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
       font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
@@ -97,12 +96,18 @@
     }
     .screen-header .logotype { margin: 0; }
 
-    /* Back button */
+    /* Back orb — consistent across all screens */
     .btn-back {
-      background: none; border: none;
-      color: var(--ink-dim); font-size: 20px;
-      cursor: pointer; padding: 0; flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--ink-faint);
+      color: var(--ink-dim);
+      font-size: 16px; line-height: 1;
+      cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
     }
+    .btn-back:hover { border-color: var(--gold-dim); color: var(--gold); }
 
     /* Tab bar — Private / Shared */
     .tab-bar {
@@ -111,7 +116,7 @@
     }
     .tab-btn {
       flex: 1; padding: 8px;
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
       font-size: 11px; cursor: pointer;
       letter-spacing: 0.05em;
       border: 1px solid var(--ink-faint);
@@ -149,7 +154,7 @@
     }
     .pad-filename {
       font-size: 11px; color: var(--ink-dim);
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
     }
     .pad-content {
       flex: 1; overflow-y: auto;
@@ -157,7 +162,7 @@
       font-size: 12px; line-height: 1.8;
       color: var(--ink);
       white-space: pre-wrap; word-break: break-word;
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
     }
 
     /* Danger zone label and items */
@@ -190,7 +195,7 @@
 
     /* ── LOGOTYPE ───────────────────────────────────────────────── */
     .logotype {
-      font-family: 'DM Serif Display', serif;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 13px;
       letter-spacing: 0.25em;
       text-transform: uppercase;
@@ -201,7 +206,7 @@
 
     /* ── DISPLAY HEADING ────────────────────────────────────────── */
     .display {
-      font-family: 'DM Serif Display', serif;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: clamp(32px, 8vw, 48px);
       line-height: 1.1;
       color: var(--ink);
@@ -259,7 +264,7 @@
       border-radius: 8px;
       padding: 12px 14px;
       color: var(--ink);
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
       font-size: 14px;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
@@ -297,7 +302,7 @@
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 14px 24px;
       border: none; border-radius: 8px;
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
       font-size: 13px; font-weight: 500;
       letter-spacing: 0.05em;
       cursor: pointer;
@@ -369,7 +374,7 @@
     }
     .did-value {
       color: var(--ink);
-      font-family: 'DM Mono', monospace;
+      font-family: 'Courier New', Courier, monospace;
     }
 
     /* ── CREDENTIAL CARD ────────────────────────────────────────── */
@@ -393,7 +398,7 @@
       margin-bottom: 12px;
     }
     .cred-title {
-      font-family: 'DM Serif Display', serif;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 20px; color: var(--ink);
       margin-bottom: 4px;
     }
@@ -463,7 +468,7 @@
       border-bottom: 1px solid var(--ink-faint);
     }
     .home-handle {
-      font-family: 'DM Serif Display', serif;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 22px;
     }
     .avatar {
@@ -471,7 +476,7 @@
       background: var(--bg-lift);
       border: 1px solid var(--gold-dim);
       display: flex; align-items: center; justify-content: center;
-      font-family: 'DM Serif Display', serif;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 18px; color: var(--gold);
     }
     .section-label {
@@ -575,7 +580,7 @@
   <!-- ══════════════════════════════════════════════════════════════
        SCREEN 0 — WELCOME
   ══════════════════════════════════════════════════════════════ -->
-  <div class="screen active" id="screen-welcome">
+  <div class="screen" id="screen-welcome">
     <div class="shield fade-up">
       <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
@@ -707,15 +712,15 @@
       <div class="gen-steps" id="gen-steps">
         <div class="gen-step" id="step-keys">
           <div class="gen-step-dot"></div>
-          Generating Ed25519 keypair
+          Generating your identity keys
         </div>
         <div class="gen-step" id="step-did">
           <div class="gen-step-dot"></div>
-          Deriving sovereign DID
+          Creating your unique passport address
         </div>
         <div class="gen-step" id="step-vault">
           <div class="gen-step-dot"></div>
-          Encrypting vault (AES-256-GCM)
+          Locking your vault
         </div>
         <div class="gen-step" id="step-store">
           <div class="gen-step-dot"></div>
@@ -752,12 +757,12 @@
 
     <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
       <div class="did-display">
-        <span class="did-label">Your Decentralised Identifier (DID)</span>
+        <span class="did-label">Your Passport Address</span>
         <span class="did-value" id="display-did">—</span>
       </div>
 
       <div style="display:flex;gap:8px;margin-bottom:20px;">
-        <span class="badge badge-gold">✓ Ed25519 keypair</span>
+        <span class="badge badge-gold">✓ Identity keys generated</span>
         <span class="badge badge-green">✓ Vault encrypted</span>
       </div>
 
@@ -788,7 +793,7 @@
     <div class="menu-item fade-up fade-up-1" onclick="showDID()">
       <div class="menu-icon">🔑</div>
       <div class="menu-text">
-        <strong>My DID</strong>
+        <strong>My Passport Address</strong>
         <small id="did-short">—</small>
       </div>
       <span class="menu-arrow">›</span>
@@ -810,7 +815,7 @@
       <div class="menu-icon">🍇</div>
       <div class="menu-text">
         <strong>Invite a Grape</strong>
-        <small>Share a signed invite link</small>
+        <small>Invite someone to your community</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -840,7 +845,7 @@
       <div class="menu-icon">📨</div>
       <div class="menu-text">
         <strong>Receive Credential</strong>
-        <small>Paste an offer link or JSON</small>
+        <small>Join a community with an invite link</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -998,7 +1003,7 @@
       <div class="menu-icon">🔑</div>
       <div class="menu-text">
         <strong>Vault</strong>
-        <small>Unlocked · AES-256-GCM</small>
+        <small>Unlocked · encrypted</small>
       </div>
       <span class="badge badge-green">✓ OK</span>
     </div>
@@ -1006,7 +1011,7 @@
     <div class="menu-item menu-item-static">
       <div class="menu-icon">🆔</div>
       <div class="menu-text">
-        <strong>DID</strong>
+        <strong>Passport Address</strong>
         <small id="h-did">—</small>
       </div>
       <span class="badge badge-green">✓ Valid</span>
@@ -1047,7 +1052,7 @@
       <div class="menu-icon">📱</div>
       <div class="menu-text">
         <strong>Storage</strong>
-        <small>IndexedDB · local only · never synced</small>
+        <small>Stored on this device only</small>
       </div>
       <span class="badge badge-green">✓ Active</span>
     </div>
@@ -1155,7 +1160,7 @@
 
       <div class="divider">or</div>
 
-      <button class="btn btn-ghost" onclick="goBack()">← Go back</button>
+      <button class="btn btn-ghost" onclick="goTo(appState.vault ? 'screen-home' : 'screen-welcome')">← Go back</button>
     </div>
   </div>
 
@@ -1165,7 +1170,12 @@
        This is the entry point for joining a community —
        reachable from the home screen "Receive Credential" button.
   ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-receive">
+  <div class="screen screen-top" id="screen-receive">
+
+    <div class="screen-header">
+      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+      <p class="logotype">Join a Community</p>
+    </div>
 
     <h1 class="display fade-up" style="margin-bottom:8px;">
       Receive a<br><em>credential.</em>
@@ -1202,10 +1212,6 @@
         📷 Scan QR code
       </button>
 
-      <div class="divider"></div>
-
-      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
-
     </div>
   </div>
 
@@ -1236,7 +1242,7 @@
       </div>
       <div class="notice">
         <span class="notice-icon">🔑</span>
-        <span class="notice-text">Accepting stores a signed credential in your vault. The issuer will not know when you present it.</span>
+        <span class="notice-text">Accepting adds this membership to your passport. It's up to you to share or not this information.</span>
       </div>
       <div id="offer-error" class="notice" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
@@ -1270,7 +1276,7 @@
         <div class="cred-title" id="received-node-name">—</div>
         <div class="cred-sub" id="received-issuer" style="font-size:10px;">—</div>
         <div style="display:flex;gap:8px;margin-top:12px;">
-          <span class="badge badge-green">✓ Signed by issuer</span>
+          <span class="badge badge-green">✓ Signed by community</span>
           <span class="badge badge-gold">✓ Stored in vault</span>
         </div>
       </div>
@@ -1289,11 +1295,9 @@
   <div class="screen screen-top" id="screen-nodes">
 
     <div style="width:100%;max-width:380px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-        <button onclick="goTo('screen-home')"
-          style="background:none;border:none;color:var(--ink-dim);
-                 font-size:20px;cursor:pointer;padding:0;">←</button>
-        <h2 style="font-family:'DM Serif Display',serif;font-size:24px;">
+      <div class="screen-header">
+        <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+        <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;">
           My Clusters
         </h2>
       </div>
@@ -1329,11 +1333,9 @@
   <div class="screen screen-top" id="screen-credentials">
 
     <div style="width:100%;max-width:380px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-        <button onclick="goTo('screen-home')"
-          style="background:none;border:none;color:var(--ink-dim);
-                 font-size:20px;cursor:pointer;padding:0;">←</button>
-        <h2 style="font-family:'DM Serif Display',serif;font-size:24px;">
+      <div class="screen-header">
+        <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+        <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;">
           Credentials
         </h2>
       </div>
@@ -1367,13 +1369,18 @@
        the offer URL so the new grape just taps and accepts.
        The referral is signed with your DID key.
   ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-invite">
+  <div class="screen screen-top" id="screen-invite">
+
+    <div class="screen-header">
+      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+      <p class="logotype">Invite a Grape</p>
+    </div>
 
     <h1 class="display fade-up" style="margin-bottom:8px;">
       Invite a<br><em>Grape.</em>
     </h1>
     <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
-      Share a signed invite link. The new grape opens it,
+      Invite someone to your community. The new grape opens it,
       creates their Passport, and receives a credential.
       Your referral is recorded.
     </p>
@@ -1390,7 +1397,7 @@
         <select id="invite-cluster-select"
           style="width:100%;background:var(--bg-lift);border:1px solid var(--ink-faint);
                  border-radius:8px;padding:12px 14px;color:var(--ink);
-                 font-family:'DM Mono',monospace;font-size:14px;outline:none;">
+                 font-family:'Courier New',Courier,monospace;font-size:14px;outline:none;">
           <option value="">— select a cluster —</option>
         </select>
       </div>
@@ -1466,7 +1473,6 @@
         onclick="generateInvite()" style="margin-bottom:10px;" disabled>
         Generate invite link →
       </button>
-      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
 
     </div>
   </div>
@@ -1480,7 +1486,12 @@
        No payment processing here yet — links to
        sovereign-passport.com when ready.
   ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-officialize">
+  <div class="screen screen-top" id="screen-officialize">
+
+    <div class="screen-header">
+      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+      <p class="logotype">Become a Vine</p>
+    </div>
 
     <div class="shield fade-up">
       <svg viewBox="0 0 56 56" fill="none">
@@ -1600,8 +1611,6 @@
           Your cluster is already growing. We'll be ready when you are.
         </span>
       </div>
-
-      <button class="btn btn-ghost" onclick="goTo('screen-home')">← Back</button>
 
     </div>
   </div>
@@ -1794,19 +1803,28 @@ let _prevScreen    = null
 // SCREEN NAVIGATION
 // ─────────────────────────────────────────────────────────────────────────────
 
+// _bootDone guards the first goTo() call — no exit animation on boot
+let _bootDone = false
+
 function goTo(screenId) {
   const current = document.getElementById(_currentScreen)
   const next    = document.getElementById(screenId)
   if (!next || screenId === _currentScreen) return
 
-  if (current) {
+  if (_bootDone && current) {
     current.classList.add('exit')
     setTimeout(() => { current.classList.remove('active','exit') }, 300)
+  } else if (current) {
+    current.classList.remove('active')
   }
 
   next.classList.add('active')
   _prevScreen    = _currentScreen
   _currentScreen = screenId
+  _bootDone      = true
+
+  // Push a history entry so the browser back button has something to intercept
+  history.pushState({ screen: screenId }, '', location.href)
 
   // Trigger re-animations
   next.querySelectorAll('.fade-up').forEach(el => {
@@ -1827,6 +1845,17 @@ function goBack() {
   if (_prevScreen) goTo(_prevScreen)
   else goTo('screen-home')
 }
+
+// Intercept browser back button — never let it leave the app
+window.addEventListener('popstate', () => {
+  if (_currentScreen === 'screen-home' || _currentScreen === 'screen-welcome' ||
+      _currentScreen === 'screen-unlock') {
+    // Already at a root screen — push state again to keep user inside
+    history.pushState({ screen: _currentScreen }, '', location.href)
+  } else {
+    goTo(appState.vault ? 'screen-home' : 'screen-welcome')
+  }
+})
 
 
 
@@ -2099,7 +2128,9 @@ async function addVaultFile(input) {
   const file = input.files[0]
   if (!file) return
 
-  const reader = new FileReader()
+  const isImage = file.type.startsWith('image/')
+  const reader  = new FileReader()
+
   reader.onload = async (e) => {
     const content = e.target.result
     const vault   = appState.vault
@@ -2108,6 +2139,7 @@ async function addVaultFile(input) {
     vault.files.push({
       name:       file.name,
       path:       file.name,
+      mime:       file.type || 'text/plain',
       visibility: 'private',
       date:       new Date().toLocaleDateString('en-CA'),
       size:       `${Math.round(file.size / 1024 * 10) / 10}kb`,
@@ -2122,10 +2154,18 @@ async function addVaultFile(input) {
       populateHome()
       renderVFList()
     } catch (err) {
+      // Remove the file we just pushed since save failed
+      vault.files.pop()
       showToast('Failed to save: ' + err.message)
     }
   }
-  reader.readAsText(file)
+
+  if (isImage) {
+    reader.readAsDataURL(file)
+  } else {
+    reader.readAsText(file)
+  }
+
   input.value = ''
 }
 
@@ -2176,8 +2216,16 @@ function openVFPad(index) {
   const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
   const f     = files[index]
   if (!f) return
-  document.getElementById('vf-pad-name').textContent    = f.name ?? f.path ?? 'file'
-  document.getElementById('vf-pad-content').textContent = f.content ?? '(empty)'
+  document.getElementById('vf-pad-name').textContent = f.name ?? f.path ?? 'file'
+  const contentEl = document.getElementById('vf-pad-content')
+  const isImage   = (f.mime ?? '').startsWith('image/') ||
+                    (f.content ?? '').startsWith('data:image/')
+  if (isImage) {
+    contentEl.innerHTML = `<img src="${f.content}" alt="${escHtmlP(f.name)}"
+      style="max-width:100%;border-radius:8px;display:block;margin:0 auto;">`
+  } else {
+    contentEl.textContent = f.content ?? '(empty)'
+  }
   document.getElementById('vf-pad-overlay').classList.add('open')
 }
 
@@ -2460,7 +2508,7 @@ function openCredentials() {
           <button class="btn btn-primary"
             onclick="copyCredential(${idx})"
             style="flex:1;padding:8px;">
-            Copy SD-JWT
+            Copy credential
           </button>
           <button class="btn btn-ghost"
             onclick="presentCredential(${idx})"
@@ -2484,7 +2532,7 @@ function copyCredential(idx) {
   const cred = appState.vault?.credentials?.[idx]
   if (!cred?.sd_jwt) return
   navigator.clipboard?.writeText(cred.sd_jwt)
-    .then(() => showToast('SD-JWT copied — paste it into the verifier'))
+    .then(() => showToast('Credential copied'))
     .catch(() => showToast('Copy failed — open browser console to get SD-JWT'))
   console.log('[Credential] SD-JWT:', cred.sd_jwt)
 }
@@ -2498,7 +2546,7 @@ function copyCredential(idx) {
 function presentCredential(idx) {
   const cred = appState.vault?.credentials?.[idx]
   if (!cred?.sd_jwt) return
-  // Copy SD-JWT and instruct user to paste in verifier
+  // Copy credential and instruct user to paste in verifier
   navigator.clipboard?.writeText(cred.sd_jwt)
   showToast('SD-JWT copied — paste at mdusl.sovereign-passport.id/verify')
 }
@@ -2808,7 +2856,7 @@ async function loadOfferFromInput() {
       try {
         offer = JSON.parse(input)
       } catch {
-        throw new Error('Not a valid URL or JSON. Paste the full offer link or JSON object.')
+        throw new Error('Not a valid invite link. Paste the full link you received.')
       }
     }
 
@@ -2982,6 +3030,9 @@ async function acceptOffer() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function boot() {
+  // Push initial history entry so popstate has something to catch
+  history.pushState({ screen: 'boot' }, '', location.href)
+
   // Check for existing vault
   const stored = await loadStored().catch(() => null)
 
