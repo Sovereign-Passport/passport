@@ -2369,8 +2369,9 @@ function populateHome() {
   const sh = document.getElementById('settings-handle-display')
   if (sh) sh.textContent = handle
 
-  // Memberships count (Communities I'm Part Of)
-  const credCount = (v.credentials ?? []).length
+  // Memberships count — excludes internal FounderCredentials
+  const credCount = (v.credentials ?? [])
+    .filter(c => c.type !== 'FounderCredential').length
   document.getElementById('cred-count').textContent =
     `${credCount} membership${credCount !== 1 ? 's' : ''}`
 
@@ -2751,7 +2752,7 @@ function openNodes() {
       list.appendChild(ownLabel)
 
       ownClusters.forEach((c, i) => {
-        const memberCount = c.members?.length ?? 0
+        const memberCount = (c.members?.length ?? 0) + 1 // founder counts as member
         const card = document.createElement('div')
         card.className = 'cred-card'
         card.style.marginBottom = '12px'
@@ -2840,9 +2841,10 @@ function openCredentials() {
 
   list.innerHTML = ''
 
-  // Update home screen count
+  // Update home screen count — excludes FounderCredentials
+  const visibleCount = credentials.filter(c => c.type !== 'FounderCredential').length
   document.getElementById('cred-count').textContent =
-    `${credentials.length} credential${credentials.length !== 1 ? 's' : ''}`
+    `${visibleCount} membership${visibleCount !== 1 ? 's' : ''}`
 
   if (credentials.length === 0) {
     empty.style.display = 'block'
@@ -2855,11 +2857,25 @@ function openCredentials() {
       const card = document.createElement('div')
       card.className = 'cred-card'
       card.style.marginBottom = '12px'
-      card.style.cursor = 'pointer'
 
-      // Determine display name from type
-      const typeLabel = c.type === 'MembershipCredential'
-        ? 'Membership' : c.type ?? 'Credential'
+      const isFounder = c.type === 'FounderCredential'
+
+      // Friendly type label
+      const typeLabel = isFounder
+        ? 'Founder'
+        : c.type === 'MembershipCredential'
+          ? 'Membership'
+          : c.type ?? 'Credential'
+
+      // Title — cluster name for both types
+      const title = isFounder
+        ? (c.cluster_name ?? c.claims?.cluster_name ?? 'My Cluster')
+        : (c.node_name ?? c.issuer_did ?? 'Unknown issuer')
+
+      // Issuer line
+      const issuerLine = isFounder
+        ? 'Self-issued · Founder'
+        : (c.issuer_did ?? c.issuer ?? '')
 
       // Expiry display
       const expiry = c.expires_at
@@ -2872,11 +2888,26 @@ function openCredentials() {
             color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
         : `<span class="badge badge-green">✓ Valid</span>`
 
+      // Action buttons — FounderCredential has no SD-JWT to copy
+      const actions = isFounder ? '' : `
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-primary"
+            onclick="copyCredential(${idx})"
+            style="flex:1;padding:8px;">
+            Copy credential
+          </button>
+          <button class="btn btn-ghost"
+            onclick="presentCredential(${idx})"
+            style="flex:1;padding:8px;">
+            Present QR
+          </button>
+        </div>`
+
       card.innerHTML = `
-        <p class="cred-type">${typeLabel.toUpperCase()}</p>
-        <div class="cred-title">${c.node_name ?? c.issuer_did ?? 'Unknown issuer'}</div>
-        <div class="cred-sub" style="font-size:10px;word-break:break-all;">
-          ${c.issuer_did ?? ''}
+        <p class="cred-type">${escHtmlP(typeLabel.toUpperCase())}</p>
+        <div class="cred-title">${escHtmlP(title)}</div>
+        <div class="cred-sub" style="font-size:10px;word-break:break-all;color:var(--ink-dim);">
+          ${escHtmlP(issuerLine)}
         </div>
         <div class="cred-meta" style="margin-top:12px;">
           <div class="cred-meta-item">
@@ -2889,18 +2920,7 @@ function openCredentials() {
         <div style="display:flex;gap:8px;margin-top:12px;">
           ${revokedBadge}
         </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-primary"
-            onclick="copyCredential(${idx})"
-            style="flex:1;padding:8px;">
-            Copy credential
-          </button>
-          <button class="btn btn-ghost"
-            onclick="presentCredential(${idx})"
-            style="flex:1;padding:8px;">
-            Present QR
-          </button>
-        </div>
+        ${actions}
       `
       list.appendChild(card)
     })
