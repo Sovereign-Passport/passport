@@ -568,7 +568,84 @@
     .fade-up-4 { animation-delay: 0.26s; }
     .fade-up-5 { animation-delay: 0.33s; }
 
-    /* ── SCROLLBAR ──────────────────────────────────────────────── */
+    /* ── ABOUT ORB ──────────────────────────────────────────────── */
+    #about-orb {
+      position: fixed; top: 16px; right: 16px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--gold-dim);
+      display: none; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 50;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #about-orb.visible { display: flex; }
+    #about-orb::before {
+      content: '';
+      position: absolute; inset: -5px;
+      border-radius: 50%;
+      border: 1px solid var(--gold-dim);
+      animation: orbPulse 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    #about-orb:hover { border-color: var(--gold); box-shadow: 0 0 12px var(--gold-glow); }
+    #about-orb svg { width: 18px; height: 18px; }
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1);   opacity: 0.25; }
+      50%       { transform: scale(1.3); opacity: 0.6;  }
+    }
+
+    /* ── ABOUT OVERLAY ──────────────────────────────────────────── */
+    #about-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(8,11,18,0.96);
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      overflow-y: auto;
+      padding: 48px 24px 64px;
+    }
+    #about-overlay.open { display: flex; }
+    #about-close {
+      position: fixed; top: 16px; right: 16px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--ink-faint);
+      color: var(--ink-dim); font-size: 16px;
+      cursor: pointer; z-index: 201;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    #about-close:hover { border-color: var(--gold-dim); color: var(--gold); }
+    .about-logo {
+      width: 72px; height: 72px; margin: 0 auto 20px;
+    }
+    .about-logo svg { width: 100%; height: 100%; }
+    .about-logotype {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 11px; letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold); opacity: 0.8;
+      margin-bottom: 32px; text-align: center;
+    }
+    .about-body {
+      width: 100%; max-width: 380px;
+      font-size: 13px; line-height: 1.9;
+      color: var(--ink-dim);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .about-body h1, .about-body h2, .about-body h3 {
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--ink); margin: 28px 0 8px;
+      font-size: 16px; font-weight: normal;
+    }
+    .about-body h1 { font-size: 20px; margin-top: 0; }
+    .about-body hr {
+      border: none; border-top: 1px solid var(--ink-faint);
+      margin: 20px 0;
+    }
+    .about-body strong { color: var(--ink); }
+    .about-body em { color: var(--gold); font-style: italic; }
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 2px; }
@@ -1615,6 +1692,34 @@
     </div>
   </div>
 
+<!-- ── ABOUT ORB ──────────────────────────────────────────────────── -->
+<button id="about-orb" onclick="openAbout()" aria-label="About Sovereign Passport">
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
+      fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.5)" stroke-width="1.5"/>
+    <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+
+<!-- ── ABOUT OVERLAY ─────────────────────────────────────────────── -->
+<div id="about-overlay">
+  <button id="about-close" onclick="closeAbout()">✕</button>
+
+  <div class="about-logo">
+    <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
+        fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
+      <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <p class="about-logotype">Sovereign Passport</p>
+
+  <div class="about-body" id="about-body"></div>
+</div>
+
 </div><!-- /app -->
 
 <!-- TOAST -->
@@ -1698,6 +1803,138 @@ async function createVault(password,handle) {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN))
   const vk   = await deriveVaultKey(password,salt)
   const n    = new Date().toISOString()
+
+  const welcomeContent = `# Welcome to your Passport
+### Sovereign Passport — your identity, in your pocket.
+
+---
+
+## A few things worth knowing first
+
+This app lives on your phone.
+Not on a server. Not in a cloud. On your phone.
+
+Everything here — your identity, your files, your community memberships —
+is encrypted and stored only on this device.
+
+No company holds your data.
+No account was created anywhere.
+You are the only one with the key.
+
+---
+
+## Start with the basics
+
+**Add this app to your home screen.**
+Tap the share button in your browser, then "Add to Home Screen."
+It will open like any other app — no app store, no install, no waiting.
+
+**Download your backup right away.**
+Settings → Download Backup.
+Save that .passport file somewhere safe — another device, a USB key,
+a trusted person's cloud.
+
+If you lose your phone and have no backup, your passport is gone.
+It takes thirty seconds. Do it now.
+
+**Your password is your key.**
+There is no "forgot password."
+No one can reset it for you — not even us.
+Write it somewhere. Protect it like a house key.
+
+---
+
+## Why use a Passport?
+
+Because your identity should belong to you.
+
+Not to a platform that can ban you.
+Not to a company that sells your habits.
+Not to a service that disappears when the funding runs out.
+
+Your Passport is a small mathematical proof that you are you.
+It works anywhere SPID runs.
+It travels with you.
+It answers to no one but you.
+
+---
+
+## Invite your friends. Start a cluster.
+
+A cluster is just a gathering — your family, your friends,
+your chess group, your garden collective, your neighbourhood.
+
+Create one from the home screen.
+Invite someone with a single link.
+They tap it, create their own Passport, and they are in.
+
+No forms. No approvals. No middleman.
+Just you, vouching for someone you know.
+
+Every invitation is a small act of trust.
+The community remembers who brought whom — not to judge,
+but because that is how real communities actually work.
+
+---
+
+## What can you keep in your vault?
+
+Anything you want close and safe.
+
+Text notes. Photos. Documents. Voice memos converted to text.
+Things you want on every device — export your backup,
+restore it on another phone or your laptop, and your files come with you.
+
+Private files never leave your vault.
+Shared files go only to the people you choose.
+You decide. Every time.
+
+---
+
+## What is coming
+
+**Cluster calendar** — post events, confirm attendance,
+keep your community's rhythm without surrendering it to big tech.
+
+**AI agent** — a quiet helper that knows your community,
+your files, your context. Never decides for you.
+Always assists. Always yours.
+
+**Vine network** — when your cluster is ready to grow,
+officialize it, join the network, and federate with other communities.
+Your passport works everywhere.
+
+---
+
+## This is just the beginning
+
+Your data. Your peace of mind. Your world.
+With a little help from people you trust —
+and, gently, from AI that works for you.
+
+No rush. No pressure. Explore at your own pace.
+
+The community is here when you are ready.
+
+---
+
+## Questions?
+
+Ask someone in your cluster first.
+That is what communities are for.
+
+If you are at Maison du Soleil Levant,
+the vine admin is JF — find him in Saint-Léon-de-Standon, Quebec.
+
+---
+
+*Your identity. Your vault. Your community.*
+*Salted. Signed. Alive.*
+
+Built in Saint-Léon-de-Standon, Quebec, Canada.
+© 2026 JF Bertrand — Sovereign Passport ID
+🍇`
+
   const vault = {
     version: VAULT_VERSION,
     identity: {
@@ -1706,7 +1943,16 @@ async function createVault(password,handle) {
       location:null, virtual:true, created_at:n, updated_at:null,
     },
     keys: {publicKey:id.publicJwk, privateKey:id.privateJwk},
-    credentials:[], keychain:[], files:[], sessions:[],
+    credentials:[], keychain:[], sessions:[],
+    files: [{
+      name:       'welcome.txt',
+      path:       'welcome.txt',
+      mime:       'text/plain',
+      visibility: 'private',
+      date:       new Date().toLocaleDateString('en-CA'),
+      size:       `${Math.round(new TextEncoder().encode(welcomeContent).length / 1024 * 10) / 10}kb`,
+      content:    welcomeContent,
+    }],
     memberships:[], referrals_sent:[], referrals_received:[],
     created_at:n, updated_at:null,
   }
@@ -1831,6 +2077,11 @@ function goTo(screenId) {
     el.style.animation = 'none'
     requestAnimationFrame(() => { el.style.animation = '' })
   })
+
+  // Show orb only on welcome, unlock, home
+  const orbScreens = ['screen-welcome', 'screen-unlock', 'screen-home']
+  const orb = document.getElementById('about-orb')
+  if (orb) orb.classList.toggle('visible', orbScreens.includes(screenId))
 
   // Screen-specific init
   if (screenId === 'screen-vault-files') renderVFList()
@@ -3058,12 +3309,58 @@ async function acceptOffer() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOT
+// ABOUT OVERLAY
+// ─────────────────────────────────────────────────────────────────────────────
+
+function openAbout() {
+  const body = document.getElementById('about-body')
+  if (body && !body.dataset.loaded) {
+    body.innerHTML = renderAboutContent()
+    body.dataset.loaded = '1'
+  }
+  document.getElementById('about-overlay').classList.add('open')
+}
+
+function closeAbout() {
+  document.getElementById('about-overlay').classList.remove('open')
+}
+
+function renderAboutContent() {
+  // Render the welcome text as clean HTML
+  const sections = [
+    { h: 'Your identity. In your pocket.', body: `This app lives on your phone — not on a server, not in a cloud. On your phone.\n\nEverything here — your identity, your files, your community memberships — is encrypted and stored only on this device.\n\nNo company holds your data. No account was created anywhere. You are the only one with the key.` },
+    { h: 'Start with the basics', body: `<strong>Add this app to your home screen.</strong>\nTap the share button in your browser, then "Add to Home Screen." It opens like any other app — no app store, no install.\n\n<strong>Download your backup right away.</strong>\nSettings → Download Backup. Save that file somewhere safe. If you lose your phone and have no backup, your passport is gone. It takes thirty seconds.\n\n<strong>Your password is your key.</strong>\nThere is no "forgot password." Write it somewhere. Protect it like a house key.` },
+    { h: 'Why use a Passport?', body: `Because your identity should belong to you.\n\nNot to a platform that can ban you. Not to a company that sells your habits. Not to a service that disappears when the funding runs out.\n\nYour Passport travels with you. It answers to no one but you.` },
+    { h: 'Invite your friends. Start a cluster.', body: `A cluster is just a gathering — your family, your friends, your chess group, your garden collective, your neighbourhood.\n\nInvite someone with a single link. They tap it, create their own Passport, and they are in.\n\nNo forms. No approvals. No middleman. Just you, vouching for someone you know.\n\nEvery invitation is a small act of trust.` },
+    { h: 'Your vault', body: `Keep anything you want close and safe — notes, photos, documents.\n\nExport your backup, restore it on another phone or your laptop, and your files come with you.\n\nPrivate files never leave your vault. Shared files go only to the people you choose. You decide. Every time.` },
+    { h: 'What is coming', body: `<strong>Cluster calendar</strong> — keep your community's rhythm without surrendering it to big tech.\n\n<strong>AI agent</strong> — a quiet helper that knows your community and your files. Never decides for you. Always assists. Always yours.\n\n<strong>Vine network</strong> — when your cluster is ready to grow, officialize it and federate with other communities.` },
+    { h: 'This is just the beginning', body: `Your data. Your peace of mind. Your world.\nWith a little help from people you trust —\nand, gently, from AI that works for you.\n\nNo rush. No pressure. The community is here when you are ready.` },
+  ]
+
+  let html = sections.map(s => `
+    <h2>${s.h}</h2>
+    <p style="white-space:pre-wrap;margin-bottom:8px;">${s.body}</p>
+    <hr>
+  `).join('')
+
+  html += `<p style="text-align:center;font-size:11px;color:var(--ink-dim);margin-top:16px;letter-spacing:0.1em;">
+    <em>Your identity. Your vault. Your community.</em><br>
+    Salted. Signed. Alive. 🍇<br><br>
+    Built in Saint-Léon-de-Standon, Quebec, Canada.<br>
+    © 2026 JF Bertrand — Sovereign Passport ID
+  </p>`
+
+  return html
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function boot() {
   // Push initial history entry so popstate has something to catch
   history.pushState({ screen: 'boot' }, '', location.href)
+
+  // Show orb on welcome by default — goTo will update it from there
+  const orb = document.getElementById('about-orb')
+  if (orb) orb.classList.add('visible')
 
   // Check for existing vault
   const stored = await loadStored().catch(() => null)
