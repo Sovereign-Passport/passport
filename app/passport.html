@@ -1891,6 +1891,14 @@ const toHex = b => Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('')
 const enc   = s => new TextEncoder().encode(s)
 const dec   = b => new TextDecoder().decode(b)
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 1 — CRYPTO & IDENTITY
+// Ed25519 keypair generation, DID derivation (did:key), AES-256-GCM vault
+// encryption, PBKDF2 key derivation. Pure functions — no DOM, no state.
+// These are the best candidates for a future test suite.
+// Dependencies: WebCrypto API only. No external libraries.
+// ═════════════════════════════════════════════════════════════════════════════
+
 function toBase58(bytes) {
   const A='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
   let n=BigInt('0x'+toHex(bytes)),r='',B=BigInt(58)
@@ -2210,6 +2218,12 @@ async function importBackup(file) {
 }
 
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 2 — VAULT STORAGE & PERSISTENCE
+// IndexedDB persistence (persist, loadStored, clearStored).
+// exportBackup / importBackup — .passport file format.
+// ═════════════════════════════════════════════════════════════════════════════
+
 // ─────────────────────────────────────────────────────────────────────────────
 // APP STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2224,6 +2238,14 @@ let appState = {
 let _currentScreen = 'screen-welcome'
 let _prevScreen    = null
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 3 — SCREEN NAVIGATION
+// goTo(screenId) — transitions between screens with animation.
+// goBack() — returns to previous screen.
+// popstate listener — intercepts browser back button, keeps user in app.
+// SYNC_ENDPOINT constant — temporary on mdusl, moves to sync.sovereign-passport.id
+// ═════════════════════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCREEN NAVIGATION
@@ -2292,7 +2314,12 @@ window.addEventListener('popstate', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HANDLE VALIDATION
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 4 — ONBOARDING (CREATE NEW PASSPORT)
+// Handle validation, password strength, vault generation, generating screen.
+// Flow: screen-welcome → screen-handle → screen-password →
+//       screen-generating → screen-created → screen-home
+// ═════════════════════════════════════════════════════════════════════════════
 
 function validateHandle() {
   const val     = document.getElementById('input-handle').value.trim()
@@ -2431,7 +2458,11 @@ async function startGeneration() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNLOCK (returning user)
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 5 — UNLOCK (RETURNING USER)
+// tryUnlock() — decrypts vault with password, boots into home screen.
+// Handles pending offer and pending sync token after unlock.
+// ═════════════════════════════════════════════════════════════════════════════
 
 async function tryUnlock() {
   const password = document.getElementById('input-unlock-password').value
@@ -2500,7 +2531,11 @@ async function tryUnlock() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 6 — HOME SCREEN
+// populateHome() — renders handle, counts, menu items from vault state.
+// showDID() — copies and displays the grape's passport address.
+// ═════════════════════════════════════════════════════════════════════════════
 
 function populateHome() {
   const v = appState.vault
@@ -2562,9 +2597,16 @@ function populateHome() {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// VAULT FILES
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 7 — VAULT FILES
+// File manager — private and shared tabs.
+// addVaultFile() — detects type, enforces size limits, saves to vault.
+// renderVFList() — renders file list with toggle visibility and delete actions.
+// toggleFileVisibility() — moves file between private/shared.
+// deleteVaultFile() — removes file, reverts on error. welcome.txt is protected.
+// openVFPad() — opens file viewer overlay (text or image).
+// NOTE: "shared" visibility is intent only — transfer not yet implemented.
+// ═════════════════════════════════════════════════════════════════════════════
 
 let _vfTab = 'private'
 
@@ -2817,9 +2859,17 @@ function showDID() {
 const SYNC_ENDPOINT = 'https://mdusl.sovereign-passport.id/api/passport/sync'
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BACKUP
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 8 — BACKUP & SYNC
+// downloadBackup() — exports encrypted .passport blob to disk.
+// syncToDevice() — uploads encrypted blob to 15-min VPS relay, shows QR.
+//   QR points to passport.html#sync=TOKEN (not raw API endpoint).
+//   Uses api.qrserver.com for QR rendering — third-party, non-critical.
+//   FUTURE: move to sync.sovereign-passport.id when DNS is ready.
+// switchRestoreTab() — toggles between file restore and sync link restore.
+// restoreFromSyncLink() — fetches blob from relay, decrypts, restores.
+// tryRestore() — restores from .passport file with password.
+// ═════════════════════════════════════════════════════════════════════════════
 
 function downloadBackup() {
   if (!appState.stored) { showToast('No vault to backup yet'); return }
@@ -3305,6 +3355,15 @@ function openNodes() {
  * Reads vault.credentials and renders a card for each one.
  * Tapping a card copies the SD-JWT to clipboard.
  */
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 9 — CREDENTIALS
+// Renders vault.credentials — all credential types in one list.
+// MembershipCredential: vine-issued, has SD-JWT, copyable and presentable.
+// FounderCredential: self-issued, internal record only, no copy/present.
+// GrapeClusterCredential: founder-issued to members, copyable.
+// ═════════════════════════════════════════════════════════════════════════════
+
 function openCredentials() {
   const vault       = appState.vault
   const list        = document.getElementById('credentials-list')
@@ -3430,6 +3489,20 @@ function presentCredential(idx) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION 10 — GRAPE CLUSTERS
+// Personal community groups — no server required.
+// createCluster() — self-issues FounderCredential, pings vignard witness.
+// openNodes() — renders ownClusters (founder view) + memberships (member view).
+// softLeaveCluster() — sets status 'left', keeps cluster in vault.
+// rejoinCluster() — restores status 'active'.
+// confirmLeaveCluster() — shows modal then routes to leaveCluster or dissolve.
+// leaveCluster() — soft succession to highest-weight member.
+// dissolveCluster() — permanent delete, no members.
+// pingVignard() — fire-and-forget witness registration on mdusl VPS.
+//   Sets pre-vine flag silently when member count >= 3.
+// ═════════════════════════════════════════════════════════════════════════════
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GRAPE CLUSTERS — screen-create-cluster
 // ─────────────────────────────────────────────────────────────────────────────
