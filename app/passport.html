@@ -982,6 +982,16 @@
         onclick="switchVaultTab('shared')">Shared</button>
     </div>
 
+    <!-- Shared tab notice — intent only, transfer not yet implemented -->
+    <div id="vf-shared-notice" style="display:none;width:100%;max-width:380px;
+      margin-bottom:12px;padding:10px 14px;border-radius:8px;
+      border:1px solid var(--ink-faint);background:var(--bg-card);">
+      <p style="font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0;">
+        Files marked shared express your intent to share with cluster members.
+        <span style="color:var(--gold-dim);">Direct transfer not yet implemented.</span>
+      </p>
+    </div>
+
     <!-- Add file -->
     <div style="width:100%;max-width:380px;margin-bottom:12px;">
       <input type="file" id="vf-file-input" style="display:none"
@@ -1420,6 +1430,22 @@
         A cluster is your gathering — chess night, a garden group,
         a neighbourhood circle. Free forever. You are the founder.
       </p>
+
+      <div class="notice fade-up fade-up-1" style="margin-bottom:16px;">
+        <span class="notice-icon">⚠</span>
+        <span class="notice-text">
+          The name and description are <strong>permanent</strong> — they appear
+          on every member's credential and cannot be changed later.
+          Choose a name that will make sense over time.<br><br>
+          Members manage their own data. You can share files with cluster
+          members directly from your vault.
+          <span style="color:var(--ink-dim);font-size:11px;display:block;margin-top:4px;">
+            Intent to share — transfer not yet implemented.
+          </span>
+          Deleting this cluster is fine, just don't do it too often
+          as the cluster resides on each grape as their own.
+        </span>
+      </div>
 
       <div class="card fade-up fade-up-2" style="width:100%;">
         <div class="field">
@@ -2369,9 +2395,13 @@ function populateHome() {
   const sh = document.getElementById('settings-handle-display')
   if (sh) sh.textContent = handle
 
-  // Memberships count — excludes internal FounderCredentials
-  const credCount = (v.credentials ?? [])
-    .filter(c => c.type !== 'FounderCredential').length
+  // Memberships count — reads vault.credentials as primary source
+  // Falls back to vault.memberships for passports predating migration
+  const credCounts = (v.credentials ?? [])
+    .filter(c => c.type === 'MembershipCredential' || c.type === 'GrapeClusterCredential')
+  const legacyCounts = (v.memberships ?? [])
+    .filter(m => !(v.credentials ?? []).some(c => c.node_id === m.node_id))
+  const credCount = credCounts.length + legacyCounts.length
   document.getElementById('cred-count').textContent =
     `${credCount} membership${credCount !== 1 ? 's' : ''}`
 
@@ -2460,7 +2490,7 @@ async function addVaultFile(input) {
       name:       file.name,
       path:       file.name,
       mime:       file.type || 'text/plain',
-      visibility: 'private',
+      visibility: _vfTab ?? 'private',
       date:       new Date().toLocaleDateString('en-CA'),
       size:       `${Math.round(file.size / 1024 * 10) / 10}kb`,
       content,
@@ -2493,10 +2523,12 @@ async function addVaultFile(input) {
 
 function switchVaultTab(tab) {
   _vfTab = tab
-  const btnP = document.getElementById('vf-tab-private')
-  const btnS = document.getElementById('vf-tab-shared')
+  const btnP   = document.getElementById('vf-tab-private')
+  const btnS   = document.getElementById('vf-tab-shared')
+  const notice = document.getElementById('vf-shared-notice')
   btnP.classList.toggle('active', tab === 'private')
   btnS.classList.toggle('active', tab === 'shared')
+  if (notice) notice.style.display = tab === 'shared' ? 'block' : 'none'
   renderVFList()
 }
 
@@ -2724,15 +2756,23 @@ function isInStandaloneMode() {
 
 /**
  * Open the clusters screen.
- * Reads vault.memberships and renders a card for each one.
- * Shows empty state if no memberships exist.
+ * Reads vault.credentials (type MembershipCredential) as primary source.
+ * Falls back to vault.memberships for passports predating the migration.
  */
 function openNodes() {
   const vault      = appState.vault
   const list       = document.getElementById('nodes-list')
   const empty      = document.getElementById('nodes-empty')
-  const ownClusters = vault?.ownClusters ?? []
-  const memberships = vault?.memberships ?? []
+  const ownClusters = (vault?.ownClusters ?? [])
+    .filter(c => c.id && c.name && c.founder_did)
+
+  // Primary: credentials array. Fallback: legacy memberships array
+  const memberships = [
+    ...(vault?.credentials ?? []).filter(c => c.type === 'MembershipCredential'),
+    ...(vault?.memberships ?? []).filter(m =>
+      !(vault?.credentials ?? []).some(c => c.node_id === m.node_id)
+    ),
+  ]
 
   list.innerHTML = ''
 
@@ -2752,12 +2792,19 @@ function openNodes() {
       list.appendChild(ownLabel)
 
       ownClusters.forEach((c, i) => {
-        const memberCount = (c.members?.length ?? 0) + 1 // founder counts as member
+        const memberCount = (c.members?.length ?? 0) + 1
+        const isLeft      = c.status === 'left'
         const card = document.createElement('div')
         card.className = 'cred-card'
         card.style.marginBottom = '12px'
         card.innerHTML = `
-          <p class="cred-type">FOUNDER${c.status === 'pre-vine' ? ' · 🌱 PRE-VINE' : ''}</p>
+          <p class="cred-type">${
+            isLeft
+              ? 'FOUNDER · AWAY'
+              : c.status === 'pre-vine'
+                ? 'FOUNDER · 🌱 PRE-VINE'
+                : 'FOUNDER'
+          }</p>
           <div class="cred-title">${escHtmlP(c.name)}</div>
           <div class="cred-sub" style="font-size:11px;color:var(--ink-dim);margin-top:4px;">
             ${escHtmlP(c.description ?? '')}
@@ -2770,14 +2817,25 @@ function openNodes() {
               Members <span>${memberCount}</span>
             </div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="btn btn-ghost" style="flex:1;font-size:11px;"
-              onclick="openInviteFromCluster('${c.id}')">
-              Invite a Grape
-            </button>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            ${isLeft ? `
+              <button class="btn btn-ghost" style="flex:1;font-size:11px;"
+                onclick="rejoinCluster('${c.id}')">
+                Rejoin as Founder
+              </button>
+            ` : `
+              <button class="btn btn-ghost" style="flex:1;font-size:11px;"
+                onclick="openInviteFromCluster('${c.id}')">
+                Invite a Grape
+              </button>
+              <button class="btn btn-ghost" style="font-size:11px;"
+                onclick="softLeaveCluster('${c.id}')">
+                Leave
+              </button>
+            `}
             <button class="btn btn-ghost" style="font-size:11px;color:var(--red);"
               onclick="confirmLeaveCluster('${c.id}')">
-              Leave
+              Delete
             </button>
           </div>
         `
@@ -2797,14 +2855,28 @@ function openNodes() {
         const card = document.createElement('div')
         card.className = 'cred-card'
         card.style.marginBottom = '12px'
+        const isLeft = m.status === 'left'
         card.innerHTML = `
-          <p class="cred-type">${m.status?.toUpperCase() ?? 'MEMBER'}</p>
-          <div class="cred-title">${escHtmlP(m.node_name ?? m.node_id ?? 'Unknown cluster')}</div>
+          <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : (m.status?.toUpperCase() ?? 'MEMBER')}</p>
+          <div class="cred-title">${escHtmlP(m.node_name ?? m.cluster_name ?? m.node_id ?? 'Unknown cluster')}</div>
           <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
-              Joined <span>${m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}</span>
+              Joined <span>${m.joined_at ?? m.issued_at ? new Date(m.joined_at ?? m.issued_at).toLocaleDateString() : '—'}</span>
             </div>
           </div>
+          ${!isLeft ? `
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-ghost" style="font-size:11px;"
+              onclick="softLeaveMembership('${m.id ?? m.node_id}')">
+              Leave
+            </button>
+          </div>` : `
+          <div style="margin-top:8px;">
+            <p style="font-size:11px;color:var(--ink-dim);">
+              You left this cluster. Your credential remains as a personal record.
+              Rejoin by requesting a new invite from the founder.
+            </p>
+          </div>`}
         `
         list.appendChild(card)
       })
@@ -2875,7 +2947,7 @@ function openCredentials() {
       // Issuer line
       const issuerLine = isFounder
         ? 'Self-issued · Founder'
-        : (c.issuer_did ?? c.issuer ?? '')
+        : (c.issuer_did ?? '')
 
       // Expiry display
       const expiry = c.expires_at
@@ -3023,7 +3095,7 @@ async function createCluster() {
       type:        'FounderCredential',
       cluster_id:  clusterId,
       cluster_name: name,
-      issuer:      founderDid,    // self-issued
+      issuer_did:  founderDid,    // self-issued
       subject:     founderDid,
       issued_at:   now,
       claims: {
@@ -3135,26 +3207,152 @@ async function confirmLeaveCluster(clusterId) {
   const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
   if (!cluster) return
 
+  const memberCount = (cluster.members?.length ?? 0)
+
+  // Build confirmation modal
+  const existing = document.getElementById('cluster-delete-modal')
+  if (existing) existing.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'cluster-delete-modal'
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(8,11,18,0.92);
+    z-index:200;display:flex;align-items:center;
+    justify-content:center;padding:24px;
+  `
+
+  const memberLine = memberCount === 0
+    ? `This cluster has no members.`
+    : `This cluster has <strong>${memberCount} member${memberCount !== 1 ? 's' : ''} 🍇</strong>.
+       Their credentials become a personal historical record —
+       their vaults are not affected.`
+
+  const successionLine = memberCount > 0
+    ? `<p style="font-size:12px;color:var(--ink-dim);margin-top:8px;">
+        The member with the most referral weight will be offered
+        founder status. The cluster lives on in their vault.
+       </p>`
+    : ''
+
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:380px;">
+      <p class="cred-type" style="color:var(--red);">Delete cluster</p>
+      <div class="cred-title" style="margin-bottom:12px;">
+        ${escHtmlP(cluster.name)}
+      </div>
+      <p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+        ${memberLine}
+      </p>
+      ${successionLine}
+      <p style="font-size:12px;color:var(--ink-dim);line-height:1.6;margin-top:12px;">
+        Deleting this cluster is fine — just don't do it too often,
+        as the cluster resides on each grape as their own.
+        This cannot be undone.
+      </p>
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        <button class="btn btn-ghost" style="flex:1;"
+          onclick="document.getElementById('cluster-delete-modal').remove()">
+          Cancel
+        </button>
+        <button class="btn btn-primary"
+          style="flex:1;background:var(--red);border-color:var(--red);"
+          onclick="document.getElementById('cluster-delete-modal').remove();
+                   _executeClusterDelete('${clusterId}')">
+          Delete
+        </button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+}
+
+/**
+ * Soft leave — founder steps back but keeps the cluster.
+ * Status set to 'left'. Can rejoin anytime.
+ */
+async function softLeaveCluster(clusterId) {
+  const vault   = appState.vault
+  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  if (!cluster) return
+
+  cluster.status  = 'left'
+  cluster.left_at = new Date().toISOString()
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    populateHome()
+    showToast(`You stepped back from ${cluster.name}`)
+    openNodes()
+  } catch (err) {
+    showToast('Could not leave: ' + err.message)
+  }
+}
+
+/**
+ * Rejoin a cluster the founder previously left.
+ */
+async function rejoinCluster(clusterId) {
+  const vault   = appState.vault
+  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  if (!cluster) return
+
+  cluster.status  = 'active'
+  cluster.left_at = null
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    populateHome()
+    showToast(`Welcome back to ${cluster.name}`)
+    openNodes()
+  } catch (err) {
+    showToast('Could not rejoin: ' + err.message)
+  }
+}
+
+/**
+ * Soft leave a membership credential.
+ * Marks the credential status as 'left' — credential stays in vault.
+ */
+async function softLeaveMembership(credentialId) {
+  const vault = appState.vault
+  const cred  = (vault.credentials ?? []).find(
+    c => (c.id ?? c.node_id) === credentialId
+  )
+  if (!cred) return
+
+  cred.status  = 'left'
+  cred.left_at = new Date().toISOString()
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    showToast('You left the cluster. Your credential stays as a personal record.')
+    openNodes()
+  } catch (err) {
+    showToast('Could not leave: ' + err.message)
+  }
+}
+async function _executeClusterDelete(clusterId) {
+  const vault   = appState.vault
+  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  if (!cluster) return
+
   const memberCount = cluster.members?.length ?? 0
 
   if (memberCount === 0) {
-    // No members — dissolve immediately
-    if (!confirm(`Dissolve "${cluster.name}"? This cannot be undone.`)) return
     await dissolveCluster(clusterId)
     return
   }
 
-  // Members exist — soft succession
-  // Find member with most referral weight (best-effort local)
+  // Find highest-weight member for succession
   const successor = cluster.members.reduce((best, m) =>
     (m.weight ?? 0) > (best.weight ?? 0) ? m : best
   , cluster.members[0])
-
-  const msg = `You are leaving "${cluster.name}".\n\n` +
-    `${successor.handle ?? 'A member'} will be offered founder status.\n\n` +
-    `The cluster continues without you.`
-
-  if (!confirm(msg)) return
 
   await leaveCluster(clusterId, successor.did)
 }
@@ -3251,17 +3449,22 @@ function openInvite() {
 
   // Populate cluster dropdown from:
   // 1. Clusters the grape owns (vault.ownClusters)
-  // 2. Approved grape cluster credentials (vault.credentials type GrapeClusterCredential)
-  // 3. Approved vine memberships (vault.memberships)
-  const ownClusters = (vault?.ownClusters ?? [])
-  const grapeCreds  = (vault?.credentials ?? [])
+  // 2. Grape cluster credentials (vault.credentials type GrapeClusterCredential)
+  // 3. Vine memberships (vault.credentials type MembershipCredential, fallback vault.memberships)
+  const ownClusters    = (vault?.ownClusters ?? [])
+  const grapeCreds     = (vault?.credentials ?? [])
     .filter(c => c.type === 'GrapeClusterCredential')
-  const approved    = (vault?.memberships ?? []).filter(m => m.status === 'approved')
+  const vineCreds      = (vault?.credentials ?? [])
+    .filter(c => c.type === 'MembershipCredential')
+  const legacyMembers  = (vault?.memberships ?? [])
+    .filter(m => m.status === 'approved')
+    .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
 
   const allClusters = [
-    ...ownClusters.map(c => ({ node_id: c.id, node_name: c.name, own: true })),
-    ...grapeCreds.map(c => ({ node_id: c.cluster_id, node_name: c.cluster_name, own: false })),
-    ...approved.map(m => ({ node_id: m.node_id, node_name: m.node_name, own: false })),
+    ...ownClusters.map(c => ({ node_id: c.id,         node_name: c.name,         own: true  })),
+    ...grapeCreds.map(c  => ({ node_id: c.cluster_id,  node_name: c.cluster_name, own: false })),
+    ...vineCreds.map(c   => ({ node_id: c.node_id,     node_name: c.node_name,    own: false })),
+    ...legacyMembers.map(m=> ({ node_id: m.node_id,    node_name: m.node_name,    own: false })),
   ]
 
   select.innerHTML = '<option value="">— select a cluster —</option>'
@@ -3337,8 +3540,8 @@ async function generateInvite() {
     const payload = {
       id:                  crypto.randomUUID(),
       type:                'ReferralCredential',
-      from_identity_id:    vault.identity.id,
-      to_identity_id:      null,            // unknown until grape creates Passport
+      from_did:            vault.identity.id,
+      to_did:              null,            // unknown until grape creates Passport
       node_id:             cluster.node_id,
       node_name:           cluster.node_name,
       from_status_at_time: membership?.status ?? 'unknown',
