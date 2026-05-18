@@ -2773,6 +2773,8 @@ async function deleteVaultFile(index) {
     showToast('Could not delete: ' + err.message)
   }
 }
+
+function openVFPad(index) {
   const all   = appState.vault?.files ?? []
   const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
   const f     = files[index]
