@@ -646,6 +646,37 @@
     }
     .about-body strong { color: var(--ink); }
     .about-body em { color: var(--gold); font-style: italic; }
+    /* Vault file rows */
+    .vf-file-row {
+      display: flex; align-items: stretch;
+      margin-bottom: 8px;
+      border: 1px solid var(--ink-faint);
+      border-radius: 8px;
+      background: var(--bg-card);
+      overflow: hidden;
+    }
+    .vf-file-main {
+      display: flex; align-items: center;
+      flex: 1; padding: 12px; cursor: pointer;
+      gap: 12px; min-width: 0;
+    }
+    .vf-file-main:hover { background: var(--bg-lift); }
+    .vf-file-actions {
+      display: flex; flex-shrink: 0;
+      border-left: 1px solid var(--ink-faint);
+    }
+    .vf-action-btn {
+      background: none; border: none;
+      border-left: 1px solid var(--ink-faint);
+      padding: 0 14px; min-height: 48px;
+      cursor: pointer; font-size: 14px;
+      color: var(--ink-dim);
+      transition: background 0.15s, color 0.15s;
+    }
+    .vf-action-btn:first-child { border-left: none; }
+    .vf-action-btn:hover { background: var(--bg-lift); color: var(--gold); }
+    .vf-action-delete:hover { color: var(--red) !important; }
+
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 2px; }
@@ -861,7 +892,6 @@
         <p class="logotype" style="margin-bottom:2px;">Passport</p>
         <div class="home-handle" id="home-handle">—</div>
       </div>
-      <div class="avatar" id="home-avatar">—</div>
     </div>
 
     <!-- ── IDENTITY ─────────────────────────────────────────── -->
@@ -2057,6 +2087,14 @@ Built in Saint-Léon-de-Standon, Quebec, Canada.
       date:       new Date().toLocaleDateString('en-CA'),
       size:       `${Math.round(new TextEncoder().encode(welcomeContent).length / 1024 * 10) / 10}kb`,
       content:    welcomeContent,
+    }, {
+      name:       'welcome.txt',
+      path:       'welcome.txt',
+      mime:       'text/plain',
+      visibility: 'shared',
+      date:       new Date().toLocaleDateString('en-CA'),
+      size:       `${Math.round(new TextEncoder().encode(welcomeContent).length / 1024 * 10) / 10}kb`,
+      content:    welcomeContent,
     }],
     memberships:[], ownClusters:[], referrals_sent:[], referrals_received:[],
     created_at:n, updated_at:null,
@@ -2433,7 +2471,6 @@ function populateHome() {
   const handle = v.identity.handle
 
   document.getElementById('home-handle').textContent = handle
-  document.getElementById('home-avatar').textContent = handle.charAt(0).toUpperCase()
 
   // Settings handle display
   const sh = document.getElementById('settings-handle-display')
@@ -2597,29 +2634,108 @@ function renderVFList() {
   }
 
   el.innerHTML = files.map((f, i) => {
-    const isImage = (f.mime ?? '').startsWith('image/') ||
-                    (f.content ?? '').startsWith('data:image/')
-    const icon = isImage ? '🖼' : '📄'
+    const isImage   = (f.mime ?? '').startsWith('image/') ||
+                      (f.content ?? '').startsWith('data:image/')
+    const icon      = isImage ? '🖼' : '📄'
+    const otherTab  = _vfTab === 'private' ? 'shared' : 'private'
+    const toggleLbl = _vfTab === 'private' ? 'Make shared' : 'Make private'
+    const isReadonly = f.name === 'welcome.txt'
     return `
-    <div class="menu-item" style="margin-bottom:8px;" data-vf-index="${i}">
-      <div class="menu-icon">${icon}</div>
-      <div class="menu-text">
-        <strong>${escHtmlP(f.name ?? f.path ?? 'untitled')}</strong>
-        <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
+    <div class="vf-file-row" data-vf-index="${i}">
+      <div class="vf-file-main" data-vf-index="${i}">
+        <div class="menu-icon">${icon}</div>
+        <div class="menu-text">
+          <strong>${escHtmlP(f.name ?? f.path ?? 'untitled')}</strong>
+          <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
+        </div>
+        <span class="menu-arrow">›</span>
       </div>
-      <span class="menu-arrow">›</span>
+      <div class="vf-file-actions">
+        <button class="vf-action-btn" data-action="toggle" data-index="${i}"
+          title="${toggleLbl}">
+          ${_vfTab === 'private' ? '🌐' : '🔒'}
+        </button>
+        ${!isReadonly ? `
+        <button class="vf-action-btn vf-action-delete" data-action="delete" data-index="${i}"
+          title="Delete file">
+          ✕
+        </button>` : ''}
+      </div>
     </div>`
   }).join('')
 
-  // Attach click handlers via JS — no inline onclick, no quoting issues
-  el.querySelectorAll('[data-vf-index]').forEach(row => {
+  // Attach click handlers
+  el.querySelectorAll('.vf-file-main').forEach(row => {
     row.addEventListener('click', () => {
       openVFPad(parseInt(row.dataset.vfIndex, 10))
     })
   })
+  el.querySelectorAll('[data-action="toggle"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      toggleFileVisibility(parseInt(btn.dataset.index, 10))
+    })
+  })
+  el.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      deleteVaultFile(parseInt(btn.dataset.index, 10))
+    })
+  })
 }
 
-function openVFPad(index) {
+async function toggleFileVisibility(index) {
+  const vault = appState.vault
+  const all   = vault?.files ?? []
+  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const f     = files[index]
+  if (!f) return
+
+  // Find the actual index in the full array
+  const fullIdx = all.indexOf(f)
+  if (fullIdx < 0) return
+
+  vault.files[fullIdx].visibility = _vfTab === 'private' ? 'shared' : 'private'
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    renderVFList()
+    showToast(`Moved to ${vault.files[fullIdx].visibility} files`)
+  } catch (err) {
+    // Revert
+    vault.files[fullIdx].visibility = _vfTab
+    showToast('Could not update: ' + err.message)
+  }
+}
+
+async function deleteVaultFile(index) {
+  const vault = appState.vault
+  const all   = vault?.files ?? []
+  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const f     = files[index]
+  if (!f) return
+  if (f.name === 'welcome.txt') { showToast('welcome.txt cannot be deleted'); return }
+
+  const fullIdx = all.indexOf(f)
+  if (fullIdx < 0) return
+
+  vault.files.splice(fullIdx, 1)
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    populateHome()
+    renderVFList()
+    showToast(`${f.name} deleted`)
+  } catch (err) {
+    // Revert
+    vault.files.splice(fullIdx, 0, f)
+    showToast('Could not delete: ' + err.message)
+  }
+}
   const all   = appState.vault?.files ?? []
   const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
   const f     = files[index]
