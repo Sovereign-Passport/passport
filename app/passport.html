@@ -1042,13 +1042,22 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <p class="section-label">Backup &amp; Restore</p>
+    <p class="section-label">Backup &amp; Sync</p>
 
     <div class="menu-item" onclick="downloadBackup()">
       <div class="menu-icon">💾</div>
       <div class="menu-text">
         <strong>Download Backup</strong>
-        <small>Save encrypted .passport file</small>
+        <small>Save encrypted .passport file — the sovereign way</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
+    <div class="menu-item" onclick="syncToDevice()">
+      <div class="menu-icon">🔗</div>
+      <div class="menu-text">
+        <strong>Sync to another device</strong>
+        <small>15-minute encrypted relay link</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -1057,7 +1066,7 @@
       <div class="menu-icon">↩</div>
       <div class="menu-text">
         <strong>Restore from Backup</strong>
-        <small>Import a .passport file</small>
+        <small>Import a .passport file or sync link</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -1198,11 +1207,19 @@
   <div class="screen" id="screen-restore">
     <h1 class="display fade-up" style="margin-bottom:8px;">Restore<br><em>Passport.</em></h1>
     <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
-      Select your <strong style="color:var(--ink)">.passport</strong> backup file,
-      then enter your password.
+      Restore from a <strong style="color:var(--ink)">.passport</strong> file
+      or a 15-minute sync link.
     </p>
 
-    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
+    <div class="tab-bar fade-up fade-up-2" style="width:100%;max-width:380px;margin-bottom:16px;">
+      <button id="restore-tab-file" class="tab-btn active"
+        onclick="switchRestoreTab('file')">From file</button>
+      <button id="restore-tab-sync" class="tab-btn"
+        onclick="switchRestoreTab('sync')">From sync link</button>
+    </div>
+
+    <!-- File restore -->
+    <div id="restore-panel-file" class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
       <div class="field">
         <label>Backup file</label>
         <input
@@ -1230,11 +1247,6 @@
         Restore →
       </button>
 
-      <!--
-        Debug info panel — shows restore error details.
-        Visible only when an error occurs.
-        Helps diagnose backup/password issues across versions.
-      -->
       <div id="restore-debug" style="display:none;margin-top:12px;
         background:var(--bg-lift);border:1px solid var(--ink-faint);
         border-radius:8px;padding:12px;font-size:10px;
@@ -1246,7 +1258,36 @@
       </div>
 
       <div class="divider">or</div>
+      <button class="btn btn-ghost" onclick="goTo(appState.vault ? 'screen-home' : 'screen-welcome')">← Go back</button>
+    </div>
 
+    <!-- Sync link restore -->
+    <div id="restore-panel-sync" class="card" style="display:none;width:100%;max-width:380px;">
+      <div class="field">
+        <label>Sync link</label>
+        <input type="text" id="input-sync-link"
+          placeholder="https://mdusl.sovereign-passport.id/api/passport/sync/..."
+          style="font-size:12px;">
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="input-sync-password"
+          placeholder="Your vault password">
+      </div>
+
+      <div class="notice" id="sync-restore-error"
+        style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" style="color:var(--red);" id="sync-restore-error-text"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-sync-restore"
+        onclick="restoreFromSyncLink()">
+        Fetch &amp; Restore →
+      </button>
+
+      <div class="divider">or</div>
       <button class="btn btn-ghost" onclick="goTo(appState.vault ? 'screen-home' : 'screen-welcome')">← Go back</button>
     </div>
   </div>
@@ -2612,6 +2653,13 @@ function showDID() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SYNC ENDPOINT — temporary on mdusl, will move to sync.sovereign-passport.id
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SYNC_ENDPOINT = 'https://mdusl.sovereign-passport.id/api/passport/sync'
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BACKUP
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2626,6 +2674,198 @@ function downloadBackup() {
   a.click()
   URL.revokeObjectURL(url)
   showToast('Backup downloaded')
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYNC TO ANOTHER DEVICE — 15-minute relay
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Upload encrypted .passport blob to the VPS relay.
+ * Returns a sync link valid for 15 minutes.
+ * The VPS receives an opaque encrypted blob — it cannot read it.
+ */
+async function syncToDevice() {
+  if (!appState.stored) { showToast('No vault to sync'); return }
+
+  showToast('Generating sync link…')
+
+  try {
+    const blob    = exportBackup(appState.stored)
+    const text    = await blob.text()
+    const b64     = btoa(unescape(encodeURIComponent(text)))
+    const did     = appState.vault?.identity?.id
+
+    const res = await fetch(SYNC_ENDPOINT, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ did, blob: b64 }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error ?? `Server error ${res.status}`)
+    }
+
+    const { url, expires_at } = await res.json()
+    const expiresIn = Math.round((new Date(expires_at) - Date.now()) / 60000)
+
+    // Show sync link modal
+    _showSyncLinkModal(url, expiresIn)
+
+  } catch (err) {
+    showToast('Sync failed: ' + (err.message ?? 'network error'))
+  }
+}
+
+/**
+ * Show the sync link + QR in a modal overlay.
+ */
+function _showSyncLinkModal(url, expiresIn) {
+  document.getElementById('sync-link-modal')?.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id    = 'sync-link-modal'
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(8,11,18,0.96);
+    z-index:200;display:flex;align-items:center;
+    justify-content:center;padding:24px;overflow-y:auto;
+  `
+
+  // QR via Google Charts — no tracking, just math
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`
+
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:380px;text-align:center;">
+      <p class="cred-type" style="margin-bottom:8px;">Sync link</p>
+      <p style="font-size:12px;color:var(--ink-dim);line-height:1.6;margin-bottom:16px;">
+        Expires in <strong style="color:var(--gold);">${expiresIn} minutes</strong>.
+        Your data is already encrypted — the server cannot read it.
+      </p>
+
+      <img src="${qrUrl}" alt="Sync QR"
+        style="width:180px;height:180px;border-radius:8px;margin:0 auto 16px;display:block;">
+
+      <div style="background:var(--bg-deep);border-radius:6px;padding:10px;
+                  font-size:10px;color:var(--gold);word-break:break-all;
+                  margin-bottom:16px;text-align:left;line-height:1.6;">
+        ${escHtmlP(url)}
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;"
+          onclick="navigator.clipboard?.writeText('${escHtmlP(url)}');showToast('Link copied')">
+          Copy link
+        </button>
+        ${navigator.share ? `
+        <button class="btn btn-ghost" style="flex:1;"
+          onclick="navigator.share({title:'Passport sync',url:'${escHtmlP(url)}'})">
+          Share
+        </button>` : ''}
+      </div>
+
+      <div class="notice" style="margin-top:16px;text-align:left;">
+        <span class="notice-icon">ℹ</span>
+        <span class="notice-text" style="font-size:11px;">
+          The sovereign way is to download and transfer your backup file yourself.
+          This 15-minute relay is a convenience — use it, then forget it exists.
+        </span>
+      </div>
+
+      <button class="btn btn-ghost" style="margin-top:12px;width:100%;"
+        onclick="document.getElementById('sync-link-modal').remove()">
+        Close
+      </button>
+    </div>
+  `
+  document.body.appendChild(overlay)
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESTORE TAB SWITCH
+// ─────────────────────────────────────────────────────────────────────────────
+
+function switchRestoreTab(tab) {
+  const filePanel = document.getElementById('restore-panel-file')
+  const syncPanel = document.getElementById('restore-panel-sync')
+  const fileBtn   = document.getElementById('restore-tab-file')
+  const syncBtn   = document.getElementById('restore-tab-sync')
+  if (!filePanel || !syncPanel) return
+  const isFile = tab === 'file'
+  filePanel.style.display = isFile ? 'block' : 'none'
+  syncPanel.style.display = isFile ? 'none'  : 'block'
+  fileBtn.classList.toggle('active',  isFile)
+  syncBtn.classList.toggle('active', !isFile)
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESTORE FROM SYNC LINK
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function restoreFromSyncLink() {
+  const linkInput = document.getElementById('input-sync-link')
+  const pwInput   = document.getElementById('input-sync-password')
+  const errEl     = document.getElementById('sync-restore-error')
+  const errTxt    = document.getElementById('sync-restore-error-text')
+  const btn       = document.getElementById('btn-sync-restore')
+
+  const link     = linkInput?.value.trim()
+  const password = pwInput?.value
+
+  if (!link || !password) return
+
+  errEl.style.display = 'none'
+  btn.textContent     = 'Fetching…'
+  btn.disabled        = true
+
+  try {
+    // Fetch blob from relay
+    const res = await fetch(link)
+
+    if (res.status === 410) {
+      throw Object.assign(new Error('Sync link has expired. Generate a new one from your passport.'), { code: 'EXPIRED' })
+    }
+    if (res.status === 404) {
+      throw Object.assign(new Error('Sync link not found. It may have already been used or expired.'), { code: 'NOT_FOUND' })
+    }
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
+
+    const { blob: b64 } = await res.json()
+
+    // Decode base64 back to text
+    const text    = decodeURIComponent(escape(atob(b64)))
+    const payload = JSON.parse(text)
+
+    if (payload.format !== 'passport-vault' || !payload.payload) {
+      throw Object.assign(new Error('Invalid backup format'), { code: 'INVALID_BACKUP' })
+    }
+
+    // Decrypt with password — same flow as file restore
+    const { vault, vaultKey } = await unlockVault(
+      password,
+      payload.payload.salt,
+      payload.payload.iv,
+      payload.payload.ciphertext
+    )
+
+    await persist(payload.payload)
+    appState.stored   = payload.payload
+    appState.vault    = vault
+    appState.vaultKey = vaultKey
+    populateHome()
+    checkPendingOffer()
+    showToast('Passport restored from sync link')
+    goTo('screen-home')
+
+  } catch (e) {
+    errEl.style.display  = 'flex'
+    errTxt.textContent   = e.message ?? 'Could not restore'
+    btn.textContent      = 'Fetch & Restore →'
+    btn.disabled         = false
+  }
 }
 
 
