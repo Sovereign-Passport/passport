@@ -1131,17 +1131,6 @@
       <span class="badge badge-gold" id="h-files-badge">0</span>
     </div>
 
-    <p class="section-label">Backup</p>
-
-    <div class="menu-item" onclick="downloadBackup()">
-      <div class="menu-icon">💾</div>
-      <div class="menu-text">
-        <strong>Download Backup</strong>
-        <small>Keep a copy of your encrypted vault</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
     <p class="section-label">Device</p>
 
     <div class="menu-item menu-item-static">
@@ -2405,7 +2394,21 @@ async function tryUnlock() {
     appState.vaultKey = vaultKey
     populateHome()
     checkPendingOffer()
-    goTo('screen-home')
+
+    // If a sync token was waiting, route to restore screen sync tab
+    if (appState.pendingSyncToken) {
+      const token = appState.pendingSyncToken
+      appState.pendingSyncToken = null
+      goTo('screen-restore')
+      requestAnimationFrame(() => {
+        switchRestoreTab('sync')
+        const input = document.getElementById('input-sync-link')
+        if (input) input.value = `${SYNC_ENDPOINT}/${token}`
+        showToast('Enter your password to complete restore')
+      })
+    } else {
+      goTo('screen-home')
+    }
 
   } catch (e) {
     // Log real error to console
@@ -2708,11 +2711,13 @@ async function syncToDevice() {
       throw new Error(err.error ?? `Server error ${res.status}`)
     }
 
-    const { url, expires_at } = await res.json()
-    const expiresIn = Math.round((new Date(expires_at) - Date.now()) / 60000)
+    const { token, expires_at } = await res.json()
+    const expiresIn  = Math.round((new Date(expires_at) - Date.now()) / 60000)
+    const walletBase = 'https://sovereign-passport.github.io/passport/app/passport.html'
+    const syncUrl    = `${walletBase}#sync=${token}`
 
-    // Show sync link modal
-    _showSyncLinkModal(url, expiresIn)
+    // Show sync link modal — QR points to passport app, not raw API
+    _showSyncLinkModal(syncUrl, expiresIn)
 
   } catch (err) {
     showToast('Sync failed: ' + (err.message ?? 'network error'))
@@ -4206,6 +4211,7 @@ async function boot() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const offerUrl   = params.get('offer') || hashParams.get('offer')
   const offerData  = params.get('r')     || hashParams.get('r')
+  const syncToken  = params.get('sync')  || hashParams.get('sync')
 
   if (stored) {
     appState.stored = stored
@@ -4219,7 +4225,22 @@ async function boot() {
       showToast('Credential offer waiting — unlock your Passport')
     }
 
+    if (syncToken) {
+      appState.pendingSyncToken = syncToken
+      showToast('Sync link detected — unlock your Passport to restore')
+    }
+
     goTo('screen-unlock')
+
+  } else if (syncToken) {
+    // New device — go straight to restore, sync tab pre-filled
+    appState.pendingSyncToken = syncToken
+    goTo('screen-restore')
+    requestAnimationFrame(() => {
+      switchRestoreTab('sync')
+      const input = document.getElementById('input-sync-link')
+      if (input) input.value = `${SYNC_ENDPOINT}/${syncToken}`
+    })
 
   } else if (offerUrl || offerData) {
     // New user — create passport first, then handle offer
