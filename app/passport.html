@@ -11,20 +11,6 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="../images/spid-logo.jpg">
   <meta name="apple-mobile-web-app-title" content="SPID">
-  <script>
-    // Unregister ALL service workers and clear ALL caches
-    // This runs on every page load — ensures clean state always
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(reg => reg.unregister())
-      })
-      caches.keys().then(keys => {
-        keys.forEach(key => caches.delete(key))
-      })
-      // Re-register the clean no-cache SW after clearing
-      navigator.serviceWorker.register('sw.js')
-    }
-  </script>
   <!-- No external font calls — system fonts only. Sovereign by design. -->
   <link rel="stylesheet" href="passport.css">
 </head>
@@ -1218,6 +1204,7 @@
 
 <script src="passport.crypto.js"></script>
 <script src="passport.state.js"></script>
+<script src="passport.qr.js"></script>
 <script>
 
 
@@ -1768,7 +1755,7 @@ function showDID() {
 // downloadBackup() — exports encrypted .passport blob to disk.
 // syncToDevice() — uploads encrypted blob to 15-min VPS relay, shows QR.
 //   QR points to passport.html#sync=TOKEN (not raw API endpoint).
-//   Uses api.qrserver.com for QR rendering — third-party, non-critical.
+//   QR generated locally via passport.qr.js — no external calls.
 //   FUTURE: move to sync.sovereign-passport.id when DNS is ready.
 // switchRestoreTab() — toggles between file restore and sync link restore.
 // restoreFromSyncLink() — fetches blob from relay, decrypts, restores.
@@ -1847,8 +1834,8 @@ function _showSyncLinkModal(url, expiresIn) {
     justify-content:center;padding:24px;overflow-y:auto;
   `
 
-  // QR via Google Charts — no tracking, just math
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`
+  // QR — generated locally, no external call
+  const qrSvg = makeQR(url, 180)
 
   overlay.innerHTML = `
     <div class="card" style="width:100%;max-width:380px;text-align:center;">
@@ -1858,8 +1845,7 @@ function _showSyncLinkModal(url, expiresIn) {
         Your data is already encrypted — the server cannot read it.
       </p>
 
-      <img src="${qrUrl}" alt="Sync QR"
-        style="width:180px;height:180px;border-radius:8px;margin:0 auto 16px;display:block;">
+      <div style="width:180px;height:180px;border-radius:8px;margin:0 auto 16px;display:block;overflow:hidden;">${qrSvg}</div>
 
       <div style="background:var(--bg-deep);border-radius:6px;padding:10px;
                   font-size:10px;color:var(--gold);word-break:break-all;
