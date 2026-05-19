@@ -990,6 +990,9 @@
         Contains the offer URL + signed referral encoded in the hash.
       -->
       <div id="invite-result" style="display:none;margin-bottom:16px;">
+        <div id="invite-qr"
+          style="width:180px;height:180px;margin:0 auto 16px;display:block;
+                 border-radius:8px;overflow:hidden;"></div>
         <div class="did-display">
           <span class="did-label">Invite Link</span>
           <span class="did-value" id="invite-link-display"
@@ -2945,8 +2948,9 @@ async function generateInvite() {
     const walletBase = `https://sovereign-passport.github.io/passport/app/passport.html`
     const inviteUrl  = `${walletBase}#offer=${offerBase}&ref=${encodedRef}`
 
-    // Display the link
+    // Display the link + QR
     document.getElementById('invite-link-display').textContent = inviteUrl
+    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 180)
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')
