@@ -1741,7 +1741,7 @@ function escHtmlP(str) {
 function showDID() {
   const did = (appState.vault && appState.vault.identity && appState.vault.identity.id)
   if (!did) return
-  (navigator.clipboard && navigator.clipboard.writeText)(did).then(() => showToast('DID copied to clipboard'))
+  if(navigator.clipboard) navigator.clipboard.writeText(did).then(() => showToast('DID copied to clipboard'))
     .catch(() => showToast(did.slice(0,30) + '…'))
 }
 
@@ -1821,7 +1821,7 @@ async function syncToDevice() {
  * Show the sync link + QR in a modal overlay.
  */
 function _showSyncLinkModal(url, expiresIn) {
-  (document.getElementById('sync-link-modal') && document.getElementById('sync-link-modal').remove)()
+  const _slm = document.getElementById('sync-link-modal'); if(_slm) _slm.remove()
 
   const overlay = document.createElement('div')
   overlay.id    = 'sync-link-modal'
@@ -1852,7 +1852,7 @@ function _showSyncLinkModal(url, expiresIn) {
 
       <div style="display:flex;gap:8px;">
         <button class="btn btn-primary" style="flex:1;"
-          onclick="(navigator.clipboard && navigator.clipboard.writeText)('${escHtmlP(url)}');showToast('Link copied')">
+          onclick="if(navigator.clipboard)navigator.clipboard.writeText('${escHtmlP(url)}');showToast('Link copied')">
           Copy link
         </button>
         ${navigator.share ? `
@@ -2354,7 +2354,7 @@ function openCredentials() {
 function copyCredential(idx) {
   const cred = (appState.vault && appState.vault.credentials && appState.vault.credentials[idx])
   if (!(cred && cred.sd_jwt)) return
-  (navigator.clipboard && navigator.clipboard.writeText)(cred.sd_jwt)
+  if(navigator.clipboard) navigator.clipboard.writeText(cred.sd_jwt)
     .then(() => showToast('Credential copied'))
     .catch(() => showToast('Copy failed — open browser console to get SD-JWT'))
   console.log('[Credential] SD-JWT:', cred.sd_jwt)
@@ -2370,7 +2370,7 @@ function presentCredential(idx) {
   const cred = (appState.vault && appState.vault.credentials && appState.vault.credentials[idx])
   if (!(cred && cred.sd_jwt)) return
   // Copy credential and instruct user to paste in verifier
-  (navigator.clipboard && navigator.clipboard.writeText)(cred.sd_jwt)
+  if(navigator.clipboard) navigator.clipboard.writeText(cred.sd_jwt)
   showToast('SD-JWT copied — paste at mdusl.sovereign-passport.id/verify')
 }
 
@@ -2976,7 +2976,7 @@ async function generateInvite() {
  */
 function copyInviteLink() {
   const link = document.getElementById('invite-link-display').textContent
-  (navigator.clipboard && navigator.clipboard.writeText)(link)
+  if(navigator.clipboard) navigator.clipboard.writeText(link)
     .then(() => showToast('Invite link copied'))
     .catch(() => showToast('Copy failed'))
 }
@@ -3332,7 +3332,7 @@ async function boot() {
   if (stored) {
     appState.stored = stored
     document.getElementById('unlock-handle-display').textContent =
-      `DID: ${(stored.did && stored.did.slice)(0,20)}…`
+      `DID: ${stored.did ? stored.did.slice(0,20) : ""}…`
 
     if (offerUrl || offerData) {
       // Store offer URL for after unlock
