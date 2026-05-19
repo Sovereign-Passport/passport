@@ -219,7 +219,7 @@ var QR = (() => {
     const fpos = [0,1,2,3,4,5,7,8,8,8,8,8,8,8]
     const fcol = [8,8,8,8,8,8,8,8,7,5,4,3,2,1,0]
     for (let i = 0; i < 15; i++) {
-      set(fpos[i], 8, 0); set(8, fcol[i] ?? (size-6+i), 0)
+      set(fpos[i], 8, 0); set(8, fcol[i], 0)
     }
     set(size-8, 8, 0)
 

@@ -87,7 +87,7 @@ function goTo(screenId) {
   if (screenId === 'screen-health')      populateHome()
   if (screenId === 'screen-settings') {
     const sh = document.getElementById('settings-handle-display')
-    if (sh) sh.textContent = appState.vault?.identity?.handle ?? '—'
+    if (sh) sh.textContent = (appState.vault && appState.vault.identity && appState.vault.identity.handle) ? appState.vault.identity.handle : '—'
   }
 }
 

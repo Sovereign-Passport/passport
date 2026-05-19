@@ -25,7 +25,7 @@
 // CRYPTO — vault foundation (same as vault.js, inlined for single-file PWA)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PBKDF2_ITER = 600_000
+const PBKDF2_ITER = 600000
 const SALT_LEN = 32, IV_LEN = 12
 const VAULT_VERSION = '1.0.0'
 const ED25519_MC = new Uint8Array([0xed, 0x01])
@@ -51,9 +51,15 @@ const dec   = b => new TextDecoder().decode(b)
 
 function toBase58(bytes) {
   const A='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-  let n=BigInt('0x'+toHex(bytes)),r='',B=BigInt(58)
-  while(n>0n){r=A[Number(n%B)]+r;n=n/B}
-  for(const b of bytes){if(b!==0)break;r='1'+r}
+  const digits=[0]
+  for(let i=0;i<bytes.length;i++){
+    let carry=bytes[i]
+    for(let j=0;j<digits.length;j++){carry+=digits[j]<<8;digits[j]=carry%58;carry=Math.floor(carry/58)}
+    while(carry){digits.push(carry%58);carry=Math.floor(carry/58)}
+  }
+  let r=''
+  for(const b of bytes){if(b!==0)break;r+='1'}
+  for(let i=digits.length-1;i>=0;i--)r+=A[digits[i]]
   return r
 }
 
@@ -339,7 +345,7 @@ async function loadStored() {
   return new Promise((res,rej)=>{
     const tx=db.transaction(STORE,'readonly')
     const r=tx.objectStore(STORE).get('current')
-    r.onsuccess=e=>res(e.target.result??null)
+    r.onsuccess=e=>res(e.target.result !== undefined ? e.target.result : null)
     r.onerror=e=>rej(e.target.error)
   })
 }

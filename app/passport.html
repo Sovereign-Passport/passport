@@ -1209,12 +1209,6 @@
 <script src="passport.state.js"></script>
 <script src="passport.qr.js"></script>
 <script>
-
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HANDLE VALIDATION
-// ═════════════════════════════════════════════════════════════════════════════
 // SECTION 4 — ONBOARDING (CREATE NEW PASSPORT)
 // Handle validation, password strength, vault generation, generating screen.
 // Flow: screen-welcome → screen-handle → screen-password →
@@ -1418,7 +1412,7 @@ async function tryUnlock() {
 
   } catch (e) {
     // Log real error to console
-    console.error('[Unlock] Failed:', e.code ?? e.message, e)
+    console.error('[Unlock] Failed:', (e.code || e.message), e)
 
     err.style.display = 'flex'
     btn.textContent   = 'Unlock →'
@@ -1450,23 +1444,23 @@ function populateHome() {
 
   // Memberships count — reads vault.credentials as primary source
   // Falls back to vault.memberships for passports predating migration
-  const credCounts = (v.credentials ?? [])
+  const credCounts = (v.credentials || [])
     .filter(c => c.type === 'MembershipCredential' || c.type === 'GrapeClusterCredential')
-  const legacyCounts = (v.memberships ?? [])
-    .filter(m => !(v.credentials ?? []).some(c => c.node_id === m.node_id))
+  const legacyCounts = (v.memberships || [])
+    .filter(m => !(v.credentials || []).some(c => c.node_id === m.node_id))
   const credCount = credCounts.length + legacyCounts.length
   document.getElementById('cred-count').textContent =
     `${credCount} membership${credCount !== 1 ? 's' : ''}`
 
   // Clusters count (Communities I Own)
-  const nodeCount = (v.ownClusters ?? []).length
+  const nodeCount = (v.ownClusters || []).length
   document.getElementById('nodes-count').textContent =
     nodeCount > 0
       ? `${nodeCount} cluster${nodeCount !== 1 ? 's' : ''} — free forever`
       : '0 clusters — free forever'
 
   // Vault files count
-  const fileCount = (v.files ?? []).length
+  const fileCount = (v.files || []).length
   document.getElementById('vault-file-count').textContent =
     `${fileCount} file${fileCount !== 1 ? 's' : ''}`
 
@@ -1550,7 +1544,7 @@ async function addVaultFile(input) {
       name:       file.name,
       path:       file.name,
       mime:       file.type || 'text/plain',
-      visibility: _vfTab ?? 'private',
+      visibility: _vfTab || 'private',
       date:       new Date().toLocaleDateString('en-CA'),
       size:       `${Math.round(file.size / 1024 * 10) / 10}kb`,
       content,
@@ -1567,7 +1561,7 @@ async function addVaultFile(input) {
       renderVFList()
     } catch (err) {
       vault.files.pop()
-      showToast('Could not save — ' + (err.message ?? 'storage error'))
+      showToast('Could not save — ' + ((err.message || 'storage error')))
       console.error('[VaultFile] Save failed:', err)
     }
   }
@@ -1595,8 +1589,8 @@ function switchVaultTab(tab) {
 function renderVFList() {
   const el    = document.getElementById('vf-file-list')
   if (!el) return
-  const all   = appState.vault?.files ?? []
-  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const all   = (appState.vault && appState.vault.files) || []
+  const files = all.filter(f => (f.visibility || 'private') === _vfTab)
 
   if (files.length === 0) {
     el.innerHTML = `
@@ -1613,8 +1607,8 @@ function renderVFList() {
   }
 
   el.innerHTML = files.map((f, i) => {
-    const isImage   = (f.mime ?? '').startsWith('image/') ||
-                      (f.content ?? '').startsWith('data:image/')
+    const isImage   = (f.mime || '').startsWith('image/') ||
+                      (f.content || '').startsWith('data:image/')
     const icon      = isImage ? '🖼' : '📄'
     const otherTab  = _vfTab === 'private' ? 'shared' : 'private'
     const toggleLbl = _vfTab === 'private' ? 'Make shared' : 'Make private'
@@ -1624,8 +1618,8 @@ function renderVFList() {
       <div class="vf-file-main" data-vf-index="${i}">
         <div class="menu-icon">${icon}</div>
         <div class="menu-text">
-          <strong>${escHtmlP(f.name ?? f.path ?? 'untitled')}</strong>
-          <small>${f.date ?? '—'} · ${f.size ?? '—'}</small>
+          <strong>${escHtmlP((f.name || f.path || 'untitled'))}</strong>
+          <small>${f.date || '—'} · ${f.size || '—'}</small>
         </div>
         <span class="menu-arrow">›</span>
       </div>
@@ -1665,8 +1659,8 @@ function renderVFList() {
 
 async function toggleFileVisibility(index) {
   const vault = appState.vault
-  const all   = vault?.files ?? []
-  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const all   = (vault && vault.files) || []
+  const files = all.filter(f => (f.visibility || 'private') === _vfTab)
   const f     = files[index]
   if (!f) return
 
@@ -1691,8 +1685,8 @@ async function toggleFileVisibility(index) {
 
 async function deleteVaultFile(index) {
   const vault = appState.vault
-  const all   = vault?.files ?? []
-  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const all   = (vault && vault.files) || []
+  const files = all.filter(f => (f.visibility || 'private') === _vfTab)
   const f     = files[index]
   if (!f) return
   if (f.name === 'welcome.txt') { showToast('welcome.txt cannot be deleted'); return }
@@ -1717,42 +1711,42 @@ async function deleteVaultFile(index) {
 }
 
 function openVFPad(index) {
-  const all   = appState.vault?.files ?? []
-  const files = all.filter(f => (f.visibility ?? 'private') === _vfTab)
+  const all   = (appState.vault && appState.vault.files) || []
+  const files = all.filter(f => (f.visibility || 'private') === _vfTab)
   const f     = files[index]
   if (!f) return
-  document.getElementById('vf-pad-name').textContent = f.name ?? f.path ?? 'file'
+  document.getElementById('vf-pad-name').textContent = (f.name || f.path || 'file')
   const contentEl = document.getElementById('vf-pad-content')
-  const isImage   = (f.mime ?? '').startsWith('image/') ||
-                    (f.content ?? '').startsWith('data:image/')
+  const isImage   = (f.mime || '').startsWith('image/') ||
+                    (f.content || '').startsWith('data:image/')
   if (isImage) {
     contentEl.innerHTML = `<img src="${f.content}" alt="${escHtmlP(f.name)}"
       style="max-width:100%;border-radius:8px;display:block;margin:0 auto;">`
   } else {
-    contentEl.textContent = f.content ?? '(empty)'
+    contentEl.textContent = (f.content || '(empty)')
   }
   document.getElementById('vf-pad-overlay').classList.add('open')
 }
 
 function closeVFPad() {
-  document.getElementById('vf-pad-overlay')?.classList.remove('open')
+  (document.getElementById('vf-pad-overlay') && document.getElementById('vf-pad-overlay').classList).remove('open')
 }
 
 function escHtmlP(str) {
-  return String(str ?? '')
+  return String(str || '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
 function showDID() {
-  const did = appState.vault?.identity?.id
+  const did = (appState.vault && appState.vault.identity && appState.vault.identity.id)
   if (!did) return
-  navigator.clipboard?.writeText(did).then(() => showToast('DID copied to clipboard'))
+  (navigator.clipboard && navigator.clipboard.writeText)(did).then(() => showToast('DID copied to clipboard'))
     .catch(() => showToast(did.slice(0,30) + '…'))
 }
 
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // ═════════════════════════════════════════════════════════════════════════════
 // SECTION 8 — BACKUP & SYNC
 // downloadBackup() — exports encrypted .passport blob to disk.
@@ -1770,7 +1764,7 @@ function downloadBackup() {
   const blob = exportBackup(appState.stored)
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
-  const handle = appState.vault?.identity?.handle ?? 'passport'
+  const handle = ((appState.vault && appState.vault.identity && appState.vault.identity.handle) || 'passport')
   a.href     = url
   a.download = `${handle}-passport-backup.passport`
   a.click()
@@ -1797,7 +1791,7 @@ async function syncToDevice() {
     const blob    = exportBackup(appState.stored)
     const text    = await blob.text()
     const b64     = btoa(unescape(encodeURIComponent(text)))
-    const did     = appState.vault?.identity?.id
+    const did     = (appState.vault && appState.vault.identity && appState.vault.identity.id)
 
     const res = await fetch(SYNC_ENDPOINT, {
       method:  'POST',
@@ -1807,7 +1801,7 @@ async function syncToDevice() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.error ?? `Server error ${res.status}`)
+      throw new Error((err.error || `Server error ${res.status}`))
     }
 
     const { token, expires_at } = await res.json()
@@ -1819,7 +1813,7 @@ async function syncToDevice() {
     _showSyncLinkModal(syncUrl, expiresIn)
 
   } catch (err) {
-    showToast('Sync failed: ' + (err.message ?? 'network error'))
+    showToast('Sync failed: ' + ((err.message || 'network error')))
   }
 }
 
@@ -1827,7 +1821,7 @@ async function syncToDevice() {
  * Show the sync link + QR in a modal overlay.
  */
 function _showSyncLinkModal(url, expiresIn) {
-  document.getElementById('sync-link-modal')?.remove()
+  (document.getElementById('sync-link-modal') && document.getElementById('sync-link-modal').remove)()
 
   const overlay = document.createElement('div')
   overlay.id    = 'sync-link-modal'
@@ -1858,7 +1852,7 @@ function _showSyncLinkModal(url, expiresIn) {
 
       <div style="display:flex;gap:8px;">
         <button class="btn btn-primary" style="flex:1;"
-          onclick="navigator.clipboard?.writeText('${escHtmlP(url)}');showToast('Link copied')">
+          onclick="(navigator.clipboard && navigator.clipboard.writeText)('${escHtmlP(url)}');showToast('Link copied')">
           Copy link
         </button>
         ${navigator.share ? `
@@ -1915,8 +1909,8 @@ async function restoreFromSyncLink() {
   const errTxt    = document.getElementById('sync-restore-error-text')
   const btn       = document.getElementById('btn-sync-restore')
 
-  const link     = linkInput?.value.trim()
-  const password = pwInput?.value
+  const link     = (linkInput && linkInput.value).trim()
+  const password = (pwInput && pwInput.value)
 
   if (!link || !password) return
 
@@ -1965,7 +1959,7 @@ async function restoreFromSyncLink() {
 
   } catch (e) {
     errEl.style.display  = 'flex'
-    errTxt.textContent   = e.message ?? 'Could not restore'
+    errTxt.textContent   = (e.message || 'Could not restore')
     btn.textContent      = 'Fetch & Restore →'
     btn.disabled         = false
   }
@@ -2026,7 +2020,7 @@ async function tryRestore() {
       etxt.textContent = 'Wrong password for this backup.'
     } else {
       // Show the actual error message so we can diagnose it
-      etxt.textContent = 'Restore failed: ' + (e.message ?? e.toString())
+      etxt.textContent = 'Restore failed: ' + ((e.message || e.toString()))
     }
 
     // Log full error to console for debugging
@@ -2038,10 +2032,10 @@ async function tryRestore() {
     if (debugEl && debugTxt) {
       debugEl.style.display = 'block'
       debugTxt.textContent  =
-        'Error code: ' + (e.code ?? 'none') + '\n' +
-        'Message: '    + (e.message ?? e.toString()) + '\n' +
-        'File name: '  + (file?.name ?? 'unknown') + '\n' +
-        'File size: '  + (file?.size ?? 0) + ' bytes'
+        'Error code: ' + ((e.code || 'none')) + '\n' +
+        'Message: '    + ((e.message || e.toString())) + '\n' +
+        'File name: '  + ((file && file.name) || 'unknown') + '\n' +
+        'File size: '  + ((file && file.size) || 0) + ' bytes'
     }
 
     btn.textContent = 'Restore →'
@@ -2106,14 +2100,14 @@ function openNodes() {
   const vault      = appState.vault
   const list       = document.getElementById('nodes-list')
   const empty      = document.getElementById('nodes-empty')
-  const ownClusters = (vault?.ownClusters ?? [])
+  const ownClusters = ((vault && vault.ownClusters) || [])
     .filter(c => c.id && c.name && c.founder_did)
 
   // Primary: credentials array. Fallback: legacy memberships array
   const memberships = [
-    ...(vault?.credentials ?? []).filter(c => c.type === 'MembershipCredential'),
-    ...(vault?.memberships ?? []).filter(m =>
-      !(vault?.credentials ?? []).some(c => c.node_id === m.node_id)
+    ...((vault && vault.credentials) || []).filter(c => c.type === 'MembershipCredential'),
+    ...((vault && vault.memberships) || []).filter(m =>
+      !((vault && vault.credentials) || []).some(c => c.node_id === m.node_id)
     ),
   ]
 
@@ -2135,7 +2129,7 @@ function openNodes() {
       list.appendChild(ownLabel)
 
       ownClusters.forEach((c, i) => {
-        const memberCount = (c.members?.length ?? 0) + 1
+        const memberCount = ((c.members && c.members.length) || 0) + 1
         const isLeft      = c.status === 'left'
         const card = document.createElement('div')
         card.className = 'cred-card'
@@ -2150,7 +2144,7 @@ function openNodes() {
           }</p>
           <div class="cred-title">${escHtmlP(c.name)}</div>
           <div class="cred-sub" style="font-size:11px;color:var(--ink-dim);margin-top:4px;">
-            ${escHtmlP(c.description ?? '')}
+            ${escHtmlP(c.description || '')}
           </div>
           <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
@@ -2200,17 +2194,17 @@ function openNodes() {
         card.style.marginBottom = '12px'
         const isLeft = m.status === 'left'
         card.innerHTML = `
-          <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : (m.status?.toUpperCase() ?? 'MEMBER')}</p>
-          <div class="cred-title">${escHtmlP(m.node_name ?? m.cluster_name ?? m.node_id ?? 'Unknown cluster')}</div>
+          <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : ((m.status ? m.status.toUpperCase() : '') || 'MEMBER')}</p>
+          <div class="cred-title">${escHtmlP((m.node_name || m.cluster_name || m.node_id || 'Unknown cluster'))}</div>
           <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
-              Joined <span>${m.joined_at ?? m.issued_at ? new Date(m.joined_at ?? m.issued_at).toLocaleDateString() : '—'}</span>
+              Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
           </div>
           ${!isLeft ? `
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn btn-ghost" style="font-size:11px;"
-              onclick="softLeaveMembership('${m.id ?? m.node_id}')">
+              onclick="softLeaveMembership('${(m.id || m.node_id)}')">
               Leave
             </button>
           </div>` : `
@@ -2261,7 +2255,7 @@ function openCredentials() {
   const vault       = appState.vault
   const list        = document.getElementById('credentials-list')
   const empty       = document.getElementById('credentials-empty')
-  const credentials = vault?.credentials ?? []
+  const credentials = (vault && vault.credentials) || []
 
   list.innerHTML = ''
 
@@ -2289,17 +2283,17 @@ function openCredentials() {
         ? 'Founder'
         : c.type === 'MembershipCredential'
           ? 'Membership'
-          : c.type ?? 'Credential'
+          : (c.type || 'Credential')
 
       // Title — cluster name for both types
       const title = isFounder
-        ? (c.cluster_name ?? c.claims?.cluster_name ?? 'My Cluster')
-        : (c.node_name ?? c.issuer_did ?? 'Unknown issuer')
+        ? ((c.cluster_name || (c.claims && c.claims.cluster_name) || 'My Cluster'))
+        : ((c.node_name || c.issuer_did || 'Unknown issuer'))
 
       // Issuer line
       const issuerLine = isFounder
         ? 'Self-issued · Founder'
-        : (c.issuer_did ?? '')
+        : (c.issuer_did || '')
 
       // Expiry display
       const expiry = c.expires_at
@@ -2358,9 +2352,9 @@ function openCredentials() {
  * @param {number} idx - index in vault.credentials
  */
 function copyCredential(idx) {
-  const cred = appState.vault?.credentials?.[idx]
-  if (!cred?.sd_jwt) return
-  navigator.clipboard?.writeText(cred.sd_jwt)
+  const cred = (appState.vault && appState.vault.credentials && appState.vault.credentials[idx])
+  if (!(cred && cred.sd_jwt)) return
+  (navigator.clipboard && navigator.clipboard.writeText)(cred.sd_jwt)
     .then(() => showToast('Credential copied'))
     .catch(() => showToast('Copy failed — open browser console to get SD-JWT'))
   console.log('[Credential] SD-JWT:', cred.sd_jwt)
@@ -2373,10 +2367,10 @@ function copyCredential(idx) {
  * @param {number} idx - index in vault.credentials
  */
 function presentCredential(idx) {
-  const cred = appState.vault?.credentials?.[idx]
-  if (!cred?.sd_jwt) return
+  const cred = (appState.vault && appState.vault.credentials && appState.vault.credentials[idx])
+  if (!(cred && cred.sd_jwt)) return
   // Copy credential and instruct user to paste in verifier
-  navigator.clipboard?.writeText(cred.sd_jwt)
+  (navigator.clipboard && navigator.clipboard.writeText)(cred.sd_jwt)
   showToast('SD-JWT copied — paste at mdusl.sovereign-passport.id/verify')
 }
 
@@ -2405,7 +2399,7 @@ function presentCredential(idx) {
  * Enables the Found button when name is filled.
  */
 function validateCreateCluster() {
-  const name = document.getElementById('create-cluster-name')?.value.trim()
+  const name = (document.getElementById('create-cluster-name') && document.getElementById('create-cluster-name').value).trim()
   const btn  = document.getElementById('btn-create-cluster')
   const err  = document.getElementById('create-cluster-error')
   if (err) err.style.display = 'none'
@@ -2427,8 +2421,8 @@ async function createCluster() {
   const errTxt = document.getElementById('create-cluster-error-text')
   const btn    = document.getElementById('btn-create-cluster')
 
-  const name = nameEl?.value.trim()
-  const desc = descEl?.value.trim() ?? ''
+  const name = (nameEl && nameEl.value).trim()
+  const desc = (descEl && descEl.value).trim() || ''
 
   if (!name) return
 
@@ -2502,7 +2496,7 @@ async function createCluster() {
 
   } catch (err) {
     if (errEl)  errEl.style.display  = 'flex'
-    if (errTxt) errTxt.textContent   = err.message ?? 'Could not create cluster'
+    if (errTxt) errTxt.textContent   = (err.message || 'Could not create cluster')
     btn.disabled    = false
     btn.textContent = 'Found this cluster →'
   }
@@ -2523,12 +2517,12 @@ async function pingVignard(clusterId, name, description, founderDid) {
       const data = await res.json()
       // Update cluster record with vignard witness timestamp
       const vault   = appState.vault
-      const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+      const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
       if (cluster) {
         cluster.witnessed_at = data.witnessed_at
         cluster.vignard_did  = 'did:web:mdusl.sovereign-passport.id'
         // Silent pre-vine flag — no UI prompt, just state
-        if ((cluster.members?.length ?? 0) >= 3 && cluster.status === 'active') {
+        if (((cluster.members && cluster.members.length) || 0) >= 3 && cluster.status === 'active') {
           cluster.status = 'pre-vine'
         }
         const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
@@ -2570,10 +2564,10 @@ function openInviteFromCluster(clusterId) {
  */
 async function confirmLeaveCluster(clusterId) {
   const vault   = appState.vault
-  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
-  const memberCount = (cluster.members?.length ?? 0)
+  const memberCount = ((cluster.members && cluster.members.length) || 0)
 
   // Build confirmation modal
   const existing = document.getElementById('cluster-delete-modal')
@@ -2638,7 +2632,7 @@ async function confirmLeaveCluster(clusterId) {
  */
 async function softLeaveCluster(clusterId) {
   const vault   = appState.vault
-  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
   cluster.status  = 'left'
@@ -2661,7 +2655,7 @@ async function softLeaveCluster(clusterId) {
  */
 async function rejoinCluster(clusterId) {
   const vault   = appState.vault
-  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
   cluster.status  = 'active'
@@ -2685,8 +2679,8 @@ async function rejoinCluster(clusterId) {
  */
 async function softLeaveMembership(credentialId) {
   const vault = appState.vault
-  const cred  = (vault.credentials ?? []).find(
-    c => (c.id ?? c.node_id) === credentialId
+  const cred  = (vault.credentials || []).find(
+    c => (c.id || c.node_id) === credentialId
   )
   if (!cred) return
 
@@ -2705,10 +2699,10 @@ async function softLeaveMembership(credentialId) {
 }
 async function _executeClusterDelete(clusterId) {
   const vault   = appState.vault
-  const cluster = (vault.ownClusters ?? []).find(c => c.id === clusterId)
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
-  const memberCount = cluster.members?.length ?? 0
+  const memberCount = (cluster.members && cluster.members.length) || 0
 
   if (memberCount === 0) {
     await dissolveCluster(clusterId)
@@ -2717,7 +2711,7 @@ async function _executeClusterDelete(clusterId) {
 
   // Find highest-weight member for succession
   const successor = cluster.members.reduce((best, m) =>
-    (m.weight ?? 0) > (best.weight ?? 0) ? m : best
+    (m.weight || 0) > (best.weight || 0) ? m : best
   , cluster.members[0])
 
   await leaveCluster(clusterId, successor.did)
@@ -2728,7 +2722,7 @@ async function _executeClusterDelete(clusterId) {
  */
 async function leaveCluster(clusterId, successorDid) {
   const vault   = appState.vault
-  const clusterIdx = (vault.ownClusters ?? []).findIndex(c => c.id === clusterId)
+  const clusterIdx = (vault.ownClusters || []).findIndex(c => c.id === clusterId)
   if (clusterIdx < 0) return
 
   const cluster = vault.ownClusters[clusterIdx]
@@ -2739,7 +2733,7 @@ async function leaveCluster(clusterId, successorDid) {
   cluster.left_at    = new Date().toISOString()
 
   // Remove founder credential from vault.credentials
-  vault.credentials = (vault.credentials ?? []).filter(
+  vault.credentials = (vault.credentials || []).filter(
     c => !(c.type === 'FounderCredential' && c.cluster_id === clusterId)
   )
 
@@ -2752,8 +2746,8 @@ async function leaveCluster(clusterId, successorDid) {
     appState.stored = newPayload
 
     // Ping vignard with succession event — fire and forget
-    pingVignard(clusterId, cluster.name, cluster.description ?? '',
-      successorDid ?? vault.identity.id).catch(() => {})
+    pingVignard(clusterId, cluster.name, cluster.description || '',
+      (successorDid || vault.identity.id)).catch(() => {})
 
     populateHome()
     showToast(`You have left ${cluster.name}`)
@@ -2768,8 +2762,8 @@ async function leaveCluster(clusterId, successorDid) {
  */
 async function dissolveCluster(clusterId) {
   const vault = appState.vault
-  vault.ownClusters = (vault.ownClusters ?? []).filter(c => c.id !== clusterId)
-  vault.credentials = (vault.credentials ?? []).filter(
+  vault.ownClusters = (vault.ownClusters || []).filter(c => c.id !== clusterId)
+  vault.credentials = (vault.credentials || []).filter(
     c => !(c.type === 'FounderCredential' && c.cluster_id === clusterId)
   )
 
@@ -2817,12 +2811,12 @@ function openInvite() {
   // 1. Clusters the grape owns (vault.ownClusters)
   // 2. Grape cluster credentials (vault.credentials type GrapeClusterCredential)
   // 3. Vine memberships (vault.credentials type MembershipCredential, fallback vault.memberships)
-  const ownClusters    = (vault?.ownClusters ?? [])
-  const grapeCreds     = (vault?.credentials ?? [])
+  const ownClusters    = ((vault && vault.ownClusters) || [])
+  const grapeCreds     = ((vault && vault.credentials) || [])
     .filter(c => c.type === 'GrapeClusterCredential')
-  const vineCreds      = (vault?.credentials ?? [])
+  const vineCreds      = ((vault && vault.credentials) || [])
     .filter(c => c.type === 'MembershipCredential')
-  const legacyMembers  = (vault?.memberships ?? [])
+  const legacyMembers  = ((vault && vault.memberships) || [])
     .filter(m => m.status === 'approved')
     .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
 
@@ -2837,7 +2831,7 @@ function openInvite() {
   allClusters.forEach(c => {
     const opt = document.createElement('option')
     opt.value       = JSON.stringify({ node_id: c.node_id, node_name: c.node_name })
-    opt.textContent = (c.node_name ?? c.node_id) + (c.own ? ' ✦' : '')
+    opt.textContent = (c.node_name || c.node_id) + (c.own ? ' ✦' : '')
     select.appendChild(opt)
   })
 
@@ -2898,7 +2892,7 @@ async function generateInvite() {
     }
 
     // Find this membership for status + weight
-    const membership = (vault.memberships ?? []).find(
+    const membership = (vault.memberships || []).find(
       m => m.node_id === cluster.node_id
     )
 
@@ -2910,8 +2904,8 @@ async function generateInvite() {
       to_did:              null,            // unknown until grape creates Passport
       node_id:             cluster.node_id,
       node_name:           cluster.node_name,
-      from_status_at_time: membership?.status ?? 'unknown',
-      weight:              membership?.status === 'approved' ? 3 : 1,
+      from_status_at_time: (membership && membership.status) || 'unknown',
+      weight:              (membership && membership.status) === 'approved' ? 3 : 1,
       disclosed:           {},
       note:                note || null,
       created_at:          new Date().toISOString(),
@@ -2921,9 +2915,9 @@ async function generateInvite() {
     // Apply disclosures
     if (disclosures.handle && vault.identity.handle)
       payload.disclosed.handle = vault.identity.handle
-    if (disclosures.since && membership?.joined_at)
+    if (disclosures.since && (membership && membership.joined_at))
       payload.disclosed.since = membership.joined_at
-    if (disclosures.role && membership?.is_issuer)
+    if (disclosures.role && (membership && membership.is_issuer))
       payload.disclosed.role = 'issuer'
 
     // Sign the referral with the holder's private key
@@ -2982,7 +2976,7 @@ async function generateInvite() {
  */
 function copyInviteLink() {
   const link = document.getElementById('invite-link-display').textContent
-  navigator.clipboard?.writeText(link)
+  (navigator.clipboard && navigator.clipboard.writeText)(link)
     .then(() => showToast('Invite link copied'))
     .catch(() => showToast('Copy failed'))
 }
@@ -2993,7 +2987,7 @@ function copyInviteLink() {
  */
 async function shareInviteLink() {
   const link   = document.getElementById('invite-link-display').textContent
-  const handle = appState.vault?.identity?.handle ?? 'Someone'
+  const handle = ((appState.vault && appState.vault.identity && appState.vault.identity.handle) || 'Someone')
   try {
     await navigator.share({
       title: 'Join my cluster on Sovereign Passport',
@@ -3017,13 +3011,13 @@ async function shareInviteLink() {
  */
 function openOfficialize() {
   const vault       = appState.vault
-  const memberships = vault?.memberships ?? []
+  const memberships = (vault && vault.memberships) || []
   const approved    = memberships.filter(m => m.status === 'approved')
 
   // Show first approved cluster name and status
   const primary = approved[0]
   document.getElementById('officialize-cluster-name').textContent =
-    primary?.node_name ?? 'No approved cluster yet'
+    ((primary && primary.node_name) || 'No approved cluster yet')
   document.getElementById('officialize-status').textContent =
     primary ? 'Approved member ✓' : 'Not yet approved in any cluster'
 
@@ -3115,9 +3109,9 @@ async function loadOfferFromInput() {
     _pendingOffer = offer
 
     // Populate the offer screen with community details
-    document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id ?? 'Unknown community'
+    document.getElementById('offer-node-name').textContent  = (offer.node_name || offer.node_id || 'Unknown community')
     document.getElementById('offer-issuer-did').textContent = offer.issuer
-    document.getElementById('offer-type').textContent       = offer.credential_type ?? 'membership'
+    document.getElementById('offer-type').textContent       = (offer.credential_type || 'membership')
     document.getElementById('offer-expires').textContent    = offer.expires_at
       ? new Date(offer.expires_at).toLocaleDateString()
       : '1 year'
@@ -3156,9 +3150,9 @@ async function loadOffer(offerUrl) {
     _pendingOffer = offer
 
     // Populate the offer screen
-    document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id
+    document.getElementById('offer-node-name').textContent  = (offer.node_name || offer.node_id)
     document.getElementById('offer-issuer-did').textContent = offer.issuer
-    document.getElementById('offer-type').textContent       = offer.credential_type ?? 'membership'
+    document.getElementById('offer-type').textContent       = (offer.credential_type || 'membership')
     document.getElementById('offer-expires').textContent    = '1 year'
 
     goTo('screen-offer')
@@ -3196,7 +3190,7 @@ async function acceptOffer() {
     // Build the signed credential request payload
     const requestPayload = {
       subject_did:        vault.identity.id,
-      type:               offer.credential_type ?? 'membership',
+      type:               (offer.credential_type || 'membership'),
       node_id:            offer.node_id,
       nonce:              offer.nonce,
     }
@@ -3212,7 +3206,7 @@ async function acceptOffer() {
       subject_public_key: vault.keys.publicKey,
       signature,
       member_info: {
-        name: vault.identity.profile?.name ?? null,
+        name: (vault.identity.profile && vault.identity.profile.name) || null,
       },
     }
 
@@ -3225,7 +3219,7 @@ async function acceptOffer() {
 
     if (!issueRes.ok) {
       const err = await issueRes.json().catch(() => ({}))
-      throw new Error(err.message ?? err.error ?? `Issuer returned ${issueRes.status}`)
+      throw new Error((err.message || err.error || `Issuer returned ${issueRes.status}`))
     }
 
     const issued = await issueRes.json()
@@ -3338,7 +3332,7 @@ async function boot() {
   if (stored) {
     appState.stored = stored
     document.getElementById('unlock-handle-display').textContent =
-      `DID: ${stored.did?.slice(0,20)}…`
+      `DID: ${(stored.did && stored.did.slice)(0,20)}…`
 
     if (offerUrl || offerData) {
       // Store offer URL for after unlock
@@ -3399,7 +3393,7 @@ function checkPendingOffer() {
     try {
       const offer = JSON.parse(data)
       _pendingOffer = offer
-      document.getElementById('offer-node-name').textContent  = offer.node_name ?? offer.node_id
+      document.getElementById('offer-node-name').textContent  = (offer.node_name || offer.node_id)
       document.getElementById('offer-issuer-did').textContent = offer.issuer
       setTimeout(() => goTo('screen-offer'), 500)
     } catch {
