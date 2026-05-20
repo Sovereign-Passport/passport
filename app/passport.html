@@ -1836,9 +1836,6 @@ function renderAboutContent() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function boot() {
-  // Reveal app — hidden by CSS until JS is ready to prevent flash
-  document.getElementById('app').classList.add('ready')
-
   // Push initial history entry so popstate has something to catch
   history.pushState({ screen: 'boot' }, '', location.href)
 
