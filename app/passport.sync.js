@@ -116,7 +116,7 @@ function _showSyncLinkModal(url, expiresIn) {
   `
 
   // QR — generated locally, no external call
-  const qrSvg = makeQR(url, 180)
+  const qrSvg = makeQR(url, 260)
 
   overlay.innerHTML = `
     <div class="card" style="width:100%;max-width:380px;text-align:center;">
@@ -126,7 +126,7 @@ function _showSyncLinkModal(url, expiresIn) {
         Your data is already encrypted — the server cannot read it.
       </p>
 
-      <div style="width:180px;height:180px;border-radius:8px;margin:0 auto 16px;display:block;overflow:hidden;">${qrSvg}</div>
+      <div style="width:260px;height:260px;border-radius:8px;margin:0 auto 16px;display:block;overflow:hidden;">${qrSvg}</div>
 
       <div style="background:var(--bg-deep);border-radius:6px;padding:10px;
                   font-size:10px;color:var(--gold);word-break:break-all;

@@ -299,14 +299,17 @@ var QR = (() => {
   // ─────────────────────────────────────────────────────────────────────────
 
   function toSVG(m, px) {
-    const size = m.length
-    const mod  = px / size
-    const rects = []
+    const size    = m.length
+    const quiet   = 4                          // 4-module quiet zone (QR spec)
+    const total   = size + quiet * 2           // matrix + quiet zone both sides
+    const mod     = px / total
+    const offset  = quiet * mod
+    const rects   = []
 
     for (let r = 0; r < size; r++)
       for (let c = 0; c < size; c++)
         if (m[r][c] === 1)
-          rects.push(`<rect x="${c*mod}" y="${r*mod}" width="${mod}" height="${mod}"/>`)
+          rects.push(`<rect x="${offset + c*mod}" y="${offset + r*mod}" width="${mod}" height="${mod}"/>`)
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${px} ${px}" ` +
            `width="${px}" height="${px}" shape-rendering="crispEdges">` +
