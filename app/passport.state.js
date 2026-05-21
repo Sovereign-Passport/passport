@@ -32,7 +32,7 @@ let appState = {
   restorePayload: null,
 }
 
-let _currentScreen = 'screen-welcome'
+let _currentScreen = null
 let _prevScreen    = null
 
 
