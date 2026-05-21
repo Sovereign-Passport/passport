@@ -1887,6 +1887,11 @@ async function boot() {
     appState.pendingOfferUrl  = offerUrl
     appState.pendingOfferData = offerData
     showToast('Create your Passport to accept this credential')
+    goTo('screen-welcome')
+
+  } else {
+    // Fresh new grape — no vault, no offer, no sync
+    goTo('screen-welcome')
   }
 
   // iOS install banner
