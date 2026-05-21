@@ -234,19 +234,27 @@ async function acceptOffer() {
     const issued = await issueRes.json()
 
     // Store credential in vault
+    // offer_endpoint — vine's /api/offer URL, derived from issue_endpoint.
+    // Stored so the grape can build invite QRs pointing to the correct vine
+    // without hardcoding any domain. Portable across all vine instances.
+    const offerEndpoint = offer.issue_endpoint
+      ? offer.issue_endpoint.replace('/api/credentials/issue', '/api/offer')
+      : null
+
     if (!vault.credentials) vault.credentials = []
     vault.credentials.push({
-      id:          issued.credential_id,
-      type:        'MembershipCredential',
-      issuer_did:  offer.issuer,
-      subject_did: vault.identity.id,
-      issued_at:   issued.issued_at,
-      expires_at:  issued.expires_at,
-      sd_jwt:      issued.sd_jwt,
-      node_id:     offer.node_id,
-      node_name:   offer.node_name,
-      stored_at:   new Date().toISOString(),
-      revoked:     false,
+      id:             issued.credential_id,
+      type:           'MembershipCredential',
+      issuer_did:     offer.issuer,
+      subject_did:    vault.identity.id,
+      issued_at:      issued.issued_at,
+      expires_at:     issued.expires_at,
+      sd_jwt:         issued.sd_jwt,
+      node_id:        offer.node_id,
+      node_name:      offer.node_name,
+      offer_endpoint: offerEndpoint,
+      stored_at:      new Date().toISOString(),
+      revoked:        false,
     })
 
     // Save vault

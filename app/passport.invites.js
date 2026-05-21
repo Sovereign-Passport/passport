@@ -160,16 +160,22 @@ async function generateInvite() {
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
     // Build the invite URL
-    // Points to the wallet with the offer URL + signed referral
-    // The offer URL is derived from the node_id convention
-    // In production this comes from the issuer's known endpoint
-    const offerBase  = `https://mdusl.sovereign-passport.id/offer`
-    const walletBase = `https://sovereign-passport.github.io/passport/passport.html`
-    const inviteUrl  = `${walletBase}#offer=${offerBase}&ref=${encodedRef}`
+    // passportBase — the sovereign PWA where the invitee lands
+    // offerBase    — derived from the grape's stored MembershipCredential for
+    //                this cluster. Each vine self-describes its own endpoint.
+    //                Falls back to mdusl only for legacy credentials that
+    //                predate offer_endpoint storage (< L3A).
+    const vineCred     = (vault.credentials || []).find(
+      function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
+    )
+    const offerBase    = (vineCred && vineCred.offer_endpoint)
+      || 'https://mdusl.sovereign-passport.id/api/offer'
+    const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
 
     // Display the link + QR
     document.getElementById('invite-link-display').textContent = inviteUrl
-    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 260)
+    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 300)
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')
