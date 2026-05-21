@@ -20,7 +20,7 @@ const fs   = require('fs')
 const path = require('path')
 
 const SRC_DIR  = path.join(__dirname)
-const DIST_DIR = path.join(__dirname, 'dist')
+const DIST_DIR = path.join(__dirname, '..', 'docs')
 const SRC_FILE = path.join(SRC_DIR,  'passport.html')
 const OUT_FILE = path.join(DIST_DIR, 'passport.html')
 
