@@ -667,3 +667,73 @@
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 2px; }
+
+    /* ── UTILITY CLASSES ────────────────────────────────────────── */
+    /* Replaces repeated inline styles throughout passport.html     */
+
+    /* Layout */
+    .w-card   { width: 100%; max-width: 380px; }
+    .w-full   { width: 100%; }
+
+    /* Margin bottom scale */
+    .mb-2     { margin-bottom: 2px; }
+    .mb-8     { margin-bottom: 8px; }
+    .mb-10    { margin-bottom: 10px; }
+    .mb-12    { margin-bottom: 12px; }
+    .mb-16    { margin-bottom: 16px; }
+    .mb-20    { margin-bottom: 20px; }
+    .mb-24    { margin-bottom: 24px; }
+    .mb-28    { margin-bottom: 28px; }
+    .mb-32    { margin-bottom: 32px; }
+    .mb-40    { margin-bottom: 40px; }
+
+    /* Margin top scale */
+    .mt-8     { margin-top: 8px; }
+    .mt-12    { margin-top: 12px; }
+    .mt-20    { margin-top: 20px; }
+
+    /* Typography */
+    .text-xs  { font-size: 11px; }
+    .text-sm  { font-size: 12px; }
+    .text-13  { font-size: 13px; }
+    .text-red { color: var(--red); }
+    .text-dim { color: var(--ink-dim); }
+    .text-ink { color: var(--ink); }
+    .text-gold { color: var(--gold); }
+    .text-dim-sm { font-size: 11px; color: var(--ink-dim); }
+    .text-dim-13 { color: var(--ink-dim); font-size: 13px; line-height: 1.7; }
+    .text-wrap   { word-break: break-all; }
+    .text-pre    { white-space: pre-wrap; }
+
+    /* Error notice state — used on .notice elements */
+    .notice-error {
+      border-color: var(--red);
+      background: rgba(192,57,43,0.05);
+    }
+
+    /* Flex helpers */
+    .row-8  { display: flex; gap: 8px; }
+    .row-12 { display: flex; gap: 12px; }
+    .row-item { display: flex; gap: 12px; align-items: flex-start; }
+    .flex-1 { flex: 1; }
+
+    /* QR container */
+    .qr-container {
+      width: 260px; height: 260px;
+      margin: 0 auto 16px;
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* Credential item icon */
+    .cred-icon { font-size: 20px; flex-shrink: 0; }
+    .cred-label { font-size: 13px; display: block; margin-bottom: 2px; }
+
+    /* Empty state */
+    .empty-state { display: none; text-align: center; padding: 40px 0; }
+
+    /* Serif display (about screen) */
+    .serif-display { font-family: Georgia,'Times New Roman',serif; font-size: 24px; }
+    .mt-4       { margin-top: 4px; }
+    .text-gold-dim { color: var(--gold-dim); }
+
