@@ -145,12 +145,13 @@ async function loadOfferFromInput() {
 
 // Pending offer stored between unlock and acceptance
 let _pendingOffer = null
+let _pendingRef   = null  // short token or null — resolved at issue time
 
 /**
  * Fetch an offer from the issuer URL and show the offer screen.
  * Called after vault is unlocked if an offer URL is present.
  */
-async function loadOffer(offerUrl) {
+async function loadOffer(offerUrl, ref) {
   try {
     // Fetch the offer from the issuer
     const res   = await fetch(offerUrl)
@@ -158,6 +159,7 @@ async function loadOffer(offerUrl) {
     const offer = await res.json()
 
     _pendingOffer = offer
+    _pendingRef   = ref || null  // short token — resolved at issue time
 
     // Populate the offer screen
     document.getElementById('offer-node-name').textContent  = (offer.node_name || offer.node_id)
@@ -210,10 +212,28 @@ async function acceptOffer() {
     const sigBuf   = await crypto.subtle.sign('Ed25519', privateKey, enc(sigData))
     const signature = toB64(sigBuf)
 
+    // Resolve ref — if we have a short token, fetch the full payload from relay
+    let resolvedRef = null
+    if (_pendingRef) {
+      const refEndpoint = offer.issue_endpoint
+        .replace('/api/credentials/issue', '/api/passport/ref/' + _pendingRef)
+      try {
+        const refRes = await fetch(refEndpoint)
+        if (refRes.ok) {
+          const refData = await refRes.json()
+          resolvedRef = refData.ref
+        }
+      } catch(e) {
+        // Non-fatal — ref is optional for open issuance vines
+        console.warn('[SPID] Could not resolve ref token:', e.message)
+      }
+    }
+
     // Build full request body
     const body = Object.assign({}, requestPayload, {
       subject_public_key: vault.keys.publicKey,
       signature: signature,
+      ref: resolvedRef,
       member_info: {
         name: (vault.identity.profile && vault.identity.profile.name) || null,
       },
@@ -270,6 +290,7 @@ async function acceptOffer() {
     document.getElementById('received-node-name').textContent = offer.node_name
     document.getElementById('received-issuer').textContent    = offer.issuer
     _pendingOffer = null
+    _pendingRef   = null
 
     goTo('screen-credential-received')
 

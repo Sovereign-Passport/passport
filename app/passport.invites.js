@@ -156,7 +156,7 @@ async function generateInvite() {
     const signature = toB64(sigBuf)
     payload.signature = signature
 
-    // Encode the signed referral as base64url
+    // Encode the signed referral as base64
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
     // Build the invite URL
@@ -171,7 +171,18 @@ async function generateInvite() {
     const offerBase    = (vineCred && vineCred.offer_endpoint)
       || 'https://mdusl.sovereign-passport.id/api/offer'
     const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
-    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
+
+    // POST ref to vine relay — returns a short token (5-day TTL)
+    // This keeps the invite URL short enough to scan as a QR code
+    const refEndpoint  = offerBase.replace('/api/offer', '/api/passport/ref')
+    const refRes       = await fetch(refEndpoint, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ref: encodedRef }),
+    })
+    if (!refRes.ok) throw new Error('Could not store invite ref on vine')
+    const refData      = await refRes.json()
+    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + refData.token
 
     // Display the link + QR
     document.getElementById('invite-link-display').textContent = inviteUrl
