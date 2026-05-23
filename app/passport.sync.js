@@ -88,13 +88,13 @@ async function syncToDevice() {
       throw new Error((err.error || `Server error ${res.status}`))
     }
 
-    const { token, expires_at } = await res.json()
+    const { token, expires_at, qr_svg } = await res.json()
     const expiresIn  = Math.round((new Date(expires_at) - Date.now()) / 60000)
-    const walletBase = 'https://sovereign-passport.github.io/passport/app/passport.html'
-    const syncUrl    = `${walletBase}#sync=${token}`
+    const walletBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const syncUrl    = walletBase + '#sync=' + token
 
-    // Show sync link modal — QR points to passport app, not raw API
-    _showSyncLinkModal(syncUrl, expiresIn)
+    // Show sync link modal — QR generated server-side by vine
+    _showSyncLinkModal(syncUrl, expiresIn, qr_svg)
 
   } catch (err) {
     showToast('Sync failed: ' + ((err.message || 'network error')))
@@ -104,7 +104,7 @@ async function syncToDevice() {
 /**
  * Show the sync link + QR in a modal overlay.
  */
-function _showSyncLinkModal(url, expiresIn) {
+function _showSyncLinkModal(url, expiresIn, qrSvg) {
   const _slm = document.getElementById('sync-link-modal'); if(_slm) _slm.remove()
 
   const overlay = document.createElement('div')
@@ -115,9 +115,6 @@ function _showSyncLinkModal(url, expiresIn) {
     justify-content:center;padding:24px;overflow-y:auto;
   `
 
-  // QR — generated locally, no external call
-  const qrSvg = makeQR(url, 260)
-
   overlay.innerHTML = `
     <div class="card" style="width:100%;max-width:380px;text-align:center;">
       <p class="cred-type" style="margin-bottom:8px;">Sync link</p>
@@ -126,7 +123,7 @@ function _showSyncLinkModal(url, expiresIn) {
         Your data is already encrypted — the server cannot read it.
       </p>
 
-      <div style="width:260px;height:260px;border-radius:8px;margin:0 auto 16px;display:block;overflow:hidden;">${qrSvg}</div>
+      <div class="qr-container">${qrSvg || ''}</div>
 
       <div style="background:var(--bg-deep);border-radius:6px;padding:10px;
                   font-size:10px;color:var(--gold);word-break:break-all;

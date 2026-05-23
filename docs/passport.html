@@ -779,8 +779,8 @@
       No company holds your data. Your keys live on your device.
     </p>
 
-    <div class="w-card" class="fade-up fade-up-4">
-      <button class="btn btn-primary" onclick="goTo('screen-handle')" class="mb-12">
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-4">
+      <button class="btn btn-primary" onclick="goTo('screen-handle')" style="margin-bottom:12px;">
         Create my Passport
       </button>
       <button class="btn btn-ghost" onclick="showRestore()">
@@ -799,8 +799,8 @@
       <div class="dot"></div>
     </div>
 
-    <h1 class="display" class="mb-8">What shall<br>we call you?</h1>
-    <p class="body-text" class="mb-28">
+    <h1 class="display" style="margin-bottom:8px;">What shall<br>we call you?</h1>
+    <p class="body-text" style="margin-bottom:28px;">
       Your handle is how others see you in the network.
       It is stored only on your device.
     </p>
@@ -838,8 +838,8 @@
       <div class="dot"></div>
     </div>
 
-    <h1 class="display" class="mb-8">Choose a<br><em>strong</em> password.</h1>
-    <p class="body-text" class="mb-28">
+    <h1 class="display" style="margin-bottom:8px;">Choose a<br><em>strong</em> password.</h1>
+    <p class="body-text" style="margin-bottom:28px;">
       This encrypts your entire vault. It is never sent anywhere.
       If you lose it, no one can recover it — not even us.
     </p>
@@ -848,7 +848,7 @@
       <div class="notice">
         <span class="notice-icon">⚠️</span>
         <span class="notice-text">
-          <strong class="text-ink">Write this down.</strong>
+          <strong style="color:var(--ink)">Write this down.</strong>
           There is no "forgot password." Your password is your key.
         </span>
       </div>
@@ -873,9 +873,9 @@
         >
       </div>
 
-      <div class="notice" id="password-error" class="notice-error" style="display:none;">
+      <div class="notice" id="password-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" id="password-error-text" class="text-red"></span>
+        <span class="notice-text" id="password-error-text" style="color:var(--red);"></span>
       </div>
 
       <button class="btn btn-primary" id="btn-password-next" disabled onclick="startGeneration()">
@@ -888,7 +888,7 @@
        SCREEN 3 — GENERATING
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-generating">
-    <p class="logotype" class="mb-32">Creating your Passport</p>
+    <p class="logotype" style="margin-bottom:32px;">Creating your Passport</p>
 
     <div class="generating">
       <div class="gen-ring"></div>
@@ -923,7 +923,7 @@
       <div class="dot active"></div>
     </div>
 
-    <div class="shield fade-up" class="mb-20">
+    <div class="shield fade-up" style="margin-bottom:20px;">
       <svg viewBox="0 0 56 56" fill="none">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(39,174,96,0.1)" stroke="rgba(39,174,96,0.4)" stroke-width="1.5"/>
@@ -933,12 +933,12 @@
     </div>
 
     <h1 class="display fade-up fade-up-1">Passport<br><em>created.</em></h1>
-    <p class="body-text fade-up fade-up-2" class="mb-24">
+    <p class="body-text fade-up fade-up-2" style="margin-bottom:24px;">
       Your sovereign identity is ready. Your keys exist only on this device.
       No server holds them. No company owns them.
     </p>
 
-    <div class="w-card" class="fade-up fade-up-3">
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
       <div class="did-display">
         <span class="did-label">Your Passport Address</span>
         <span class="did-value" id="display-did">—</span>
@@ -949,7 +949,7 @@
         <span class="badge badge-green">✓ Vault encrypted</span>
       </div>
 
-      <button class="btn btn-primary fade-up fade-up-4" onclick="goTo('screen-home')" class="mb-12">
+      <button class="btn btn-primary fade-up fade-up-4" onclick="goTo('screen-home')" style="margin-bottom:12px;">
         Open my Passport →
       </button>
       <button class="btn btn-ghost fade-up fade-up-5" onclick="downloadBackup()">
@@ -964,7 +964,7 @@
   <div class="screen screen-top" id="screen-home">
     <div class="home-header fade-up">
       <div>
-        <p class="logotype" class="mb-2">Passport</p>
+        <p class="logotype" style="margin-bottom:2px;">Passport</p>
         <div class="home-handle" id="home-handle">—</div>
       </div>
     </div>
@@ -1060,7 +1060,7 @@
     <p class="section-label fade-up fade-up-4">Health</p>
 
     <div class="menu-item fade-up fade-up-5" onclick="goTo('screen-health')"
-      class="mb-40">
+      style="margin-bottom:40px;">
       <div class="menu-icon">💚</div>
       <div class="menu-text">
         <strong>Passport Health</strong>
@@ -1091,14 +1091,14 @@
     <div id="vf-shared-notice" style="display:none;width:100%;max-width:380px;
       margin-bottom:12px;padding:10px 14px;border-radius:8px;
       border:1px solid var(--ink-faint);background:var(--bg-card);">
-      <p class="text-dim-sm">
+      <p style="font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0;">
         Files marked shared express your intent to share with cluster members.
-        <span class="text-gold-dim">Direct transfer not yet implemented.</span>
+        <span style="color:var(--gold-dim);">Direct transfer not yet implemented.</span>
       </p>
     </div>
 
     <!-- Add file -->
-    <div class="w-card mb-12">
+    <div style="width:100%;max-width:380px;margin-bottom:12px;">
       <input type="file" id="vf-file-input" style="display:none"
         onchange="addVaultFile(this)">
       <button class="btn btn-ghost" onclick="document.getElementById('vf-file-input').click()">
@@ -1263,12 +1263,12 @@
     </div>
 
     <p class="logotype fade-up fade-up-1">Passport</p>
-    <h1 class="display fade-up fade-up-2" class="mb-8">Welcome<br><em>back.</em></h1>
-    <p class="body-text fade-up fade-up-3" id="unlock-handle-display" class="mb-28">
+    <h1 class="display fade-up fade-up-2" style="margin-bottom:8px;">Welcome<br><em>back.</em></h1>
+    <p class="body-text fade-up fade-up-3" id="unlock-handle-display" style="margin-bottom:28px;">
       Enter your password to unlock your vault.
     </p>
 
-    <div class="card fade-up fade-up-4" class="w-card">
+    <div class="card fade-up fade-up-4" style="width:100%;max-width:380px;">
       <div class="field">
         <label>Password</label>
         <input
@@ -1278,9 +1278,9 @@
         >
       </div>
 
-      <div class="notice" id="unlock-error" class="notice-error" style="display:none;">
+      <div class="notice" id="unlock-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" class="text-red">Wrong password. Try again.</span>
+        <span class="notice-text" style="color:var(--red);">Wrong password. Try again.</span>
       </div>
 
       <button class="btn btn-primary" onclick="tryUnlock()" id="btn-unlock">
@@ -1299,13 +1299,13 @@
        SCREEN 7 — RESTORE
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-restore">
-    <h1 class="display fade-up" class="mb-8">Restore<br><em>Passport.</em></h1>
-    <p class="body-text fade-up fade-up-1" class="mb-28">
-      Restore from a <strong class="text-ink">.passport</strong> file
+    <h1 class="display fade-up" style="margin-bottom:8px;">Restore<br><em>Passport.</em></h1>
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
+      Restore from a <strong style="color:var(--ink)">.passport</strong> file
       or a 15-minute sync link.
     </p>
 
-    <div class="tab-bar fade-up fade-up-2" class="w-card mb-16">
+    <div class="tab-bar fade-up fade-up-2" style="width:100%;max-width:380px;margin-bottom:16px;">
       <button id="restore-tab-file" class="tab-btn active"
         onclick="switchRestoreTab('file')">From file</button>
       <button id="restore-tab-sync" class="tab-btn"
@@ -1313,13 +1313,13 @@
     </div>
 
     <!-- File restore -->
-    <div id="restore-panel-file" class="card fade-up fade-up-2" class="w-card">
+    <div id="restore-panel-file" class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
       <div class="field">
         <label>Backup file</label>
         <input
           type="file" id="input-restore-file"
           accept=".passport,application/x-passport-vault"
-          class="text-dim" style="cursor:pointer;"
+          style="color:var(--ink-dim);cursor:pointer;"
           onchange="handleRestoreFile()"
         >
       </div>
@@ -1332,9 +1332,9 @@
         >
       </div>
 
-      <div class="notice" id="restore-error" class="notice-error" style="display:none;">
+      <div class="notice" id="restore-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" class="text-red" id="restore-error-text"></span>
+        <span class="notice-text" style="color:var(--red);" id="restore-error-text"></span>
       </div>
 
       <button class="btn btn-primary" id="btn-restore" disabled onclick="tryRestore()">
@@ -1361,7 +1361,7 @@
         <label>Sync link</label>
         <input type="text" id="input-sync-link"
           placeholder="https://mdusl.sovereign-passport.id/api/passport/sync/..."
-          class="text-sm">
+          style="font-size:12px;">
       </div>
 
       <div class="field">
@@ -1371,9 +1371,9 @@
       </div>
 
       <div class="notice" id="sync-restore-error"
-        class="notice-error" style="display:none;">
+        style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" class="text-red" id="sync-restore-error-text"></span>
+        <span class="notice-text" style="color:var(--red);" id="sync-restore-error-text"></span>
       </div>
 
       <button class="btn btn-primary" id="btn-sync-restore"
@@ -1399,15 +1399,15 @@
       <p class="logotype">Join a Community</p>
     </div>
 
-    <h1 class="display fade-up" class="mb-8">
+    <h1 class="display fade-up" style="margin-bottom:8px;">
       Receive a<br><em>credential.</em>
     </h1>
-    <p class="body-text fade-up fade-up-1" class="mb-28">
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
       Paste an invite link from a community.<br>
       Your credential will be issued instantly.
     </p>
 
-    <div class="card fade-up fade-up-2" class="w-card">
+    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
 
       <div class="field">
         <label>Paste invite link</label>
@@ -1419,9 +1419,9 @@
         ></textarea>
       </div>
 
-      <div class="notice" id="receive-error" class="notice-error" style="display:none;">
+      <div class="notice" id="receive-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" id="receive-error-text" class="text-red"></span>
+        <span class="notice-text" id="receive-error-text" style="color:var(--red);"></span>
       </div>
 
       <button class="btn btn-primary" id="btn-load-offer" disabled onclick="loadOfferFromInput()">
@@ -1451,13 +1451,13 @@
       </svg>
     </div>
     <p class="logotype fade-up fade-up-1">Credential Offer</p>
-    <h1 class="display fade-up fade-up-2" class="mb-8">You've been<br><em>invited.</em></h1>
-    <div class="w-card" class="fade-up fade-up-3">
-      <div class="cred-card" class="mb-20">
+    <h1 class="display fade-up fade-up-2" style="margin-bottom:8px;">You've been<br><em>invited.</em></h1>
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
+      <div class="cred-card" style="margin-bottom:20px;">
         <p class="cred-type">Membership Credential</p>
         <div class="cred-title" id="offer-node-name">—</div>
-        <div class="cred-sub" id="offer-issuer-did" class="text-sm text-wrap">—</div>
-        <div class="cred-meta" class="mt-12">
+        <div class="cred-sub" id="offer-issuer-did" style="font-size:10px;word-break:break-all;">—</div>
+        <div class="cred-meta" style="margin-top:12px;">
           <div class="cred-meta-item">Type <span id="offer-type">membership</span></div>
           <div class="cred-meta-item">Expires <span id="offer-expires">1 year</span></div>
         </div>
@@ -1466,11 +1466,11 @@
         <span class="notice-icon">🔑</span>
         <span class="notice-text">Accepting adds this membership to your passport. It's up to you to share or not this information.</span>
       </div>
-      <div id="offer-error" class="notice" class="notice-error" style="display:none;">
+      <div id="offer-error" class="notice" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" id="offer-error-text" class="text-red"></span>
+        <span class="notice-text" id="offer-error-text" style="color:var(--red);"></span>
       </div>
-      <button class="btn btn-primary fade-up fade-up-4" id="btn-accept-offer" onclick="acceptOffer()" class="mb-12">
+      <button class="btn btn-primary fade-up fade-up-4" id="btn-accept-offer" onclick="acceptOffer()" style="margin-bottom:12px;">
         Accept credential →
       </button>
       <button class="btn btn-ghost fade-up fade-up-5" onclick="goTo('screen-home')">Decline</button>
@@ -1481,7 +1481,7 @@
        SCREEN 9 — CREDENTIAL RECEIVED
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen" id="screen-credential-received">
-    <div class="shield fade-up" class="mb-20">
+    <div class="shield fade-up" style="margin-bottom:20px;">
       <svg viewBox="0 0 56 56" fill="none">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(39,174,96,0.1)" stroke="rgba(39,174,96,0.4)" stroke-width="1.5"/>
@@ -1489,15 +1489,15 @@
       </svg>
     </div>
     <h1 class="display fade-up fade-up-1">Credential<br><em>received.</em></h1>
-    <p class="body-text fade-up fade-up-2" class="mb-24">
+    <p class="body-text fade-up fade-up-2" style="margin-bottom:24px;">
       Your membership credential is signed and stored in your vault.
     </p>
-    <div class="w-card" class="fade-up fade-up-3">
-      <div class="cred-card" class="mb-20">
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
+      <div class="cred-card" style="margin-bottom:20px;">
         <p class="cred-type">Membership Credential</p>
         <div class="cred-title" id="received-node-name">—</div>
-        <div class="cred-sub" id="received-issuer" class="text-xs">—</div>
-        <div class="row-8 mt-12">
+        <div class="cred-sub" id="received-issuer" style="font-size:10px;">—</div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
           <span class="badge badge-green">✓ Signed by community</span>
           <span class="badge badge-gold">✓ Stored in vault</span>
         </div>
@@ -1516,10 +1516,10 @@
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen screen-top" id="screen-nodes">
 
-    <div class="w-card">
+    <div style="width:100%;max-width:380px;">
       <div class="screen-header">
         <button class="btn-back" onclick="goTo('screen-home')">‹</button>
-        <h2 class="serif-display">
+        <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;">
           My Clusters
         </h2>
       </div>
@@ -1531,15 +1531,15 @@
       <div id="nodes-list"></div>
 
       <!-- Empty state — shown when no clusters exist -->
-      <div id="nodes-empty" class="empty-state">
-        <p class="mb-12" style="font-size:32px;">🌱</p>
-        <p class="text-dim-13">
+      <div id="nodes-empty" style="display:none;text-align:center;padding:40px 0;">
+        <p style="font-size:32px;margin-bottom:12px;">🌱</p>
+        <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
           You haven't created any clusters yet.<br>
           Clusters are free forever — start one<br>
           and invite your first grape.
         </p>
         <button class="btn btn-primary" onclick="goTo('screen-create-cluster')"
-          class="mt-20">
+          style="margin-top:20px;">
           Create a Cluster →
         </button>
       </div>
@@ -1552,21 +1552,21 @@
        Self-issues a FounderCredential stored in vault.
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen screen-top" id="screen-create-cluster">
-    <div class="w-card">
+    <div style="width:100%;max-width:380px;">
       <div class="screen-header">
         <button class="btn-back" onclick="goTo('screen-nodes')">‹</button>
         <p class="logotype">New Cluster</p>
       </div>
 
-      <h1 class="display fade-up" class="mb-8">
+      <h1 class="display fade-up" style="margin-bottom:8px;">
         Start a<br><em>cluster.</em>
       </h1>
-      <p class="body-text fade-up fade-up-1" class="mb-28">
+      <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
         A cluster is your gathering — chess night, a garden group,
         a neighbourhood circle. Free forever. You are the founder.
       </p>
 
-      <div class="notice fade-up fade-up-1" class="mb-16">
+      <div class="notice fade-up fade-up-1" style="margin-bottom:16px;">
         <span class="notice-icon">⚠</span>
         <span class="notice-text">
           The name and description are <strong>permanent</strong> — they appear
@@ -1582,7 +1582,7 @@
         </span>
       </div>
 
-      <div class="card fade-up fade-up-2" class="w-full">
+      <div class="card fade-up fade-up-2" style="width:100%;">
         <div class="field">
           <label>Cluster name</label>
           <input type="text" id="create-cluster-name"
@@ -1597,10 +1597,10 @@
         </div>
 
         <div class="notice" id="create-cluster-error"
-          class="notice-error" style="display:none;">
+          style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
           <span class="notice-icon">✗</span>
           <span class="notice-text" id="create-cluster-error-text"
-            class="text-red"></span>
+            style="color:var(--red);"></span>
         </div>
 
         <button class="btn btn-primary" id="btn-create-cluster"
@@ -1619,10 +1619,10 @@
   ══════════════════════════════════════════════════════════════ -->
   <div class="screen screen-top" id="screen-credentials">
 
-    <div class="w-card">
+    <div style="width:100%;max-width:380px;">
       <div class="screen-header">
         <button class="btn-back" onclick="goTo('screen-home')">‹</button>
-        <h2 class="serif-display">
+        <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;">
           Credentials
         </h2>
       </div>
@@ -1635,14 +1635,14 @@
       <div id="credentials-list"></div>
 
       <!-- Empty state -->
-      <div id="credentials-empty" class="empty-state">
-        <p class="mb-12" style="font-size:32px;">🎫</p>
-        <p class="text-dim-13">
+      <div id="credentials-empty" style="display:none;text-align:center;padding:40px 0;">
+        <p style="font-size:32px;margin-bottom:12px;">🎫</p>
+        <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
           No credentials in your vault yet.<br>
           Join a community to receive your first credential.
         </p>
         <button class="btn btn-primary" onclick="openReceiveCredential()"
-          class="mt-20">
+          style="margin-top:20px;">
           Receive a credential →
         </button>
       </div>
@@ -1663,16 +1663,16 @@
       <p class="logotype">Invite a Grape</p>
     </div>
 
-    <h1 class="display fade-up" class="mb-8">
+    <h1 class="display fade-up" style="margin-bottom:8px;">
       Invite a<br><em>Grape.</em>
     </h1>
-    <p class="body-text fade-up fade-up-1" class="mb-28">
+    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
       Invite someone to your community. The new grape opens it,
       creates their Passport, and receives a credential.
       Your referral is recorded.
     </p>
 
-    <div class="card fade-up fade-up-2" class="w-card">
+    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
 
       <!--
         Step 1 — choose which cluster to invite to.
@@ -1734,32 +1734,33 @@
       -->
       <div id="invite-result" style="display:none;margin-bottom:16px;">
         <div id="invite-qr"
-          class="qr-container"></div>
+          style="width:180px;height:180px;margin:0 auto 16px;display:block;
+                 border-radius:8px;overflow:hidden;"></div>
         <div class="did-display">
           <span class="did-label">Invite Link</span>
           <span class="did-value" id="invite-link-display"
-            class="text-sm text-wrap"></span>
+            style="font-size:10px;word-break:break-all;"></span>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <button class="btn btn-primary" onclick="copyInviteLink()"
-            class="flex-1">
+            style="flex:1;">
             Copy link
           </button>
           <button class="btn btn-ghost" onclick="shareInviteLink()"
-            class="flex-1" id="btn-share-invite">
+            style="flex:1;" id="btn-share-invite">
             Share
           </button>
         </div>
       </div>
 
       <div id="invite-error" class="notice"
-        class="notice-error" style="display:none;">
+        style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
         <span class="notice-icon">✗</span>
-        <span class="notice-text" id="invite-error-text" class="text-red"></span>
+        <span class="notice-text" id="invite-error-text" style="color:var(--red);"></span>
       </div>
 
       <button class="btn btn-primary" id="btn-generate-invite"
-        onclick="generateInvite()" class="mb-10" disabled>
+        onclick="generateInvite()" style="margin-bottom:10px;" disabled>
         Generate invite link →
       </button>
 
@@ -1793,55 +1794,55 @@
     </div>
 
     <p class="logotype fade-up fade-up-1">Sovereign Passport</p>
-    <h1 class="display fade-up fade-up-2" class="mb-8">
+    <h1 class="display fade-up fade-up-2" style="margin-bottom:8px;">
       Become a<br><em>Vine.</em>
     </h1>
-    <p class="body-text fade-up fade-up-2" class="mb-24">
+    <p class="body-text fade-up fade-up-2" style="margin-bottom:24px;">
       Your cluster is thriving. Ready to join the network,
       federate with other communities, and carry your
       piece of the distributed backbone?
     </p>
 
-    <div class="w-card" class="fade-up fade-up-3">
+    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
 
       <!-- What you get -->
-      <div class="card" class="mb-16">
+      <div class="card" style="margin-bottom:16px;">
         <p class="card-title">What you get</p>
         <div style="display:flex;flex-direction:column;gap:12px;">
 
-          <div class="row-item">
-            <span class="cred-icon">🌿</span>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🌿</span>
             <div>
-              <strong class="cred-label">
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
                 Network membership
               </strong>
-              <span class="text-dim-sm">
+              <span style="font-size:11px;color:var(--ink-dim);">
                 Your cluster joins the sovereign network.
                 Federate with other vines.
               </span>
             </div>
           </div>
 
-          <div class="row-item">
-            <span class="cred-icon">🌐</span>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🌐</span>
             <div>
-              <strong class="cred-label">
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
                 Your domain
               </strong>
-              <span class="text-dim-sm">
+              <span style="font-size:11px;color:var(--ink-dim);">
                 yourcluster.sovereign-passport.org
                 — or point your own domain.
               </span>
             </div>
           </div>
 
-          <div class="row-item">
-            <span class="cred-icon">💾</span>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">💾</span>
             <div>
-              <strong class="cred-label">
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
                 SPID.app — the vine engine
               </strong>
-              <span class="text-dim-sm">
+              <span style="font-size:11px;color:var(--ink-dim);">
                 Desktop app. Runs on any PC.
                 Manages your grapes, clusters, federation.
                 Peer backup mesh. AI agent.
@@ -1849,13 +1850,13 @@
             </div>
           </div>
 
-          <div class="row-item">
-            <span class="cred-icon">🔒</span>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <span style="font-size:20px;flex-shrink:0;">🔒</span>
             <div>
-              <strong class="cred-label">
+              <strong style="font-size:13px;display:block;margin-bottom:2px;">
                 Distributed backup
               </strong>
-              <span class="text-dim-sm">
+              <span style="font-size:11px;color:var(--ink-dim);">
                 Your community's data is held in
                 encrypted fragments across the network.
                 No single point of failure.
@@ -1867,7 +1868,7 @@
       </div>
 
       <!-- Requirements -->
-      <div class="card" class="mb-16">
+      <div class="card" style="margin-bottom:16px;">
         <p class="card-title">Requirements</p>
         <div style="display:flex;flex-direction:column;gap:10px;">
 
@@ -1885,18 +1886,18 @@
           </div>
           <div class="claim-row" style="border:none;">
             <span class="claim-key">One-time fee</span>
-            <span class="claim-val" class="text-gold">$100 CAD</span>
+            <span class="claim-val" style="color:var(--gold);">$100 CAD</span>
           </div>
 
         </div>
       </div>
 
       <!-- Coming soon notice -->
-      <div class="notice" class="mb-20">
+      <div class="notice" style="margin-bottom:20px;">
         <span class="notice-icon">ℹ️</span>
         <span class="notice-text">
           Officialisation is coming soon at
-          <strong class="text-ink">sovereign-passport.com</strong>.
+          <strong style="color:var(--ink);">sovereign-passport.com</strong>.
           Your cluster is already growing. We'll be ready when you are.
         </span>
       </div>
@@ -2449,347 +2450,6 @@ const SYNC_ENDPOINT = 'https://mdusl.sovereign-passport.id/api/passport/sync'
 
 </script>
 <script>
-/* passport.qr.js */
-/*
- * PASSPORT — Sovereign Identity System
- * passport.qr.js — QR CODE GENERATOR
- *
- * Generates QR codes as inline SVG. No external calls. No dependencies.
- * Pure JS implementation of QR Code Model 2, versions 1–40.
- *
- * Single public function:
- *   makeQR(text, size) → SVG string (width=size, height=size)
- *
- * Usage:
- *   document.getElementById('qr').innerHTML = makeQR('https://...', 180)
- *
- * Based on the QR code standard (ISO 18004).
- * Adapted from qrcodegen by Project Nayuki (MIT License).
- * Sovereign fork — self-hosted, no CDN, no network call.
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GALOIS FIELD ARITHMETIC (GF 2^8, polynomial 0x11D)
-// ─────────────────────────────────────────────────────────────────────────────
-
-var QR = (() => {
-
-  // Precompute GF(256) exp/log tables
-  const GF_EXP = new Uint8Array(512)
-  const GF_LOG = new Uint8Array(256)
-  {
-    let x = 1
-    for (let i = 0; i < 255; i++) {
-      GF_EXP[i] = x
-      GF_LOG[x] = i
-      x = x << 1
-      if (x & 0x100) x ^= 0x11D
-    }
-    for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255]
-  }
-
-  const gfMul = (a, b) => (!a || !b) ? 0 : GF_EXP[GF_LOG[a] + GF_LOG[b]]
-
-  // Reed-Solomon error correction codewords
-  function rsGenerator(degree) {
-    const g = new Uint8Array(degree + 1)
-    g[degree] = 1
-    let root = 1
-    for (let i = 0; i < degree; i++) {
-      for (let j = 0; j < degree; j++)
-        g[j] = gfMul(g[j], root) ^ (j > 0 ? g[j-1] : 0)
-      g[degree] = gfMul(g[degree], root)
-      root = GF_EXP[GF_LOG[root] + 1]
-    }
-    return g
-  }
-
-  function rsRemainder(data, generator) {
-    const result = new Uint8Array(generator.length - 1)
-    for (const b of data) {
-      const factor = b ^ result[0]
-      result.copyWithin(0, 1)
-      result[result.length - 1] = 0
-      for (let i = 0; i < result.length; i++)
-        result[i] ^= gfMul(generator[i + 1], factor)
-    }
-    return result
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // QR VERSION / CAPACITY TABLES
-  // Error correction level M (15% recovery) — good balance for URLs
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // [version]: [totalCodewords, dataCodewords, ecCodewordsPerBlock, blocks]
-  const EC_M = [
-    null,
-    [26,  16,  10, 1], [44,  28,  16, 1], [70,  44,  26, 1],
-    [100, 64,  18, 2], [134, 86,  24, 2], [172, 108, 16, 4],
-    [196, 124, 18, 4], [242, 154, 22, 4], [292, 182, 22, 5],
-    [346, 216, 26, 5], [404, 254, 30, 5], [466, 290, 22, 8],
-    [532, 334, 22, 8], [581, 365, 24, 8], [655, 415, 24, 10],
-    [733, 453, 28, 10],[815, 507, 28, 12],[901, 563, 26, 14],
-    [991, 627, 26, 16],[1085,669, 26, 17],[1156,714, 26, 17],
-    [1258,782, 28, 18],[1364,860, 28, 20],[1474,914, 28, 21],
-    [1588,1000,28,23], [1706,1062,28,25],[1828,1128,28,26],
-    [1921,1193,28,28],[2051,1267,28,29],[2185,1373,28,30],
-    [2323,1455,28,33],[2465,1541,28,34],[2611,1631,28,35],
-    [2761,1725,28,36],[2876,1812,28,37],[3034,1914,28,38],
-    [3196,1992,28,40],[3362,2102,28,41],[3532,2216,28,43],
-    [3706,2334,28,45]
-  ]
-
-  // Alignment pattern positions by version
-  const ALIGN = [
-    [], [], [6,18], [6,22], [6,26], [6,30], [6,34],
-    [6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],
-    [6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],
-    [6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],
-    [6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],
-    [6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],
-    [6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],
-    [6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],
-    [6,30,54,78,102,126,150],[6,24,50,76,102,128,154],
-    [6,28,54,80,106,132,158],[6,32,58,84,110,136,162],
-    [6,26,54,82,110,138,166],[6,30,58,86,114,142,170]
-  ]
-
-  // Format info strings for EC level M, masks 0–7
-  const FORMAT_M = [
-    0x5412, 0x5125, 0x5E7C, 0x5B4B, 0x45F9, 0x40CE, 0x4F97, 0x4AA0
-  ]
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DATA ENCODING — byte mode (UTF-8)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function encodeData(text, version) {
-    const bytes = new TextEncoder().encode(text)
-    const cap   = EC_M[version][1]
-    const bits  = []
-
-    const push = (val, len) => {
-      for (let i = len - 1; i >= 0; i--)
-        bits.push((val >> i) & 1)
-    }
-
-    push(0b0100, 4)          // mode: byte
-    push(bytes.length, version < 10 ? 8 : 16)
-    for (const b of bytes) push(b, 8)
-
-    // Terminator
-    for (let i = 0; i < 4 && bits.length < cap * 8; i++) bits.push(0)
-    while (bits.length % 8) bits.push(0)
-
-    // Pad bytes
-    const pads = [0xEC, 0x11]
-    let pi = 0
-    while (bits.length < cap * 8) push(pads[pi++ % 2], 8)
-
-    // Bits to bytes
-    const out = new Uint8Array(cap)
-    for (let i = 0; i < cap; i++)
-      out[i] = (bits[i*8]<<7)|(bits[i*8+1]<<6)|(bits[i*8+2]<<5)|
-               (bits[i*8+3]<<4)|(bits[i*8+4]<<3)|(bits[i*8+5]<<2)|
-               (bits[i*8+6]<<1)|bits[i*8+7]
-    return out
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // INTERLEAVE + RS BLOCKS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function buildCodewords(text, version) {
-    const [total, dataCap, ecPer, numBlocks] = EC_M[version]
-    const data  = encodeData(text, version)
-    const gen   = rsGenerator(ecPer)
-
-    const shortBlocks = numBlocks - (total % numBlocks || 0)
-    const shortLen    = Math.floor(dataCap / numBlocks)
-
-    const dataBlocks = [], ecBlocks = []
-    let offset = 0
-    for (let i = 0; i < numBlocks; i++) {
-      const len = shortLen + (i >= shortBlocks ? 1 : 0)
-      const blk = data.slice(offset, offset + len)
-      dataBlocks.push(blk)
-      ecBlocks.push(rsRemainder(blk, gen))
-      offset += len
-    }
-
-    const out = []
-    const maxLen = dataBlocks[dataBlocks.length - 1].length
-    for (let i = 0; i < maxLen; i++)
-      for (const b of dataBlocks) if (i < b.length) out.push(b[i])
-    for (let i = 0; i < ecPer; i++)
-      for (const b of ecBlocks) out.push(b[i])
-
-    return out
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // MATRIX BUILDING
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function makeMatrix(version) {
-    const size = version * 4 + 17
-    const m    = Array.from({length: size}, () => new Int8Array(size).fill(-1))
-    const set  = (r, c, v) => { if (r >= 0 && r < size && c >= 0 && c < size) m[r][c] = v }
-
-    // Finder patterns + separators
-    const finder = (row, col) => {
-      for (let r = -1; r <= 7; r++)
-        for (let c = -1; c <= 7; c++) {
-          const v = r >= 0 && r <= 6 && c >= 0 && c <= 6 &&
-            (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4))
-          set(row + r, col + c, v ? 1 : 0)
-        }
-    }
-    finder(0, 0); finder(0, size - 7); finder(size - 7, 0)
-
-    // Timing patterns
-    for (let i = 8; i < size - 8; i++) {
-      m[6][i] = m[i][6] = i % 2 === 0 ? 1 : 0
-    }
-
-    // Dark module
-    m[size - 8][8] = 1
-
-    // Alignment patterns
-    const ap = ALIGN[version]
-    for (const r of ap) for (const c of ap) {
-      if (m[r][c] !== -1) continue
-      for (let dr = -2; dr <= 2; dr++)
-        for (let dc = -2; dc <= 2; dc++)
-          set(r + dr, c + dc,
-            dr === -2 || dr === 2 || dc === -2 || dc === 2 ? 1 :
-            (dr === 0 && dc === 0) ? 1 : 0)
-    }
-
-    // Format info placeholders
-    const fpos = [0,1,2,3,4,5,7,8,8,8,8,8,8,8]
-    const fcol = [8,8,8,8,8,8,8,8,7,5,4,3,2,1,0]
-    for (let i = 0; i < 15; i++) {
-      set(fpos[i], 8, 0); set(8, fcol[i], 0)
-    }
-    set(size-8, 8, 0)
-
-    return m
-  }
-
-  // Data placement zigzag
-  function placeData(m, codewords, version) {
-    const size = m.length
-    let   idx  = 0, bit = 7
-
-    const nextBit = () => {
-      if (idx >= codewords.length) return 0
-      const b = (codewords[idx] >> bit) & 1
-      if (--bit < 0) { bit = 7; idx++ }
-      return b
-    }
-
-    let upward = true
-    for (let right = size - 1; right >= 1; right -= 2) {
-      if (right === 6) right = 5
-      for (let vert = 0; vert < size; vert++) {
-        const row = upward ? size - 1 - vert : vert
-        for (let lr = 0; lr < 2; lr++) {
-          const col = right - lr
-          if (m[row][col] === -1) m[row][col] = nextBit()
-        }
-      }
-      upward = !upward
-    }
-  }
-
-  // Mask pattern 2: (row // 2 + col // 3) % 2 == 0
-  // Good default — balanced, avoids streaks
-  function applyMask(m) {
-    const size = m.length
-    for (let r = 0; r < size; r++)
-      for (let c = 0; c < size; c++)
-        if (m[r][c] !== -1 && (Math.floor(r/2) + Math.floor(c/3)) % 2 === 0)
-          m[r][c] ^= 1
-    return 2 // mask index
-  }
-
-  function writeFormat(m, mask, version) {
-    const size = m.length
-    const fmt  = FORMAT_M[mask]
-    const bits = []
-    for (let i = 14; i >= 0; i--) bits.push((fmt >> i) & 1)
-
-    // Around top-left finder
-    const positions = [
-      [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
-      [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]
-    ]
-    positions.forEach(([r,c], i) => m[r][c] = bits[i])
-
-    // Top-right + bottom-left copies
-    for (let i = 0; i < 8; i++) m[size-1-i][8] = bits[i]
-    for (let i = 8; i < 15; i++) m[8][size-15+i] = bits[i]
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // VERSION SELECTION
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function pickVersion(text) {
-    const bytes = new TextEncoder().encode(text).length
-    for (let v = 1; v <= 40; v++) {
-      const cap = EC_M[v][1] - (v < 10 ? 3 : 4) // mode+length overhead
-      if (bytes <= cap) return v
-    }
-    throw new Error('Text too long for QR')
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SVG OUTPUT
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function toSVG(m, px) {
-    const quiet = 4
-    const size  = m.length
-    const mod   = px / (size + quiet * 2)
-    const off   = quiet * mod
-    const rects = []
-
-    for (let r = 0; r < size; r++)
-      for (let c = 0; c < size; c++)
-        if (m[r][c] === 1)
-          rects.push(`<rect x="${off + c*mod}" y="${off + r*mod}" width="${mod}" height="${mod}"/>`)
-
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${px} ${px}" ` +
-           `width="${px}" height="${px}" shape-rendering="crispEdges">` +
-           `<rect width="${px}" height="${px}" fill="#fff"/>` +
-           `<g fill="#000">${rects.join('')}</g></svg>`
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // PUBLIC API
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function makeQR(text, size = 180) {
-    const version   = pickVersion(text)
-    const codewords = buildCodewords(text, version)
-    const matrix    = makeMatrix(version)
-    placeData(matrix, codewords, version)
-    const mask = applyMask(matrix)
-    writeFormat(matrix, mask, version)
-    return toSVG(matrix, size)
-  }
-
-  return { makeQR }
-
-})()
-
-var makeQR = QR.makeQR
-
-</script>
-<script>
 /* passport.ui.js */
 /*
  * PASSPORT — Sovereign Identity System
@@ -2924,13 +2584,13 @@ async function syncToDevice() {
       throw new Error((err.error || `Server error ${res.status}`))
     }
 
-    const { token, expires_at } = await res.json()
+    const { token, expires_at, qr_svg } = await res.json()
     const expiresIn  = Math.round((new Date(expires_at) - Date.now()) / 60000)
-    const walletBase = 'https://sovereign-passport.github.io/passport/app/passport.html'
-    const syncUrl    = `${walletBase}#sync=${token}`
+    const walletBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const syncUrl    = walletBase + '#sync=' + token
 
-    // Show sync link modal — QR points to passport app, not raw API
-    _showSyncLinkModal(syncUrl, expiresIn)
+    // Show sync link modal — QR generated server-side by vine
+    _showSyncLinkModal(syncUrl, expiresIn, qr_svg)
 
   } catch (err) {
     showToast('Sync failed: ' + ((err.message || 'network error')))
@@ -2940,7 +2600,7 @@ async function syncToDevice() {
 /**
  * Show the sync link + QR in a modal overlay.
  */
-function _showSyncLinkModal(url, expiresIn) {
+function _showSyncLinkModal(url, expiresIn, qrSvg) {
   const _slm = document.getElementById('sync-link-modal'); if(_slm) _slm.remove()
 
   const overlay = document.createElement('div')
@@ -2951,9 +2611,6 @@ function _showSyncLinkModal(url, expiresIn) {
     justify-content:center;padding:24px;overflow-y:auto;
   `
 
-  // QR — generated locally, no external call
-  const qrSvg = makeQR(url, 260)
-
   overlay.innerHTML = `
     <div class="card" style="width:100%;max-width:380px;text-align:center;">
       <p class="cred-type" style="margin-bottom:8px;">Sync link</p>
@@ -2962,7 +2619,7 @@ function _showSyncLinkModal(url, expiresIn) {
         Your data is already encrypted — the server cannot read it.
       </p>
 
-      <div style="width:260px;height:260px;border-radius:8px;margin:0 auto 16px;display:block;overflow:hidden;">${qrSvg}</div>
+      <div class="qr-container">${qrSvg || ''}</div>
 
       <div style="background:var(--bg-deep);border-radius:6px;padding:10px;
                   font-size:10px;color:var(--gold);word-break:break-all;
@@ -4042,34 +3699,27 @@ async function generateInvite() {
     // Encode the signed referral as base64
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
-    // Build the invite URL
-    // passportBase — the sovereign PWA where the invitee lands
-    // offerBase    — derived from the grape's stored MembershipCredential for
-    //                this cluster. Each vine self-describes its own endpoint.
-    //                Falls back to mdusl only for legacy credentials that
-    //                predate offer_endpoint storage (< L3A).
-    const vineCred     = (vault.credentials || []).find(
+    // POST ref payload to vine relay
+    // Vine stores it for 5 days, returns short token + QR SVG + full invite URL
+    // QR is generated server-side — no QR library needed in passport
+    const vineCred    = (vault.credentials || []).find(
       function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
     )
-    const offerBase    = (vineCred && vineCred.offer_endpoint)
+    const offerBase   = (vineCred && vineCred.offer_endpoint)
       || 'https://mdusl.sovereign-passport.id/api/offer'
-    const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const refEndpoint = offerBase.replace('/api/offer', '/api/passport/ref')
 
-    // POST ref to vine relay — returns a short token (5-day TTL)
-    // This keeps the invite URL short enough to scan as a QR code
-    const refEndpoint  = offerBase.replace('/api/offer', '/api/passport/ref')
-    const refRes       = await fetch(refEndpoint, {
+    const refRes = await fetch(refEndpoint, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ ref: encodedRef }),
     })
     if (!refRes.ok) throw new Error('Could not store invite ref on vine')
-    const refData      = await refRes.json()
-    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + refData.token
+    const refData = await refRes.json()
 
-    // Display the link + QR
-    document.getElementById('invite-link-display').textContent = inviteUrl
-    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 260)
+    // Display the invite URL and QR returned by the vine
+    document.getElementById('invite-link-display').textContent = refData.invite_url
+    document.getElementById('invite-qr').innerHTML = refData.qr_svg
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')
@@ -4792,10 +4442,10 @@ function openNodes() {
                 : 'FOUNDER'
           }</p>
           <div class="cred-title">${escHtmlP(c.name)}</div>
-          <div class="cred-sub" class="text-dim-sm mt-4">
+          <div class="cred-sub" style="font-size:11px;color:var(--ink-dim);margin-top:4px;">
             ${escHtmlP(c.description || '')}
           </div>
-          <div class="cred-meta" class="mt-12">
+          <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
               Founded <span>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</span>
             </div>
@@ -4805,16 +4455,16 @@ function openNodes() {
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
             ${isLeft ? `
-              <button class="btn btn-ghost" class="flex-1 text-xs"
+              <button class="btn btn-ghost" style="flex:1;font-size:11px;"
                 onclick="rejoinCluster('${c.id}')">
                 Rejoin as Founder
               </button>
             ` : `
-              <button class="btn btn-ghost" class="flex-1 text-xs"
+              <button class="btn btn-ghost" style="flex:1;font-size:11px;"
                 onclick="openInviteFromCluster('${c.id}')">
                 Invite a Grape
               </button>
-              <button class="btn btn-ghost" class="text-xs"
+              <button class="btn btn-ghost" style="font-size:11px;"
                 onclick="softLeaveCluster('${c.id}')">
                 Leave
               </button>
@@ -4845,20 +4495,20 @@ function openNodes() {
         card.innerHTML = `
           <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : ((m.status ? m.status.toUpperCase() : '') || 'MEMBER')}</p>
           <div class="cred-title">${escHtmlP((m.node_name || m.cluster_name || m.node_id || 'Unknown cluster'))}</div>
-          <div class="cred-meta" class="mt-12">
+          <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
               Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
           </div>
           ${!isLeft ? `
-          <div class="row-8 mt-12">
-            <button class="btn btn-ghost" class="text-xs"
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-ghost" style="font-size:11px;"
               onclick="softLeaveMembership('${(m.id || m.node_id)}')">
               Leave
             </button>
           </div>` : `
-          <div class="mt-8">
-            <p class="text-dim-sm">
+          <div style="margin-top:8px;">
+            <p style="font-size:11px;color:var(--ink-dim);">
               You left this cluster. Your credential remains as a personal record.
               Rejoin by requesting a new invite from the founder.
             </p>
@@ -4960,12 +4610,12 @@ function openCredentials() {
         <div style="margin-top:12px;display:flex;gap:8px;">
           <button class="btn btn-primary"
             onclick="copyCredential(${idx})"
-            class="flex-1" style="padding:8px;">
+            style="flex:1;padding:8px;">
             Copy credential
           </button>
           <button class="btn btn-ghost"
             onclick="presentCredential(${idx})"
-            class="flex-1" style="padding:8px;">
+            style="flex:1;padding:8px;">
             Present QR
           </button>
         </div>`
@@ -4976,7 +4626,7 @@ function openCredentials() {
         <div class="cred-sub" style="font-size:10px;word-break:break-all;color:var(--ink-dim);">
           ${escHtmlP(issuerLine)}
         </div>
-        <div class="cred-meta" class="mt-12">
+        <div class="cred-meta" style="margin-top:12px;">
           <div class="cred-meta-item">
             Issued <span>${c.issued_at ? new Date(c.issued_at).toLocaleDateString() : '—'}</span>
           </div>
@@ -4984,7 +4634,7 @@ function openCredentials() {
             Expires <span>${expiry}</span>
           </div>
         </div>
-        <div class="row-8 mt-12">
+        <div style="display:flex;gap:8px;margin-top:12px;">
           ${revokedBadge}
         </div>
         ${actions}

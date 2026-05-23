@@ -159,34 +159,27 @@ async function generateInvite() {
     // Encode the signed referral as base64
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
-    // Build the invite URL
-    // passportBase — the sovereign PWA where the invitee lands
-    // offerBase    — derived from the grape's stored MembershipCredential for
-    //                this cluster. Each vine self-describes its own endpoint.
-    //                Falls back to mdusl only for legacy credentials that
-    //                predate offer_endpoint storage (< L3A).
-    const vineCred     = (vault.credentials || []).find(
+    // POST ref payload to vine relay
+    // Vine stores it for 5 days, returns short token + QR SVG + full invite URL
+    // QR is generated server-side — no QR library needed in passport
+    const vineCred    = (vault.credentials || []).find(
       function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
     )
-    const offerBase    = (vineCred && vineCred.offer_endpoint)
+    const offerBase   = (vineCred && vineCred.offer_endpoint)
       || 'https://mdusl.sovereign-passport.id/api/offer'
-    const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const refEndpoint = offerBase.replace('/api/offer', '/api/passport/ref')
 
-    // POST ref to vine relay — returns a short token (5-day TTL)
-    // This keeps the invite URL short enough to scan as a QR code
-    const refEndpoint  = offerBase.replace('/api/offer', '/api/passport/ref')
-    const refRes       = await fetch(refEndpoint, {
+    const refRes = await fetch(refEndpoint, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ ref: encodedRef }),
     })
     if (!refRes.ok) throw new Error('Could not store invite ref on vine')
-    const refData      = await refRes.json()
-    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + refData.token
+    const refData = await refRes.json()
 
-    // Display the link + QR
-    document.getElementById('invite-link-display').textContent = inviteUrl
-    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 260)
+    // Display the invite URL and QR returned by the vine
+    document.getElementById('invite-link-display').textContent = refData.invite_url
+    document.getElementById('invite-qr').innerHTML = refData.qr_svg
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')
