@@ -186,7 +186,7 @@ async function generateInvite() {
 
     // Display the link + QR
     document.getElementById('invite-link-display').textContent = inviteUrl
-    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 300)
+    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 260)
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')

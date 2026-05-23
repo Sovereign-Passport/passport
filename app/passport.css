@@ -719,10 +719,12 @@
 
     /* QR container */
     .qr-container {
-      width: 260px; height: 260px;
-      margin: 0 auto 16px;
-      display: block;
-      border-radius: 8px;
+    width: 100%;
+    max-width: 260px;
+    height: auto;
+    margin: 0 auto 16px;
+    display: block;
+    border-radius: 8px;
     }
 
     /* Credential item icon */

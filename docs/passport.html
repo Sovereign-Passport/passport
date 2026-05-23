@@ -734,10 +734,12 @@
 
     /* QR container */
     .qr-container {
-      width: 260px; height: 260px;
-      margin: 0 auto 16px;
-      display: block;
-      border-radius: 8px;
+    width: 100%;
+    max-width: 260px;
+    height: auto;
+    margin: 0 auto 16px;
+    display: block;
+    border-radius: 8px;
     }
 
     /* Credential item icon */
@@ -4067,7 +4069,7 @@ async function generateInvite() {
 
     // Display the link + QR
     document.getElementById('invite-link-display').textContent = inviteUrl
-    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 300)
+    document.getElementById('invite-qr').innerHTML = makeQR(inviteUrl, 260)
 
     // Show share button only if Web Share API available
     const shareBtn = document.getElementById('btn-share-invite')
