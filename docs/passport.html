@@ -3696,28 +3696,33 @@ async function generateInvite() {
     const signature = toB64(sigBuf)
     payload.signature = signature
 
-    // Encode the signed referral as base64
+    // Encode the signed referral as base64url
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
-    // POST ref payload to vine relay
-    // Vine stores it for 5 days, returns short token + QR SVG + full invite URL
-    // QR is generated server-side — no QR library needed in passport
-    const vineCred    = (vault.credentials || []).find(
+    // Build the invite URL
+    // passportBase — the sovereign PWA where the invitee lands
+    // offerBase    — derived from the grape's stored MembershipCredential for
+    //                this cluster. Each vine self-describes its own endpoint.
+    //                Falls back to mdusl only for legacy credentials that
+    //                predate offer_endpoint storage (< L3A).
+    const vineCred     = (vault.credentials || []).find(
       function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
     )
-    const offerBase   = (vineCred && vineCred.offer_endpoint)
+    const offerBase    = (vineCred && vineCred.offer_endpoint)
       || 'https://mdusl.sovereign-passport.id/api/offer'
-    const refEndpoint = offerBase.replace('/api/offer', '/api/passport/ref')
+    const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
 
-    const refRes = await fetch(refEndpoint, {
-      method:  'POST',
+    // POST encodedRef to VPS relay — returns short token + QR SVG
+    const refRes = await fetch('https://mdusl.sovereign-passport.id/api/passport/ref', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ref: encodedRef }),
+      body: JSON.stringify({ ref: encodedRef }),
     })
-    if (!refRes.ok) throw new Error('Could not store invite ref on vine')
+    if (!refRes.ok) throw new Error('Could not connect to SPID network')
     const refData = await refRes.json()
 
-    // Display the invite URL and QR returned by the vine
+    // Display the link + QR
     document.getElementById('invite-link-display').textContent = refData.invite_url
     document.getElementById('invite-qr').innerHTML = refData.qr_svg
 
