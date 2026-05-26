@@ -4735,6 +4735,7 @@ async function boot() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const offerUrl   = params.get('offer') || hashParams.get('offer')
   const offerData  = params.get('r')     || hashParams.get('r')
+  const offerRef   = params.get('ref')   || hashParams.get('ref')
   const syncToken  = params.get('sync')  || hashParams.get('sync')
 
   if (stored) {
@@ -4746,6 +4747,7 @@ async function boot() {
       // Store offer URL for after unlock
       appState.pendingOfferUrl  = offerUrl
       appState.pendingOfferData = offerData
+      appState.pendingOfferRef  = offerRef
       showToast('Credential offer waiting — unlock your Passport')
     }
 
@@ -4770,6 +4772,7 @@ async function boot() {
     // New user — create passport first, then handle offer
     appState.pendingOfferUrl  = offerUrl
     appState.pendingOfferData = offerData
+    appState.pendingOfferRef  = offerRef
     showToast('Create your Passport to accept this credential')
     goTo('screen-welcome')
 
@@ -4796,8 +4799,10 @@ async function boot() {
 function checkPendingOffer() {
   if (appState.pendingOfferUrl) {
     const url = appState.pendingOfferUrl
+    const ref = appState.pendingOfferRef
     appState.pendingOfferUrl = null
-    setTimeout(() => loadOffer(url), 500)
+    appState.pendingOfferRef = null
+    setTimeout(() => loadOffer(url, ref), 500)
   } else if (appState.pendingOfferData) {
     // pendingOfferData is a raw offer JSON string (not a URL)
     // Only parse if it looks like JSON, not a URL or ref token
