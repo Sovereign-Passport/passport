@@ -63,6 +63,30 @@ function toBase58(bytes) {
   return r
 }
 
+// Base58btc decode (mirror of toBase58) — needed to resolve a did:key issuer.
+function fromBase58(str) {
+  const A='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let num=0n
+  for(const ch of str){const idx=A.indexOf(ch); if(idx<0) throw new Error('BAD_BASE58'); num=num*58n+BigInt(idx)}
+  let hex=num.toString(16); if(hex.length%2) hex='0'+hex
+  const body = (hex==='00'||num===0n) ? [] : hex.match(/.{2}/g).map(h=>parseInt(h,16))
+  let zeros=0; for(const ch of str){if(ch!=='1')break; zeros++}
+  return Uint8Array.from([...new Array(zeros).fill(0), ...body])
+}
+
+// Resolve a did:key:z… (Ed25519) to a WebCrypto verify key.
+async function didKeyToPublicKey(did) {
+  if (typeof did!=='string' || did.indexOf('did:key:z')!==0) throw new Error('NOT_DID_KEY')
+  const bytes = fromBase58(did.slice('did:key:z'.length))
+  if (bytes[0]!==0xed || bytes[1]!==0x01) throw new Error('BAD_MULTICODEC')
+  const raw = bytes.slice(2)
+  if (raw.length!==32) throw new Error('BAD_KEY_LENGTH')
+  return crypto.subtle.importKey(
+    'jwk', { kty:'OKP', crv:'Ed25519', x: toB64(raw) },
+    { name:'Ed25519' }, true, ['verify']
+  )
+}
+
 async function generateIdentity() {
   const kp  = await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify'])
   const raw = await crypto.subtle.exportKey('raw',kp.publicKey)

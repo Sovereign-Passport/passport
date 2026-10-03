@@ -266,6 +266,9 @@ async function acceptOffer() {
         referral_id:       issued.referral_id || _pendingRef || null,
         inviter_did:       issued.inviter_did || null,
         approval_required: issued.approval_required !== false,
+        vine_endpoint:     offer.issue_endpoint
+          ? offer.issue_endpoint.replace('/api/credentials/issue', '')
+          : null,
         stored_at:         new Date().toISOString(),
       }
       const idx = vault.memberships.findIndex(m => m.node_id === nodeId)
@@ -330,6 +333,129 @@ async function acceptOffer() {
     btn.textContent       = 'Accept credential →'
     btn.disabled          = false
   }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUSTER APPROVAL DELIVERY — signed claim + confirm (reuses vault + crypto)
+// The invited Passport fetches its pending Cluster approvals with a fresh,
+// DID-signed proof, verifies the issuer signature, stores the credential,
+// then confirms receipt with a second DID-signed proof.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CLUSTER_APPROVAL_ACTIONS = {
+  CLAIM:   'claim_cluster_approvals',
+  CONFIRM: 'confirm_cluster_approvals',
+}
+
+async function _signHolderPayload(payload) {
+  const privateKey = await crypto.subtle.importKey(
+    'jwk', appState.vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
+  )
+  const sigBuf = await crypto.subtle.sign(
+    'Ed25519', privateKey, new TextEncoder().encode(JSON.stringify(payload))
+  )
+  return toB64(sigBuf)
+}
+
+function _approvalUrl(vineEndpoint, path) {
+  return String(vineEndpoint || '').replace(/\/+$/, '') + path
+}
+
+/**
+ * Confirm receipt of Cluster approvals (signed by the holder DID).
+ * Idempotent server-side: a repeat returns 200.
+ */
+async function confirmClusterApprovals(vineEndpoint, clusterIds) {
+  const did       = appState.vault.identity.id
+  const timestamp = Date.now()
+  const payload   = { action: CLUSTER_APPROVAL_ACTIONS.CONFIRM, did, cluster_ids: clusterIds, timestamp }
+  const signature = await _signHolderPayload(payload)
+
+  const res = await fetch(_approvalUrl(vineEndpoint, '/api/clusters/approvals/confirm'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ did, timestamp, cluster_ids: clusterIds, signature }),
+  })
+  if (!res.ok) return { ok: false, error: 'CONFIRM_FAILED', status: res.status }
+  const data = await res.json().catch(() => ({}))
+  return { ok: true, confirmed: data.confirmed || clusterIds }
+}
+
+/**
+ * Claim pending Cluster approvals for THIS DID, verify them, store them once,
+ * flip the matching pending membership to approved, then confirm receipt.
+ *
+ * Confirmation is sent ONLY after a successful local vault save.
+ */
+async function claimClusterApprovals(vineEndpoint) {
+  const vault     = appState.vault
+  const did       = vault.identity.id
+  const timestamp = Date.now()
+  const payload   = { action: CLUSTER_APPROVAL_ACTIONS.CLAIM, did, timestamp }
+  const signature = await _signHolderPayload(payload)
+
+  const res = await fetch(_approvalUrl(vineEndpoint, '/api/clusters/approvals/claim'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ did, timestamp, signature }),
+  })
+  if (!res.ok) return { ok: false, error: 'CLAIM_FAILED', status: res.status }
+  const data      = await res.json().catch(() => ({}))
+  const approvals = Array.isArray(data.approvals) ? data.approvals : []
+
+  const accepted = []
+  for (const cred of approvals) {
+    if (!cred || cred.type !== 'MembershipCredential' || cred.scope !== 'cluster') continue
+    if (cred.subject_did !== did || cred.status !== 'approved') continue
+
+    const pendingIdx = (vault.memberships || []).findIndex(
+      m => m.status !== 'approved' &&
+           (m.cluster_id === cred.cluster_id || m.node_id === cred.cluster_id)
+    )
+    if (pendingIdx < 0) continue
+
+    // Verify the issuer's Ed25519 signature over the payload sans `signature`.
+    let issuerOk = false
+    try {
+      const pub = await didKeyToPublicKey(cred.issuer_did)
+      const { signature: sig, ...signed } = cred
+      issuerOk = await crypto.subtle.verify(
+        'Ed25519', pub, fromB64(sig),
+        new TextEncoder().encode(JSON.stringify(signed))
+      )
+    } catch (e) { issuerOk = false }
+    if (!issuerOk) continue
+
+    if (!vault.credentials) vault.credentials = []
+    const dup = vault.credentials.some(c =>
+      c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+      c.cluster_id === cred.cluster_id && c.signature === cred.signature)
+    if (!dup) {
+      vault.credentials.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+    }
+
+    vault.memberships[pendingIdx] = Object.assign({}, vault.memberships[pendingIdx], {
+      status:            'approved',
+      approval_required: false,
+      approved_at:       new Date().toISOString(),
+    })
+    accepted.push(cred.cluster_id)
+  }
+
+  if (accepted.length === 0) return { ok: true, stored: [], confirmed: [] }
+
+  // Save BEFORE confirming — a failed save sends no confirmation.
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+  } catch (e) {
+    return { ok: false, error: 'SAVE_FAILED', stored: [] }
+  }
+
+  const confirmed = await confirmClusterApprovals(vineEndpoint, accepted)
+  return { ok: true, stored: accepted, confirmed: confirmed.confirmed || [] }
 }
 
 
