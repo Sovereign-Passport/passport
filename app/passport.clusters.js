@@ -442,4 +442,42 @@ async function dissolveCluster(clusterId) {
   }
 }
 
+/**
+ * Build and sign a Cluster-scoped MembershipCredential approval.
+ *
+ * Signed by the admin/founder DID with its own Ed25519 key. The signature
+ * covers exactly JSON.stringify(payload without `signature`). This reuses the
+ * existing credential type (`MembershipCredential`) with `scope:'cluster'`;
+ * no new credential type is introduced.
+ *
+ * Exposed as a global for the existing/future approval action.
+ *
+ * @param {Object} vault
+ * @param {{ cluster_id:string, subject_did:string, referral_id?:string|null }} opts
+ * @returns {Promise<Object>} signed credential payload
+ */
+async function buildClusterApprovalCredential(vault, opts) {
+  const payload = {
+    type:        'MembershipCredential',
+    scope:       'cluster',
+    cluster_id:  opts.cluster_id,
+    issuer_did:  vault.identity.id,
+    subject_did: opts.subject_did,
+    referral_id: opts.referral_id ?? null,
+    status:      'approved',
+    issued_at:   new Date().toISOString(),
+    expires_at:  null,
+  }
+
+  const privateKey = await crypto.subtle.importKey(
+    'jwk', vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
+  )
+  const sigBuf = await crypto.subtle.sign(
+    'Ed25519', privateKey, new TextEncoder().encode(JSON.stringify(payload))
+  )
+
+  payload.signature = toB64(sigBuf)
+  return payload
+}
+
 
