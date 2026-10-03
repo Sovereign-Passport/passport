@@ -459,6 +459,127 @@ async function claimClusterApprovals(vineEndpoint) {
 }
 
 
+// ═════════════════════════════════════════════════════════════════════════════
+// APPROVE-MEMBER CONFIRMATION SCREEN — opened from a public #approve= demand.
+// The demand is NOT an authority; the server re-verifies everything.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Normalize a vine endpoint: scheme optional, no trailing slash, https by default. */
+function normalizeVineEndpoint(raw) {
+  let s = String(raw || '').trim()
+  if (!s) return null
+  if (!/^https?:\/\//i.test(s)) {
+    const isLocal = /^localhost(:\d+)?(\/|$)/i.test(s) ||
+                    /^127\.0\.0\.1(:\d+)?(\/|$)/i.test(s) ||
+                    /^\[::1\](:\d+)?(\/|$)/i.test(s)
+    s = (isLocal ? 'http://' : 'https://') + s
+  }
+  return s.replace(/\/+$/, '')
+}
+
+/** Remove the #approve= fragment without reloading (avoids a reload loop). */
+function clearApproveFragment() {
+  try {
+    const base = (window.location.pathname || '') + (window.location.search || '')
+    window.history.replaceState(null, '', base)
+  } catch (e) { /* non-fatal */ }
+}
+
+/**
+ * Detect a pending #approve= demand and render the confirmation screen.
+ * Required keys: vine_endpoint, cluster_id, subject_did and the KEY
+ * `referral_id` (UUID or null). A missing `referral_id` key is refused.
+ * The fragment is always removed after handling.
+ * @returns {boolean} true if a screen was shown
+ */
+function checkPendingApproval() {
+  const raw = appState.pendingApproveRaw
+  if (!raw) return false
+  appState.pendingApproveRaw = null
+
+  let demand = null
+  try {
+    demand = JSON.parse(new TextDecoder().decode(fromB64(raw)))
+  } catch (e) { demand = null }
+
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint)
+    : null
+
+  const valid = demand && typeof demand === 'object' &&
+    'referral_id' in demand &&          // null allowed, absent refused
+    endpoint && demand.cluster_id && demand.subject_did
+  if (!valid) {
+    showToast('Invalid or incomplete approval request.')
+    clearApproveFragment()
+    return false
+  }
+
+  demand.vine_endpoint     = endpoint
+  appState.pendingApproval = demand
+
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+  set('approve-cluster',  demand.cluster_id)
+  set('approve-subject',  demand.subject_did)
+  set('approve-referral', demand.referral_id == null ? '(none)' : demand.referral_id)
+  set('approve-endpoint', demand.vine_endpoint)
+  const errEl = document.getElementById('approve-error')
+  if (errEl) errEl.style.display = 'none'
+
+  clearApproveFragment()
+  goTo('screen-approve')
+  return true
+}
+
+/** Cancel — signs nothing, sends nothing. */
+function cancelPendingApproval() {
+  appState.pendingApproval = null
+  goTo('screen-home')
+}
+
+/** Explicit admin action: sign the Cluster approval and POST it. */
+async function approveClusterMember() {
+  const demand  = appState.pendingApproval
+  const btn     = document.getElementById('btn-approve-member')
+  const errEl   = document.getElementById('approve-error')
+  const errText = document.getElementById('approve-error-text')
+
+  if (!demand) { showToast('No pending approval.'); return }
+  if (!appState.vault) { goTo('screen-unlock'); return }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Approving…' }
+  if (errEl) errEl.style.display = 'none'
+
+  try {
+    const cred = await buildClusterApprovalCredential(appState.vault, {
+      cluster_id:  demand.cluster_id,
+      subject_did: demand.subject_did,
+      referral_id: demand.referral_id ?? null,
+    })
+
+    const base = normalizeVineEndpoint(demand.vine_endpoint)
+    if (!base) throw new Error('INVALID_ENDPOINT')
+    const url  = base + '/api/clusters/' + encodeURIComponent(demand.cluster_id) +
+                 '/members/' + encodeURIComponent(demand.subject_did) + '/approve'
+
+    const res  = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(cred),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || data.status || ('HTTP ' + res.status))
+
+    appState.pendingApproval = null
+    showToast('Member approved ✓')
+    goTo('screen-home')
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'flex'; if (errText) errText.textContent = e.message }
+    if (btn)   { btn.disabled = false; btn.textContent = 'Approve' }
+  }
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ABOUT OVERLAY
 // ─────────────────────────────────────────────────────────────────────────────

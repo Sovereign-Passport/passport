@@ -766,6 +766,49 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — APPROVE CLUSTER MEMBER
+       Confirmation screen opened from a public #approve= demand.
+       Reuses existing classes only — the demand is not an authority.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen screen-top" id="screen-approve">
+    <div style="width:100%;max-width:380px;">
+      <div class="screen-header">
+        <button class="btn-back" onclick="cancelPendingApproval()">‹</button>
+        <p class="logotype">Approve member</p>
+      </div>
+
+      <p class="section-label">Request</p>
+
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🏛️</div>
+        <div class="menu-text"><strong>Cluster</strong><small id="approve-cluster">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🆔</div>
+        <div class="menu-text"><strong>Member DID</strong><small id="approve-subject">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🔗</div>
+        <div class="menu-text"><strong>Referral</strong><small id="approve-referral">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🌿</div>
+        <div class="menu-text"><strong>Vine endpoint</strong><small id="approve-endpoint">—</small></div>
+      </div>
+
+      <div class="notice" id="approve-error" style="display:none;margin-top:16px;">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" id="approve-error-text"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-approve-member" onclick="approveClusterMember()"
+        style="margin-top:16px;width:100%;">
+        Approve
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
        SCREEN — MY CLUSTERS
        Shows all cluster memberships stored in the vault.
        Each entry shows the community name, issuer DID,
@@ -1399,6 +1442,7 @@ async function tryUnlock() {
     appState.vaultKey = vaultKey
     populateHome()
     checkPendingOffer()
+    checkPendingApproval()
 
     // If a sync token was waiting, route to restore screen sync tab
     if (appState.pendingSyncToken) {
@@ -1852,6 +1896,9 @@ async function boot() {
   const offerData  = params.get('r')     || hashParams.get('r')
   const offerRef   = params.get('ref')   || hashParams.get('ref')
   const syncToken  = params.get('sync')  || hashParams.get('sync')
+  // Public signed-approval demand: passport.html#approve=<base64url(payload)>
+  const approveRaw = params.get('approve') || hashParams.get('approve')
+  if (approveRaw) appState.pendingApproveRaw = approveRaw
 
   if (stored) {
     appState.stored = stored
@@ -1946,7 +1993,7 @@ function checkPendingOffer() {
 window.addEventListener('hashchange', () => {
   // Only re-run if there's actually an offer in the new hash
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  if (hashParams.get('offer') || hashParams.get('r')) {
+  if (hashParams.get('offer') || hashParams.get('r') || hashParams.get('approve')) {
     boot()
   }
 })
