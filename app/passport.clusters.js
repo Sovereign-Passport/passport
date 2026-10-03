@@ -132,8 +132,9 @@ async function createCluster() {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Ping vignard witness — fire and forget, never block
-    pingVignard(clusterId, name, desc, founderDid).catch(() => {})
+    // Ping vignard witness — fire and forget, never block.
+    // Sends the already-signed FounderCredential as-is (no second signature).
+    pingVignard(clusterId, name, desc, founderDid, founderCredential).catch(() => {})
 
     populateHome()
     showToast(`${name} founded 🍇`)
@@ -151,12 +152,29 @@ async function createCluster() {
  * Ping the vignard witness with a grape cluster registration.
  * Fire and forget — never blocks the UI.
  */
-async function pingVignard(clusterId, name, description, founderDid) {
+async function pingVignard(clusterId, name, description, founderDid, founderCredential) {
+  // The signed FounderCredential is mandatory. Without it there is nothing
+  // to prove, and NO request is made (no unsigned fallback).
+  if (!founderCredential || typeof founderCredential !== 'object') {
+    const err  = new Error('FounderCredential required for vignard witness')
+    err.code   = 'FOUNDER_CREDENTIAL_REQUIRED'
+    throw err
+  }
+
   try {
+    // Send the full, already-signed FounderCredential. Its signature covers
+    // `claims` only and is reused verbatim — no second identity or signature.
+    // `name`, `description` and `founder_did` are added as transport fields.
+    const body = Object.assign({}, founderCredential, {
+      name,
+      description,
+      founder_did: founderDid,
+    })
+
     const res = await fetch('https://mdusl.sovereign-passport.id/api/vignard/clusters', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ cluster_id: clusterId, name, description, founder_did: founderDid }),
+      body:    JSON.stringify(body),
     })
     if (res.ok) {
       const data = await res.json()
@@ -390,9 +408,9 @@ async function leaveCluster(clusterId, successorDid) {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Ping vignard with succession event — fire and forget
-    pingVignard(clusterId, cluster.name, cluster.description || '',
-      (successorDid || vault.identity.id)).catch(() => {})
+    // Departure / succession is NOT witnessed here. A founder-initiated
+    // succession will require its own distinct signed event (a succession
+    // credential signed by the successor). Until then, no unsigned ping.
 
     populateHome()
     showToast(`You have left ${cluster.name}`)
