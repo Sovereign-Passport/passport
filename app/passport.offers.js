@@ -253,6 +253,36 @@ async function acceptOffer() {
 
     const issued = await issueRes.json()
 
+    // ── Invitation accepted, Cluster approval still pending (HTTP 202) ──
+    // No credential is issued yet: record a pending membership only.
+    if (issueRes.status === 202) {
+      if (!vault.memberships) vault.memberships = []
+      const nodeId  = issued.cluster_id || offer.node_id
+      const pending = {
+        node_id:           nodeId,
+        node_name:         offer.node_name || offer.node_id || 'Cluster',
+        status:            issued.status || 'invited',
+        cluster_id:        issued.cluster_id || null,
+        referral_id:       issued.referral_id || _pendingRef || null,
+        inviter_did:       issued.inviter_did || null,
+        approval_required: issued.approval_required !== false,
+        stored_at:         new Date().toISOString(),
+      }
+      const idx = vault.memberships.findIndex(m => m.node_id === nodeId)
+      if (idx >= 0) vault.memberships[idx] = Object.assign({}, vault.memberships[idx], pending)
+      else vault.memberships.push(pending)
+
+      const pendingPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      await persist(pendingPayload)
+      appState.stored = pendingPayload
+
+      _pendingOffer = null
+      _pendingRef   = null
+      showToast('Invitation recorded — Cluster approval pending.')
+      goTo('screen-home')
+      return
+    }
+
     // Store credential in vault
     // offer_endpoint — vine's /api/offer URL, derived from issue_endpoint.
     // Stored so the grape can build invite QRs pointing to the correct vine
