@@ -1618,6 +1618,9 @@ function openNodes() {
             <div class="cred-meta-item">
               Members <span>${memberCount}</span>
             </div>
+            <div class="cred-meta-item">
+              Health <span class="pm-slot" data-marker-slot></span>
+            </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
             ${isLeft ? `
@@ -1642,7 +1645,8 @@ function openNodes() {
           </div>
         `
         // Personal markers — private, non-actionable (Cluster scope only).
-        card.appendChild(buildPersonalMarkers(c.id, openNodes))
+        const slot = card.querySelector('[data-marker-slot]')
+        if (slot) slot.appendChild(buildPersonalMarkers(c.id, openNodes))
         list.appendChild(card)
       })
     }
@@ -1666,6 +1670,7 @@ function openNodes() {
         const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
         const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
         const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
+        const markerClusterId = m.cluster_id || (m.scope === 'cluster' ? m.node_id : null)
 
         card.innerHTML = `
           <p class="cred-type">${statusText}</p>
@@ -1675,6 +1680,7 @@ function openNodes() {
             <div class="cred-meta-item">
               Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
+            ${markerClusterId ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
           </div>
         `
 
@@ -1713,8 +1719,8 @@ function openNodes() {
         // terminal statuses (suspended/revoked/removed): show status only.
 
         // Personal markers — private, non-actionable (Cluster scope only).
-        const markerClusterId = m.cluster_id || (m.scope === 'cluster' ? m.node_id : null)
-        if (markerClusterId) card.appendChild(buildPersonalMarkers(markerClusterId, openNodes))
+        const markerSlot = card.querySelector('[data-marker-slot]')
+        if (markerClusterId && markerSlot) markerSlot.appendChild(buildPersonalMarkers(markerClusterId, openNodes))
 
         list.appendChild(card)
       })

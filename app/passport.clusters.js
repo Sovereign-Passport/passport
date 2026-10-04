@@ -514,13 +514,12 @@ async function buildClusterApprovalCredential(vault, opts) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const PERSONAL_MARKER_KEYS = [
-  { key: 'invite',       icon: '✉',  label: 'Invitation'   },
+  { key: 'invite',       icon: '✉︎', label: 'Invitation'   },
   { key: 'availability', icon: '●',  label: 'Availability' },
-  { key: 'revoke',       icon: '⛔', label: 'Revocation'   },
+  { key: 'revoke',       icon: '⊘',  label: 'Revocation'   },
 ]
 
-const MARKER_NEXT   = { yellow: 'green', green: 'red', red: 'yellow' }
-const MARKER_COLORS = { yellow: '#c9a84c', green: '#27ae60', red: '#c0392b' }
+const MARKER_NEXT = { yellow: 'green', green: 'red', red: 'yellow' }
 
 /** Current stored colour for one marker (defaults to yellow, never written). */
 function getPersonalMarker(clusterId, key) {
@@ -573,32 +572,24 @@ async function cyclePersonalMarker(clusterId, key, refresh) {
 function buildPersonalMarkers(clusterId, refresh) {
   const wrap = document.createElement('div')
   wrap.className = 'personal-markers'
-  wrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;'
 
   PERSONAL_MARKER_KEYS.forEach(def => {
     const color = getPersonalMarker(clusterId, def.key)
     const btn   = document.createElement('button')
     btn.type      = 'button'
-    btn.className = 'btn btn-ghost'
-    btn.style.cssText = 'font-size:12px;line-height:1;padding:4px 6px;display:inline-flex;align-items:center;gap:4px;'
+    btn.className = 'personal-marker'
     btn.dataset.marker = def.key
     btn.dataset.color  = color
     btn.title = def.label + ' — ' + color
     btn.setAttribute('aria-label', def.label + ' — ' + color)
-
-    const dot = document.createElement('span')
-    dot.textContent = def.icon
-    dot.style.cssText = 'color:' + (MARKER_COLORS[color] || MARKER_COLORS.yellow) + ';'
-    btn.appendChild(dot)
-
+    btn.textContent = def.icon
     btn.addEventListener('click', () => cyclePersonalMarker(clusterId, def.key, refresh))
     wrap.appendChild(btn)
   })
 
   const help = document.createElement('button')
   help.type      = 'button'
-  help.className = 'btn btn-ghost'
-  help.style.cssText = 'font-size:11px;padding:2px 6px;'
+  help.className = 'personal-marker-help'
   help.textContent = '?'
   help.title = 'About personal markers'
   help.setAttribute('aria-label', 'About personal markers')
