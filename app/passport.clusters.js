@@ -507,3 +507,107 @@ async function buildClusterApprovalCredential(vault, opts) {
 }
 
 
+// ═════════════════════════════════════════════════════════════════════════════
+// PERSONAL MARKERS — optional, private, non-actionable notes on Cluster cards.
+// Stored in the encrypted vault under vault.personal_markers.
+// Colours have NO official meaning and never affect permissions or SPID actions.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const PERSONAL_MARKER_KEYS = [
+  { key: 'invite',       icon: '✉',  label: 'Invitation'   },
+  { key: 'availability', icon: '●',  label: 'Availability' },
+  { key: 'revoke',       icon: '⛔', label: 'Revocation'   },
+]
+
+const MARKER_NEXT   = { yellow: 'green', green: 'red', red: 'yellow' }
+const MARKER_COLORS = { yellow: '#c9a84c', green: '#27ae60', red: '#c0392b' }
+
+/** Current stored colour for one marker (defaults to yellow, never written). */
+function getPersonalMarker(clusterId, key) {
+  const store = (appState.vault && appState.vault.personal_markers) || {}
+  const entry = store['cluster:' + clusterId] || {}
+  const c     = entry[key]
+  return (c === 'green' || c === 'red' || c === 'yellow') ? c : 'yellow'
+}
+
+/**
+ * Cycle one marker yellow→green→red→yellow, persisting via the encrypted
+ * vault. Creates only the concerned entry. On save failure, restores the
+ * previous state and reports an error. Never performs any network call.
+ */
+async function cyclePersonalMarker(clusterId, key, refresh) {
+  const vault = appState.vault
+  if (!vault) return
+
+  const storeKey  = 'cluster:' + clusterId
+  const prevStore = vault.personal_markers
+    ? JSON.parse(JSON.stringify(vault.personal_markers)) : null
+
+  const next  = MARKER_NEXT[getPersonalMarker(clusterId, key)] || 'yellow'
+
+  if (!vault.personal_markers) vault.personal_markers = {}
+  const entry = Object.assign({}, vault.personal_markers[storeKey] || {})
+  entry[key] = next
+  vault.personal_markers[storeKey] = entry
+
+  try {
+    const payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(payload)
+    appState.stored = payload
+    if (typeof refresh === 'function') refresh()
+  } catch (e) {
+    if (prevStore === null) delete vault.personal_markers
+    else vault.personal_markers = prevStore
+    showToast('Could not save personal markers')
+  }
+}
+
+/**
+ * Build the compact personal-marker strip for a Cluster card.
+ * Purely decorative/private: clicks never trigger Invite/Revoke/Leave nor any
+ * network request.
+ * @param {string} clusterId
+ * @param {Function} [refresh] re-render callback
+ * @returns {HTMLElement}
+ */
+function buildPersonalMarkers(clusterId, refresh) {
+  const wrap = document.createElement('div')
+  wrap.className = 'personal-markers'
+  wrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;'
+
+  PERSONAL_MARKER_KEYS.forEach(def => {
+    const color = getPersonalMarker(clusterId, def.key)
+    const btn   = document.createElement('button')
+    btn.type      = 'button'
+    btn.className = 'btn btn-ghost'
+    btn.style.cssText = 'font-size:12px;line-height:1;padding:4px 6px;display:inline-flex;align-items:center;gap:4px;'
+    btn.dataset.marker = def.key
+    btn.dataset.color  = color
+    btn.title = def.label + ' — ' + color
+    btn.setAttribute('aria-label', def.label + ' — ' + color)
+
+    const dot = document.createElement('span')
+    dot.textContent = def.icon
+    dot.style.cssText = 'color:' + (MARKER_COLORS[color] || MARKER_COLORS.yellow) + ';'
+    btn.appendChild(dot)
+
+    btn.addEventListener('click', () => cyclePersonalMarker(clusterId, def.key, refresh))
+    wrap.appendChild(btn)
+  })
+
+  const help = document.createElement('button')
+  help.type      = 'button'
+  help.className = 'btn btn-ghost'
+  help.style.cssText = 'font-size:11px;padding:2px 6px;'
+  help.textContent = '?'
+  help.title = 'About personal markers'
+  help.setAttribute('aria-label', 'About personal markers')
+  help.addEventListener('click', () => showToast(
+    'Personal markers are optional private notes. Colours have no official ' +
+    'meaning and never affect permissions, status or SPID actions.'))
+  wrap.appendChild(help)
+
+  return wrap
+}
+
+

@@ -1641,6 +1641,8 @@ function openNodes() {
             </button>
           </div>
         `
+        // Personal markers — private, non-actionable (Cluster scope only).
+        card.appendChild(buildPersonalMarkers(c.id, openNodes))
         list.appendChild(card)
       })
     }
@@ -1709,6 +1711,10 @@ function openNodes() {
           card.appendChild(actions)
         }
         // terminal statuses (suspended/revoked/removed): show status only.
+
+        // Personal markers — private, non-actionable (Cluster scope only).
+        const markerClusterId = m.cluster_id || (m.scope === 'cluster' ? m.node_id : null)
+        if (markerClusterId) card.appendChild(buildPersonalMarkers(markerClusterId, openNodes))
 
         list.appendChild(card)
       })
