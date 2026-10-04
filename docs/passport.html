@@ -1509,6 +1509,49 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — APPROVE CLUSTER MEMBER
+       Confirmation screen opened from a public #approve= demand.
+       Reuses existing classes only — the demand is not an authority.
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen screen-top" id="screen-approve">
+    <div style="width:100%;max-width:380px;">
+      <div class="screen-header">
+        <button class="btn-back" onclick="cancelPendingApproval()">‹</button>
+        <p class="logotype">Approve member</p>
+      </div>
+
+      <p class="section-label">Request</p>
+
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🏛️</div>
+        <div class="menu-text"><strong>Cluster</strong><small id="approve-cluster">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🆔</div>
+        <div class="menu-text"><strong>Member DID</strong><small id="approve-subject">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🔗</div>
+        <div class="menu-text"><strong>Referral</strong><small id="approve-referral">—</small></div>
+      </div>
+      <div class="menu-item menu-item-static">
+        <div class="menu-icon">🌿</div>
+        <div class="menu-text"><strong>Vine endpoint</strong><small id="approve-endpoint">—</small></div>
+      </div>
+
+      <div class="notice" id="approve-error" style="display:none;margin-top:16px;">
+        <span class="notice-icon">✗</span>
+        <span class="notice-text" id="approve-error-text"></span>
+      </div>
+
+      <button class="btn btn-primary" id="btn-approve-member" onclick="approveClusterMember()"
+        style="margin-top:16px;width:100%;">
+        Approve
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
        SCREEN — MY CLUSTERS
        Shows all cluster memberships stored in the vault.
        Each entry shows the community name, issuer DID,
@@ -2013,6 +2056,30 @@ function toBase58(bytes) {
   for(const b of bytes){if(b!==0)break;r+='1'}
   for(let i=digits.length-1;i>=0;i--)r+=A[digits[i]]
   return r
+}
+
+// Base58btc decode (mirror of toBase58) — needed to resolve a did:key issuer.
+function fromBase58(str) {
+  const A='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let num=0n
+  for(const ch of str){const idx=A.indexOf(ch); if(idx<0) throw new Error('BAD_BASE58'); num=num*58n+BigInt(idx)}
+  let hex=num.toString(16); if(hex.length%2) hex='0'+hex
+  const body = (hex==='00'||num===0n) ? [] : hex.match(/.{2}/g).map(h=>parseInt(h,16))
+  let zeros=0; for(const ch of str){if(ch!=='1')break; zeros++}
+  return Uint8Array.from([...new Array(zeros).fill(0), ...body])
+}
+
+// Resolve a did:key:z… (Ed25519) to a WebCrypto verify key.
+async function didKeyToPublicKey(did) {
+  if (typeof did!=='string' || did.indexOf('did:key:z')!==0) throw new Error('NOT_DID_KEY')
+  const bytes = fromBase58(did.slice('did:key:z'.length))
+  if (bytes[0]!==0xed || bytes[1]!==0x01) throw new Error('BAD_MULTICODEC')
+  const raw = bytes.slice(2)
+  if (raw.length!==32) throw new Error('BAD_KEY_LENGTH')
+  return crypto.subtle.importKey(
+    'jwk', { kty:'OKP', crv:'Ed25519', x: toB64(raw) },
+    { name:'Ed25519' }, true, ['verify']
+  )
 }
 
 async function generateIdentity() {
@@ -3190,16 +3257,21 @@ async function createCluster() {
     const clusterId  = crypto.randomUUID()
     const now        = new Date().toISOString()
 
+    // Endpoint is per-Cluster (from #newcluster). Absent → local-only Cluster.
+    const clusterEndpoint = (typeof normalizeVineEndpoint === 'function')
+      ? normalizeVineEndpoint(appState.pendingClusterEndpoint) : null
+
     // Build cluster record
     const cluster = {
-      id:          clusterId,
+      id:            clusterId,
       name,
-      description: desc,
-      founder_did: founderDid,
-      vignard_did: null,          // set after vignard ping
-      members:     [],
-      status:      'active',
-      created_at:  now,
+      description:   desc,
+      founder_did:   founderDid,
+      vine_endpoint: clusterEndpoint || null,
+      vignard_did:   null,          // stays null — vine_endpoint is the only link
+      members:       [],
+      status:        'active',
+      created_at:    now,
       weight_events: [],
     }
 
@@ -3241,11 +3313,23 @@ async function createCluster() {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Ping vignard witness — fire and forget, never block
-    pingVignard(clusterId, name, desc, founderDid).catch(() => {})
-
-    populateHome()
-    showToast(`${name} founded 🍇`)
+    // Send the signed witness to THIS cluster's endpoint — only if it has one.
+    // The Cluster is always kept locally; no rollback, no automatic retry.
+    if (clusterEndpoint) {
+      let linked = false
+      try {
+        await pingVignard(clusterEndpoint, clusterId, name, desc, founderDid, founderCredential)
+        linked = true
+      } catch (e) { linked = false }
+      populateHome()
+      showToast(linked
+        ? 'Cluster founded and linked to the Vine.'
+        : 'Cluster created locally — Vine witness failed.')
+    } else {
+      populateHome()
+      showToast('Cluster created locally — not linked to a Vine.')
+    }
+    appState.pendingClusterEndpoint = null
     goTo('screen-nodes')
 
   } catch (err) {
@@ -3260,33 +3344,60 @@ async function createCluster() {
  * Ping the vignard witness with a grape cluster registration.
  * Fire and forget — never blocks the UI.
  */
-async function pingVignard(clusterId, name, description, founderDid) {
-  try {
-    const res = await fetch('https://mdusl.sovereign-passport.id/api/vignard/clusters', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ cluster_id: clusterId, name, description, founder_did: founderDid }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      // Update cluster record with vignard witness timestamp
-      const vault   = appState.vault
-      const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
-      if (cluster) {
-        cluster.witnessed_at = data.witnessed_at
-        cluster.vignard_did  = 'did:web:mdusl.sovereign-passport.id'
-        // Silent pre-vine flag — no UI prompt, just state
-        if (((cluster.members && cluster.members.length) || 0) >= 3 && cluster.status === 'active') {
-          cluster.status = 'pre-vine'
-        }
-        const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-        await persist(newPayload)
-        appState.stored = newPayload
-      }
-    }
-  } catch(e) {
-    // Silent — vignard is a witness, not a dependency
+async function pingVignard(vineEndpoint, clusterId, name, description, founderDid, founderCredential) {
+  // A Cluster endpoint is mandatory — there is NO default / mdusl fallback.
+  const vineBase = (typeof normalizeVineEndpoint === 'function')
+    ? normalizeVineEndpoint(vineEndpoint) : null
+  if (!vineBase) {
+    const err  = new Error('A vine endpoint is required to send the witness')
+    err.code   = 'VINE_ENDPOINT_REQUIRED'
+    throw err
   }
+
+  // The signed FounderCredential is mandatory. Without it there is nothing
+  // to prove, and NO request is made (no unsigned fallback).
+  if (!founderCredential || typeof founderCredential !== 'object') {
+    const err  = new Error('FounderCredential required for vignard witness')
+    err.code   = 'FOUNDER_CREDENTIAL_REQUIRED'
+    throw err
+  }
+
+  // Send the full, already-signed FounderCredential. Its signature covers
+  // `claims` only and is reused verbatim — no second identity or signature.
+  // `name`, `description` and `founder_did` are added as transport fields.
+  const body = Object.assign({}, founderCredential, {
+    name,
+    description,
+    founder_did: founderDid,
+  })
+
+  const res = await fetch(vineBase + '/api/vignard/clusters', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err  = new Error('WITNESS_FAILED')
+    err.code   = 'WITNESS_FAILED'
+    throw err
+  }
+
+  const data = await res.json()
+  // Update cluster record with the witness timestamp. vignard_did stays null —
+  // vine_endpoint is the Cluster's only network link.
+  const vault   = appState.vault
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
+  if (cluster) {
+    cluster.witnessed_at = data.witnessed_at
+    // Silent pre-vine flag — no UI prompt, just state
+    if (((cluster.members && cluster.members.length) || 0) >= 3 && cluster.status === 'active') {
+      cluster.status = 'pre-vine'
+    }
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+  }
+  return true
 }
 
 /**
@@ -3499,9 +3610,9 @@ async function leaveCluster(clusterId, successorDid) {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Ping vignard with succession event — fire and forget
-    pingVignard(clusterId, cluster.name, cluster.description || '',
-      (successorDid || vault.identity.id)).catch(() => {})
+    // Departure / succession is NOT witnessed here. A founder-initiated
+    // succession will require its own distinct signed event (a succession
+    // credential signed by the successor). Until then, no unsigned ping.
 
     populateHome()
     showToast(`You have left ${cluster.name}`)
@@ -3531,6 +3642,148 @@ async function dissolveCluster(clusterId) {
   } catch (err) {
     showToast('Could not dissolve cluster: ' + err.message)
   }
+}
+
+/**
+ * Build and sign a Cluster-scoped MembershipCredential approval.
+ *
+ * Signed by the admin/founder DID with its own Ed25519 key. The signature
+ * covers exactly JSON.stringify(payload without `signature`). This reuses the
+ * existing credential type (`MembershipCredential`) with `scope:'cluster'`;
+ * no new credential type is introduced.
+ *
+ * Exposed as a global for the existing/future approval action.
+ *
+ * @param {Object} vault
+ * @param {{ cluster_id:string, subject_did:string, referral_id?:string|null }} opts
+ * @returns {Promise<Object>} signed credential payload
+ */
+async function buildClusterApprovalCredential(vault, opts) {
+  const payload = {
+    type:        'MembershipCredential',
+    scope:       'cluster',
+    cluster_id:  opts.cluster_id,
+    issuer_did:  vault.identity.id,
+    subject_did: opts.subject_did,
+    referral_id: opts.referral_id ?? null,
+    status:      'approved',
+    issued_at:   new Date().toISOString(),
+    expires_at:  null,
+  }
+
+  const privateKey = await crypto.subtle.importKey(
+    'jwk', vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
+  )
+  const sigBuf = await crypto.subtle.sign(
+    'Ed25519', privateKey, new TextEncoder().encode(JSON.stringify(payload))
+  )
+
+  payload.signature = toB64(sigBuf)
+  return payload
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PERSONAL MARKERS — optional, private, non-actionable notes on Cluster cards.
+// Stored in the encrypted vault under vault.personal_markers.
+// Colours have NO official meaning and never affect permissions or SPID actions.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const PERSONAL_MARKER_KEYS = [
+  { key: 'invite',       icon: '✉',  label: 'Invitation'   },
+  { key: 'availability', icon: '●',  label: 'Availability' },
+  { key: 'revoke',       icon: '⛔', label: 'Revocation'   },
+]
+
+const MARKER_NEXT   = { yellow: 'green', green: 'red', red: 'yellow' }
+const MARKER_COLORS = { yellow: '#c9a84c', green: '#27ae60', red: '#c0392b' }
+
+/** Current stored colour for one marker (defaults to yellow, never written). */
+function getPersonalMarker(clusterId, key) {
+  const store = (appState.vault && appState.vault.personal_markers) || {}
+  const entry = store['cluster:' + clusterId] || {}
+  const c     = entry[key]
+  return (c === 'green' || c === 'red' || c === 'yellow') ? c : 'yellow'
+}
+
+/**
+ * Cycle one marker yellow→green→red→yellow, persisting via the encrypted
+ * vault. Creates only the concerned entry. On save failure, restores the
+ * previous state and reports an error. Never performs any network call.
+ */
+async function cyclePersonalMarker(clusterId, key, refresh) {
+  const vault = appState.vault
+  if (!vault) return
+
+  const storeKey  = 'cluster:' + clusterId
+  const prevStore = vault.personal_markers
+    ? JSON.parse(JSON.stringify(vault.personal_markers)) : null
+
+  const next  = MARKER_NEXT[getPersonalMarker(clusterId, key)] || 'yellow'
+
+  if (!vault.personal_markers) vault.personal_markers = {}
+  const entry = Object.assign({}, vault.personal_markers[storeKey] || {})
+  entry[key] = next
+  vault.personal_markers[storeKey] = entry
+
+  try {
+    const payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(payload)
+    appState.stored = payload
+    if (typeof refresh === 'function') refresh()
+  } catch (e) {
+    if (prevStore === null) delete vault.personal_markers
+    else vault.personal_markers = prevStore
+    showToast('Could not save personal markers')
+  }
+}
+
+/**
+ * Build the compact personal-marker strip for a Cluster card.
+ * Purely decorative/private: clicks never trigger Invite/Revoke/Leave nor any
+ * network request.
+ * @param {string} clusterId
+ * @param {Function} [refresh] re-render callback
+ * @returns {HTMLElement}
+ */
+function buildPersonalMarkers(clusterId, refresh) {
+  const wrap = document.createElement('div')
+  wrap.className = 'personal-markers'
+  wrap.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;'
+
+  PERSONAL_MARKER_KEYS.forEach(def => {
+    const color = getPersonalMarker(clusterId, def.key)
+    const btn   = document.createElement('button')
+    btn.type      = 'button'
+    btn.className = 'btn btn-ghost'
+    btn.style.cssText = 'font-size:12px;line-height:1;padding:4px 6px;display:inline-flex;align-items:center;gap:4px;'
+    btn.dataset.marker = def.key
+    btn.dataset.color  = color
+    btn.title = def.label + ' — ' + color
+    btn.setAttribute('aria-label', def.label + ' — ' + color)
+
+    const dot = document.createElement('span')
+    dot.textContent = def.icon
+    dot.style.cssText = 'color:' + (MARKER_COLORS[color] || MARKER_COLORS.yellow) + ';'
+    btn.appendChild(dot)
+
+    btn.addEventListener('click', () => cyclePersonalMarker(clusterId, def.key, refresh))
+    wrap.appendChild(btn)
+  })
+
+  const help = document.createElement('button')
+  help.type      = 'button'
+  help.className = 'btn btn-ghost'
+  help.style.cssText = 'font-size:11px;padding:2px 6px;'
+  help.textContent = '?'
+  help.title = 'About personal markers'
+  help.setAttribute('aria-label', 'About personal markers')
+  help.addEventListener('click', () => showToast(
+    'Personal markers are optional private notes. Colours have no official ' +
+    'meaning and never affect permissions, status or SPID actions.'))
+  wrap.appendChild(help)
+
+  return wrap
 }
 
 
@@ -3572,25 +3825,26 @@ function openInvite() {
   btn.disabled             = true
   document.getElementById('invite-note').value = ''
 
-  // Populate cluster dropdown from:
-  // 1. Clusters the grape owns (vault.ownClusters)
-  // 2. Grape cluster credentials (vault.credentials type GrapeClusterCredential)
-  // 3. Vine memberships (vault.credentials type MembershipCredential, fallback vault.memberships)
-  const ownClusters    = ((vault && vault.ownClusters) || [])
-  const grapeCreds     = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'GrapeClusterCredential')
-  const vineCreds      = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'MembershipCredential')
-  const legacyMembers  = ((vault && vault.memberships) || [])
-    .filter(m => m.status === 'approved')
-    .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
+  // Cluster dropdown — canonical Cluster ids ONLY:
+  //   1. ownClusters[].id (the Passport's canonical UUID)
+  //   2. GrapeClusterCredential.cluster_id
+  //   3. MembershipCredential scope=cluster, approved → cluster_id
+  // Never use a Vine credential's node_id / vine_handle as a Cluster id.
+  const ownClusters  = ((vault && vault.ownClusters) || [])
+  const grapeCreds   = ((vault && vault.credentials) || [])
+    .filter(c => c.type === 'GrapeClusterCredential' && c.cluster_id)
+  const clusterCreds = ((vault && vault.credentials) || [])
+    .filter(c => c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+                 c.status === 'approved' && c.cluster_id)
 
-  const allClusters = [
+  const rawClusters = [
     ...ownClusters.map(c => ({ node_id: c.id,         node_name: c.name,         own: true  })),
     ...grapeCreds.map(c  => ({ node_id: c.cluster_id,  node_name: c.cluster_name, own: false })),
-    ...vineCreds.map(c   => ({ node_id: c.node_id,     node_name: c.node_name,    own: false })),
-    ...legacyMembers.map(m=> ({ node_id: m.node_id,    node_name: m.node_name,    own: false })),
+    ...clusterCreds.map(c=> ({ node_id: c.cluster_id,  node_name: c.cluster_name || 'Cluster', own: false })),
   ]
+  const seen = {}
+  const allClusters = rawClusters.filter(c =>
+    c.node_id && !seen[c.node_id] && (seen[c.node_id] = true))
 
   select.innerHTML = '<option value="">— select a cluster —</option>'
   allClusters.forEach(c => {
@@ -3699,22 +3953,34 @@ async function generateInvite() {
     // Encode the signed referral as base64url
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
-    // Build the invite URL
-    // passportBase — the sovereign PWA where the invitee lands
-    // offerBase    — derived from the grape's stored MembershipCredential for
-    //                this cluster. Each vine self-describes its own endpoint.
-    //                Falls back to mdusl only for legacy credentials that
-    //                predate offer_endpoint storage (< L3A).
-    const vineCred     = (vault.credentials || []).find(
-      function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
-    )
-    const offerBase    = (vineCred && vineCred.offer_endpoint)
-      || 'https://mdusl.sovereign-passport.id/api/offer'
+    // The endpoint must belong to THIS Cluster. Resolution order:
+    //   1. the ownCluster's stored vine_endpoint
+    //   2. the matching cluster-membership record's vine_endpoint
+    //   3. the one-shot #invite descriptor — ONLY if it targets this cluster_id
+    // No global fallback: absent endpoint → clear error, no request.
+    const own = (vault.ownClusters || []).find(c => c.id === cluster.node_id)
+    let vineEndpoint = (own && own.vine_endpoint) || null
+    if (!vineEndpoint) {
+      const mem = (vault.memberships || []).find(m =>
+        m.cluster_id === cluster.node_id || m.node_id === cluster.node_id)
+      vineEndpoint = (mem && mem.vine_endpoint) || null
+    }
+    if (!vineEndpoint && appState.pendingInvite &&
+        appState.pendingInvite.cluster_id === cluster.node_id) {
+      vineEndpoint = appState.pendingInvite.vine_endpoint
+    }
+    const vineBase = (typeof normalizeVineEndpoint === 'function')
+      ? normalizeVineEndpoint(vineEndpoint) : null
+    if (!vineBase) {
+      throw new Error('No vine endpoint for this cluster.')
+    }
+    const offerBase    = vineBase + '/api/offer'
+    const refEndpoint  = vineBase + '/api/passport/ref'
     const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
     const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
 
-    // POST encodedRef to VPS relay — returns short token + QR SVG
-    const refRes = await fetch('https://mdusl.sovereign-passport.id/api/passport/ref', {
+    // POST encodedRef to the vine relay — returns short token + QR SVG
+    const refRes = await fetch(refEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: encodedRef }),
@@ -3789,6 +4055,66 @@ async function shareInviteLink() {
  * Open the officialize screen.
  * Populates current cluster name and member status.
  */
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIGNED FLOW HAND-OFFS — #newcluster= / #invite= from the SPID dashboard.
+// Fragments are public demands, never an authority. No cluster-id conversion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Does this Passport hold a canonical Cluster with this exact UUID? */
+function hasCanonicalCluster(clusterId) {
+  const vault = appState.vault
+  if (!vault || !clusterId) return false
+  if ((vault.ownClusters || []).some(c => c.id === clusterId)) return true
+  return (vault.credentials || []).some(c =>
+    c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+    c.status === 'approved' && c.cluster_id === clusterId)
+}
+
+/** #newcluster= → open the existing create-cluster screen with the endpoint. */
+function checkPendingNewCluster() {
+  const raw = appState.pendingNewClusterRaw
+  if (!raw) return false
+  appState.pendingNewClusterRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint) : null
+
+  clearApproveFragment()
+  if (!endpoint) { showToast('Invalid or incomplete cluster request.'); return false }
+
+  appState.pendingClusterEndpoint = endpoint
+  goTo('screen-create-cluster')
+  return true
+}
+
+/** #invite= → open the existing invite screen for a canonical Cluster only. */
+function checkPendingInvite() {
+  const raw = appState.pendingInviteRaw
+  if (!raw) return false
+  appState.pendingInviteRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint) : null
+
+  clearApproveFragment()
+
+  if (!endpoint) { showToast('Invalid or incomplete invite request.'); return false }
+  if (!demand.cluster_id) { showToast('Invite request missing cluster.'); return false }
+  if (!hasCanonicalCluster(demand.cluster_id)) {
+    showToast('This legacy cluster is not linked to your Passport.')
+    return false
+  }
+
+  appState.pendingInvite = demand
+  openInviteFromCluster(demand.cluster_id)   // opens + preselects the canonical cluster
+  return true
+}
 
 </script>
 <script>
@@ -4048,6 +4374,39 @@ async function acceptOffer() {
 
     const issued = await issueRes.json()
 
+    // ── Invitation accepted, Cluster approval still pending (HTTP 202) ──
+    // No credential is issued yet: record a pending membership only.
+    if (issueRes.status === 202) {
+      if (!vault.memberships) vault.memberships = []
+      const nodeId  = issued.cluster_id || offer.node_id
+      const pending = {
+        node_id:           nodeId,
+        node_name:         offer.node_name || offer.node_id || 'Cluster',
+        status:            issued.status || 'invited',
+        cluster_id:        issued.cluster_id || null,
+        referral_id:       issued.referral_id || _pendingRef || null,
+        inviter_did:       issued.inviter_did || null,
+        approval_required: issued.approval_required !== false,
+        vine_endpoint:     offer.issue_endpoint
+          ? offer.issue_endpoint.replace('/api/credentials/issue', '')
+          : null,
+        stored_at:         new Date().toISOString(),
+      }
+      const idx = vault.memberships.findIndex(m => m.node_id === nodeId)
+      if (idx >= 0) vault.memberships[idx] = Object.assign({}, vault.memberships[idx], pending)
+      else vault.memberships.push(pending)
+
+      const pendingPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      await persist(pendingPayload)
+      appState.stored = pendingPayload
+
+      _pendingOffer = null
+      _pendingRef   = null
+      showToast('Invitation recorded — Cluster approval pending.')
+      goTo('screen-home')
+      return
+    }
+
     // Store credential in vault
     // offer_endpoint — vine's /api/offer URL, derived from issue_endpoint.
     // Stored so the grape can build invite QRs pointing to the correct vine
@@ -4094,6 +4453,259 @@ async function acceptOffer() {
     errText.textContent   = err.message
     btn.textContent       = 'Accept credential →'
     btn.disabled          = false
+  }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUSTER APPROVAL DELIVERY — signed claim + confirm (reuses vault + crypto)
+// The invited Passport fetches its pending Cluster approvals with a fresh,
+// DID-signed proof, verifies the issuer signature, stores the credential,
+// then confirms receipt with a second DID-signed proof.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CLUSTER_APPROVAL_ACTIONS = {
+  CLAIM:   'claim_cluster_approvals',
+  CONFIRM: 'confirm_cluster_approvals',
+}
+
+async function _signHolderPayload(payload) {
+  const privateKey = await crypto.subtle.importKey(
+    'jwk', appState.vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
+  )
+  const sigBuf = await crypto.subtle.sign(
+    'Ed25519', privateKey, new TextEncoder().encode(JSON.stringify(payload))
+  )
+  return toB64(sigBuf)
+}
+
+function _approvalUrl(vineEndpoint, path) {
+  return String(vineEndpoint || '').replace(/\/+$/, '') + path
+}
+
+/**
+ * Confirm receipt of Cluster approvals (signed by the holder DID).
+ * Idempotent server-side: a repeat returns 200.
+ */
+async function confirmClusterApprovals(vineEndpoint, clusterIds) {
+  const did       = appState.vault.identity.id
+  const timestamp = Date.now()
+  const payload   = { action: CLUSTER_APPROVAL_ACTIONS.CONFIRM, did, cluster_ids: clusterIds, timestamp }
+  const signature = await _signHolderPayload(payload)
+
+  const res = await fetch(_approvalUrl(vineEndpoint, '/api/clusters/approvals/confirm'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ did, timestamp, cluster_ids: clusterIds, signature }),
+  })
+  if (!res.ok) return { ok: false, error: 'CONFIRM_FAILED', status: res.status }
+  const data = await res.json().catch(() => ({}))
+  return { ok: true, confirmed: data.confirmed || clusterIds }
+}
+
+/**
+ * Claim pending Cluster approvals for THIS DID, verify them, store them once,
+ * flip the matching pending membership to approved, then confirm receipt.
+ *
+ * Confirmation is sent ONLY after a successful local vault save.
+ */
+async function claimClusterApprovals(vineEndpoint) {
+  const vault     = appState.vault
+  const did       = vault.identity.id
+  const timestamp = Date.now()
+  const payload   = { action: CLUSTER_APPROVAL_ACTIONS.CLAIM, did, timestamp }
+  const signature = await _signHolderPayload(payload)
+
+  const res = await fetch(_approvalUrl(vineEndpoint, '/api/clusters/approvals/claim'), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ did, timestamp, signature }),
+  })
+  if (!res.ok) return { ok: false, error: 'CLAIM_FAILED', status: res.status }
+  const data      = await res.json().catch(() => ({}))
+  const approvals = Array.isArray(data.approvals) ? data.approvals : []
+
+  // Work on copies so a failed local save never corrupts the in-memory vault.
+  const prevCreds = vault.credentials
+  const prevMems  = vault.memberships
+  const nextCreds = (vault.credentials || []).slice()
+  const nextMems  = (vault.memberships || []).map(m => Object.assign({}, m))
+
+  const accepted = []
+  for (const cred of approvals) {
+    if (!cred || cred.type !== 'MembershipCredential' || cred.scope !== 'cluster') continue
+    if (cred.subject_did !== did || cred.status !== 'approved') continue
+
+    const pendingIdx = nextMems.findIndex(
+      m => m.status !== 'approved' &&
+           (m.cluster_id === cred.cluster_id || m.node_id === cred.cluster_id)
+    )
+    if (pendingIdx < 0) continue
+
+    // Verify the issuer's Ed25519 signature over the payload sans `signature`.
+    let issuerOk = false
+    try {
+      const pub = await didKeyToPublicKey(cred.issuer_did)
+      const { signature: sig, ...signed } = cred
+      issuerOk = await crypto.subtle.verify(
+        'Ed25519', pub, fromB64(sig),
+        new TextEncoder().encode(JSON.stringify(signed))
+      )
+    } catch (e) { issuerOk = false }
+    if (!issuerOk) continue
+
+    const dup = nextCreds.some(c =>
+      c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+      c.cluster_id === cred.cluster_id && c.signature === cred.signature)
+    if (!dup) {
+      nextCreds.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+    }
+
+    nextMems[pendingIdx] = Object.assign({}, nextMems[pendingIdx], {
+      status:            'approved',
+      approval_required: false,
+      approved_at:       new Date().toISOString(),
+    })
+    accepted.push(cred.cluster_id)
+  }
+
+  if (accepted.length === 0) return { ok: true, stored: [], confirmed: [] }
+
+  // Commit to memory only once, then save. On failure, restore the snapshot.
+  vault.credentials = nextCreds
+  vault.memberships = nextMems
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+  } catch (e) {
+    vault.credentials = prevCreds
+    vault.memberships = prevMems
+    return { ok: false, error: 'SAVE_FAILED', stored: [] }
+  }
+
+  const confirmed = await confirmClusterApprovals(vineEndpoint, accepted)
+  return { ok: true, stored: accepted, confirmed: confirmed.confirmed || [] }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// APPROVE-MEMBER CONFIRMATION SCREEN — opened from a public #approve= demand.
+// The demand is NOT an authority; the server re-verifies everything.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Normalize a vine endpoint: scheme optional, no trailing slash, https by default. */
+function normalizeVineEndpoint(raw) {
+  let s = String(raw || '').trim()
+  if (!s) return null
+  if (!/^https?:\/\//i.test(s)) {
+    const isLocal = /^localhost(:\d+)?(\/|$)/i.test(s) ||
+                    /^127\.0\.0\.1(:\d+)?(\/|$)/i.test(s) ||
+                    /^\[::1\](:\d+)?(\/|$)/i.test(s)
+    s = (isLocal ? 'http://' : 'https://') + s
+  }
+  return s.replace(/\/+$/, '')
+}
+
+/** Remove the #approve= fragment without reloading (avoids a reload loop). */
+function clearApproveFragment() {
+  try {
+    const base = (window.location.pathname || '') + (window.location.search || '')
+    window.history.replaceState(null, '', base)
+  } catch (e) { /* non-fatal */ }
+}
+
+/**
+ * Detect a pending #approve= demand and render the confirmation screen.
+ * Required keys: vine_endpoint, cluster_id, subject_did and the KEY
+ * `referral_id` (UUID or null). A missing `referral_id` key is refused.
+ * The fragment is always removed after handling.
+ * @returns {boolean} true if a screen was shown
+ */
+function checkPendingApproval() {
+  const raw = appState.pendingApproveRaw
+  if (!raw) return false
+  appState.pendingApproveRaw = null
+
+  let demand = null
+  try {
+    demand = JSON.parse(new TextDecoder().decode(fromB64(raw)))
+  } catch (e) { demand = null }
+
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint)
+    : null
+
+  const valid = demand && typeof demand === 'object' &&
+    'referral_id' in demand &&          // null allowed, absent refused
+    endpoint && demand.cluster_id && demand.subject_did
+  if (!valid) {
+    showToast('Invalid or incomplete approval request.')
+    clearApproveFragment()
+    return false
+  }
+
+  demand.vine_endpoint     = endpoint
+  appState.pendingApproval = demand
+
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+  set('approve-cluster',  demand.cluster_id)
+  set('approve-subject',  demand.subject_did)
+  set('approve-referral', demand.referral_id == null ? '(none)' : demand.referral_id)
+  set('approve-endpoint', demand.vine_endpoint)
+  const errEl = document.getElementById('approve-error')
+  if (errEl) errEl.style.display = 'none'
+
+  clearApproveFragment()
+  goTo('screen-approve')
+  return true
+}
+
+/** Cancel — signs nothing, sends nothing. */
+function cancelPendingApproval() {
+  appState.pendingApproval = null
+  goTo('screen-home')
+}
+
+/** Explicit admin action: sign the Cluster approval and POST it. */
+async function approveClusterMember() {
+  const demand  = appState.pendingApproval
+  const btn     = document.getElementById('btn-approve-member')
+  const errEl   = document.getElementById('approve-error')
+  const errText = document.getElementById('approve-error-text')
+
+  if (!demand) { showToast('No pending approval.'); return }
+  if (!appState.vault) { goTo('screen-unlock'); return }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Approving…' }
+  if (errEl) errEl.style.display = 'none'
+
+  try {
+    const cred = await buildClusterApprovalCredential(appState.vault, {
+      cluster_id:  demand.cluster_id,
+      subject_did: demand.subject_did,
+      referral_id: demand.referral_id ?? null,
+    })
+
+    const base = normalizeVineEndpoint(demand.vine_endpoint)
+    if (!base) throw new Error('INVALID_ENDPOINT')
+    const url  = base + '/api/clusters/' + encodeURIComponent(demand.cluster_id) +
+                 '/members/' + encodeURIComponent(demand.subject_did) + '/approve'
+
+    const res  = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(cred),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || data.status || ('HTTP ' + res.status))
+
+    appState.pendingApproval = null
+    showToast('Member approved ✓')
+    goTo('screen-home')
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'flex'; if (errText) errText.textContent = e.message }
+    if (btn)   { btn.disabled = false; btn.textContent = 'Approve' }
   }
 }
 
@@ -4289,6 +4901,9 @@ async function tryUnlock() {
     appState.vaultKey = vaultKey
     populateHome()
     checkPendingOffer()
+    checkPendingApproval()
+    checkPendingNewCluster()
+    checkPendingInvite()
 
     // If a sync token was waiting, route to restore screen sync tab
     if (appState.pendingSyncToken) {
@@ -4407,11 +5022,16 @@ function openNodes() {
   const ownClusters = ((vault && vault.ownClusters) || [])
     .filter(c => c.id && c.name && c.founder_did)
 
-  // Primary: credentials array. Fallback: legacy memberships array
+  // Membership display: vine credentials + membership records (incl. pending
+  // Cluster invitations). Cluster-scope credentials are represented by their
+  // membership record, to avoid duplicates.
+  const allCreds  = ((vault && vault.credentials) || [])
+  const vineCreds = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope !== 'cluster')
   const memberships = [
-    ...((vault && vault.credentials) || []).filter(c => c.type === 'MembershipCredential'),
+    ...vineCreds,
     ...((vault && vault.memberships) || []).filter(m =>
-      !((vault && vault.credentials) || []).some(c => c.node_id === m.node_id)
+      !vineCreds.some(c => c.node_id === m.node_id)
     ),
   ]
 
@@ -4480,6 +5100,8 @@ function openNodes() {
             </button>
           </div>
         `
+        // Personal markers — private, non-actionable (Cluster scope only).
+        card.appendChild(buildPersonalMarkers(c.id, openNodes))
         list.appendChild(card)
       })
     }
@@ -4496,29 +5118,63 @@ function openNodes() {
         const card = document.createElement('div')
         card.className = 'cred-card'
         card.style.marginBottom = '12px'
-        const isLeft = m.status === 'left'
+
+        const status     = m.status || null            // null = vine credential
+        const isLeft     = status === 'left'
+        const isPending  = status === 'invited' || status === 'candidate' || status === 'temporary'
+        const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
+        const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
+        const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
+
         card.innerHTML = `
-          <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : ((m.status ? m.status.toUpperCase() : '') || 'MEMBER')}</p>
-          <div class="cred-title">${escHtmlP((m.node_name || m.cluster_name || m.node_id || 'Unknown cluster'))}</div>
+          <p class="cred-type">${statusText}</p>
+          <div class="cred-title">${title}</div>
+          ${isPending ? '<div style="margin-top:6px;"><span class="badge badge-gold">Pending approval</span></div>' : ''}
           <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
               Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
           </div>
-          ${!isLeft ? `
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="btn btn-ghost" style="font-size:11px;"
-              onclick="softLeaveMembership('${(m.id || m.node_id)}')">
-              Leave
-            </button>
-          </div>` : `
-          <div style="margin-top:8px;">
-            <p style="font-size:11px;color:var(--ink-dim);">
-              You left this cluster. Your credential remains as a personal record.
-              Rejoin by requesting a new invite from the founder.
-            </p>
-          </div>`}
         `
+
+        if (isPending) {
+          // Pending Cluster invitation: offer a manual check when an endpoint
+          // is known. Never invent an endpoint, never show a dead button.
+          if (m.vine_endpoint) {
+            const checkBtn = document.createElement('button')
+            checkBtn.className     = 'btn btn-primary'
+            checkBtn.style.cssText = 'font-size:11px;margin-top:12px;'
+            checkBtn.textContent   = 'Check approval'
+            checkBtn.addEventListener('click', () => checkClusterApproval(m, checkBtn))
+            card.appendChild(checkBtn)
+          } else {
+            const note = document.createElement('p')
+            note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
+            note.textContent = 'Approval endpoint unavailable'
+            card.appendChild(note)
+          }
+        } else if (isLeft) {
+          const note = document.createElement('p')
+          note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
+          note.textContent = 'You left this cluster. Your credential remains as a personal record. Rejoin by requesting a new invite from the founder.'
+          card.appendChild(note)
+        } else if (!isTerminal) {
+          const actions = document.createElement('div')
+          actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;'
+          const leaveBtn = document.createElement('button')
+          leaveBtn.className     = 'btn btn-ghost'
+          leaveBtn.style.fontSize = '11px'
+          leaveBtn.textContent   = 'Leave'
+          leaveBtn.addEventListener('click', () => softLeaveMembership(m.id || m.node_id))
+          actions.appendChild(leaveBtn)
+          card.appendChild(actions)
+        }
+        // terminal statuses (suspended/revoked/removed): show status only.
+
+        // Personal markers — private, non-actionable (Cluster scope only).
+        const markerClusterId = m.cluster_id || (m.scope === 'cluster' ? m.node_id : null)
+        if (markerClusterId) card.appendChild(buildPersonalMarkers(markerClusterId, openNodes))
+
         list.appendChild(card)
       })
     }
@@ -4533,6 +5189,43 @@ function openNodes() {
   }
 
   goTo('screen-nodes')
+}
+
+
+/**
+ * Manual "Check approval" action for a pending Cluster membership.
+ * Reuses claimClusterApprovals(); disables the button to avoid double calls.
+ * Never corrupts local data: claimClusterApprovals restores its snapshot on
+ * a failed save, and a network failure returns before any mutation.
+ */
+async function checkClusterApproval(membership, btn) {
+  if (btn && btn.disabled) return                    // single active request
+  if (!membership || !membership.vine_endpoint) {
+    showToast('Approval endpoint unavailable')
+    return
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
+  try {
+    const r = await claimClusterApprovals(membership.vine_endpoint)
+    if (!r || !r.ok) {
+      showToast(r && r.error === 'SAVE_FAILED'
+        ? 'Could not save the approval locally.'
+        : 'Could not check approval.')
+      if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+      return
+    }
+    if (!r.stored || r.stored.length === 0) {
+      showToast('No approval available yet.')
+      if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+      return
+    }
+    showToast('Cluster approval received ✓')
+    openNodes()        // refresh My Clusters
+    populateHome()     // refresh counters + cred-count
+  } catch (e) {
+    showToast('Could not check approval.')
+    if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+  }
 }
 
 
@@ -4742,6 +5435,14 @@ async function boot() {
   const offerData  = params.get('r')     || hashParams.get('r')
   const offerRef   = params.get('ref')   || hashParams.get('ref')
   const syncToken  = params.get('sync')  || hashParams.get('sync')
+  // Public signed-approval demand: passport.html#approve=<base64url(payload)>
+  const approveRaw = params.get('approve') || hashParams.get('approve')
+  if (approveRaw) appState.pendingApproveRaw = approveRaw
+  // Signed-flow hand-offs from the SPID dashboard.
+  const newClusterRaw = params.get('newcluster') || hashParams.get('newcluster')
+  const inviteRaw     = params.get('invite')     || hashParams.get('invite')
+  if (newClusterRaw) appState.pendingNewClusterRaw = newClusterRaw
+  if (inviteRaw)     appState.pendingInviteRaw      = inviteRaw
 
   if (stored) {
     appState.stored = stored
@@ -4836,7 +5537,8 @@ function checkPendingOffer() {
 window.addEventListener('hashchange', () => {
   // Only re-run if there's actually an offer in the new hash
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  if (hashParams.get('offer') || hashParams.get('r')) {
+  if (hashParams.get('offer') || hashParams.get('r') || hashParams.get('approve') ||
+      hashParams.get('newcluster') || hashParams.get('invite')) {
     boot()
   }
 })
