@@ -1443,6 +1443,8 @@ async function tryUnlock() {
     populateHome()
     checkPendingOffer()
     checkPendingApproval()
+    checkPendingNewCluster()
+    checkPendingInvite()
 
     // If a sync token was waiting, route to restore screen sync tab
     if (appState.pendingSyncToken) {
@@ -1971,6 +1973,11 @@ async function boot() {
   // Public signed-approval demand: passport.html#approve=<base64url(payload)>
   const approveRaw = params.get('approve') || hashParams.get('approve')
   if (approveRaw) appState.pendingApproveRaw = approveRaw
+  // Signed-flow hand-offs from the SPID dashboard.
+  const newClusterRaw = params.get('newcluster') || hashParams.get('newcluster')
+  const inviteRaw     = params.get('invite')     || hashParams.get('invite')
+  if (newClusterRaw) appState.pendingNewClusterRaw = newClusterRaw
+  if (inviteRaw)     appState.pendingInviteRaw      = inviteRaw
 
   if (stored) {
     appState.stored = stored
@@ -2065,7 +2072,8 @@ function checkPendingOffer() {
 window.addEventListener('hashchange', () => {
   // Only re-run if there's actually an offer in the new hash
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  if (hashParams.get('offer') || hashParams.get('r') || hashParams.get('approve')) {
+  if (hashParams.get('offer') || hashParams.get('r') || hashParams.get('approve') ||
+      hashParams.get('newcluster') || hashParams.get('invite')) {
     boot()
   }
 })

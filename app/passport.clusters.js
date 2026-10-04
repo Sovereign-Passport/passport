@@ -81,16 +81,21 @@ async function createCluster() {
     const clusterId  = crypto.randomUUID()
     const now        = new Date().toISOString()
 
+    // Endpoint is per-Cluster (from #newcluster). Absent → local-only Cluster.
+    const clusterEndpoint = (typeof normalizeVineEndpoint === 'function')
+      ? normalizeVineEndpoint(appState.pendingClusterEndpoint) : null
+
     // Build cluster record
     const cluster = {
-      id:          clusterId,
+      id:            clusterId,
       name,
-      description: desc,
-      founder_did: founderDid,
-      vignard_did: null,          // set after vignard ping
-      members:     [],
-      status:      'active',
-      created_at:  now,
+      description:   desc,
+      founder_did:   founderDid,
+      vine_endpoint: clusterEndpoint || null,
+      vignard_did:   null,          // stays null — vine_endpoint is the only link
+      members:       [],
+      status:        'active',
+      created_at:    now,
       weight_events: [],
     }
 
@@ -132,12 +137,23 @@ async function createCluster() {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Ping vignard witness — fire and forget, never block.
-    // Sends the already-signed FounderCredential as-is (no second signature).
-    pingVignard(clusterId, name, desc, founderDid, founderCredential).catch(() => {})
-
-    populateHome()
-    showToast(`${name} founded 🍇`)
+    // Send the signed witness to THIS cluster's endpoint — only if it has one.
+    // The Cluster is always kept locally; no rollback, no automatic retry.
+    if (clusterEndpoint) {
+      let linked = false
+      try {
+        await pingVignard(clusterEndpoint, clusterId, name, desc, founderDid, founderCredential)
+        linked = true
+      } catch (e) { linked = false }
+      populateHome()
+      showToast(linked
+        ? 'Cluster founded and linked to the Vine.'
+        : 'Cluster created locally — Vine witness failed.')
+    } else {
+      populateHome()
+      showToast('Cluster created locally — not linked to a Vine.')
+    }
+    appState.pendingClusterEndpoint = null
     goTo('screen-nodes')
 
   } catch (err) {
@@ -152,7 +168,16 @@ async function createCluster() {
  * Ping the vignard witness with a grape cluster registration.
  * Fire and forget — never blocks the UI.
  */
-async function pingVignard(clusterId, name, description, founderDid, founderCredential) {
+async function pingVignard(vineEndpoint, clusterId, name, description, founderDid, founderCredential) {
+  // A Cluster endpoint is mandatory — there is NO default / mdusl fallback.
+  const vineBase = (typeof normalizeVineEndpoint === 'function')
+    ? normalizeVineEndpoint(vineEndpoint) : null
+  if (!vineBase) {
+    const err  = new Error('A vine endpoint is required to send the witness')
+    err.code   = 'VINE_ENDPOINT_REQUIRED'
+    throw err
+  }
+
   // The signed FounderCredential is mandatory. Without it there is nothing
   // to prove, and NO request is made (no unsigned fallback).
   if (!founderCredential || typeof founderCredential !== 'object') {
@@ -161,41 +186,42 @@ async function pingVignard(clusterId, name, description, founderDid, founderCred
     throw err
   }
 
-  try {
-    // Send the full, already-signed FounderCredential. Its signature covers
-    // `claims` only and is reused verbatim — no second identity or signature.
-    // `name`, `description` and `founder_did` are added as transport fields.
-    const body = Object.assign({}, founderCredential, {
-      name,
-      description,
-      founder_did: founderDid,
-    })
+  // Send the full, already-signed FounderCredential. Its signature covers
+  // `claims` only and is reused verbatim — no second identity or signature.
+  // `name`, `description` and `founder_did` are added as transport fields.
+  const body = Object.assign({}, founderCredential, {
+    name,
+    description,
+    founder_did: founderDid,
+  })
 
-    const res = await fetch('https://mdusl.sovereign-passport.id/api/vignard/clusters', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      // Update cluster record with vignard witness timestamp
-      const vault   = appState.vault
-      const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
-      if (cluster) {
-        cluster.witnessed_at = data.witnessed_at
-        cluster.vignard_did  = 'did:web:mdusl.sovereign-passport.id'
-        // Silent pre-vine flag — no UI prompt, just state
-        if (((cluster.members && cluster.members.length) || 0) >= 3 && cluster.status === 'active') {
-          cluster.status = 'pre-vine'
-        }
-        const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-        await persist(newPayload)
-        appState.stored = newPayload
-      }
-    }
-  } catch(e) {
-    // Silent — vignard is a witness, not a dependency
+  const res = await fetch(vineBase + '/api/vignard/clusters', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err  = new Error('WITNESS_FAILED')
+    err.code   = 'WITNESS_FAILED'
+    throw err
   }
+
+  const data = await res.json()
+  // Update cluster record with the witness timestamp. vignard_did stays null —
+  // vine_endpoint is the Cluster's only network link.
+  const vault   = appState.vault
+  const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
+  if (cluster) {
+    cluster.witnessed_at = data.witnessed_at
+    // Silent pre-vine flag — no UI prompt, just state
+    if (((cluster.members && cluster.members.length) || 0) >= 3 && cluster.status === 'active') {
+      cluster.status = 'pre-vine'
+    }
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+  }
+  return true
 }
 
 /**

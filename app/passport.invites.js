@@ -32,25 +32,26 @@ function openInvite() {
   btn.disabled             = true
   document.getElementById('invite-note').value = ''
 
-  // Populate cluster dropdown from:
-  // 1. Clusters the grape owns (vault.ownClusters)
-  // 2. Grape cluster credentials (vault.credentials type GrapeClusterCredential)
-  // 3. Vine memberships (vault.credentials type MembershipCredential, fallback vault.memberships)
-  const ownClusters    = ((vault && vault.ownClusters) || [])
-  const grapeCreds     = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'GrapeClusterCredential')
-  const vineCreds      = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'MembershipCredential')
-  const legacyMembers  = ((vault && vault.memberships) || [])
-    .filter(m => m.status === 'approved')
-    .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
+  // Cluster dropdown — canonical Cluster ids ONLY:
+  //   1. ownClusters[].id (the Passport's canonical UUID)
+  //   2. GrapeClusterCredential.cluster_id
+  //   3. MembershipCredential scope=cluster, approved → cluster_id
+  // Never use a Vine credential's node_id / vine_handle as a Cluster id.
+  const ownClusters  = ((vault && vault.ownClusters) || [])
+  const grapeCreds   = ((vault && vault.credentials) || [])
+    .filter(c => c.type === 'GrapeClusterCredential' && c.cluster_id)
+  const clusterCreds = ((vault && vault.credentials) || [])
+    .filter(c => c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+                 c.status === 'approved' && c.cluster_id)
 
-  const allClusters = [
+  const rawClusters = [
     ...ownClusters.map(c => ({ node_id: c.id,         node_name: c.name,         own: true  })),
     ...grapeCreds.map(c  => ({ node_id: c.cluster_id,  node_name: c.cluster_name, own: false })),
-    ...vineCreds.map(c   => ({ node_id: c.node_id,     node_name: c.node_name,    own: false })),
-    ...legacyMembers.map(m=> ({ node_id: m.node_id,    node_name: m.node_name,    own: false })),
+    ...clusterCreds.map(c=> ({ node_id: c.cluster_id,  node_name: c.cluster_name || 'Cluster', own: false })),
   ]
+  const seen = {}
+  const allClusters = rawClusters.filter(c =>
+    c.node_id && !seen[c.node_id] && (seen[c.node_id] = true))
 
   select.innerHTML = '<option value="">— select a cluster —</option>'
   allClusters.forEach(c => {
@@ -159,22 +160,34 @@ async function generateInvite() {
     // Encode the signed referral as base64url
     const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
 
-    // Build the invite URL
-    // passportBase — the sovereign PWA where the invitee lands
-    // offerBase    — derived from the grape's stored MembershipCredential for
-    //                this cluster. Each vine self-describes its own endpoint.
-    //                Falls back to mdusl only for legacy credentials that
-    //                predate offer_endpoint storage (< L3A).
-    const vineCred     = (vault.credentials || []).find(
-      function(c) { return c.type === 'MembershipCredential' && c.node_id === cluster.node_id }
-    )
-    const offerBase    = (vineCred && vineCred.offer_endpoint)
-      || 'https://mdusl.sovereign-passport.id/api/offer'
+    // The endpoint must belong to THIS Cluster. Resolution order:
+    //   1. the ownCluster's stored vine_endpoint
+    //   2. the matching cluster-membership record's vine_endpoint
+    //   3. the one-shot #invite descriptor — ONLY if it targets this cluster_id
+    // No global fallback: absent endpoint → clear error, no request.
+    const own = (vault.ownClusters || []).find(c => c.id === cluster.node_id)
+    let vineEndpoint = (own && own.vine_endpoint) || null
+    if (!vineEndpoint) {
+      const mem = (vault.memberships || []).find(m =>
+        m.cluster_id === cluster.node_id || m.node_id === cluster.node_id)
+      vineEndpoint = (mem && mem.vine_endpoint) || null
+    }
+    if (!vineEndpoint && appState.pendingInvite &&
+        appState.pendingInvite.cluster_id === cluster.node_id) {
+      vineEndpoint = appState.pendingInvite.vine_endpoint
+    }
+    const vineBase = (typeof normalizeVineEndpoint === 'function')
+      ? normalizeVineEndpoint(vineEndpoint) : null
+    if (!vineBase) {
+      throw new Error('No vine endpoint for this cluster.')
+    }
+    const offerBase    = vineBase + '/api/offer'
+    const refEndpoint  = vineBase + '/api/passport/ref'
     const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
     const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
 
-    // POST encodedRef to VPS relay — returns short token + QR SVG
-    const refRes = await fetch('https://mdusl.sovereign-passport.id/api/passport/ref', {
+    // POST encodedRef to the vine relay — returns short token + QR SVG
+    const refRes = await fetch(refEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: encodedRef }),
@@ -249,3 +262,63 @@ async function shareInviteLink() {
  * Open the officialize screen.
  * Populates current cluster name and member status.
  */
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIGNED FLOW HAND-OFFS — #newcluster= / #invite= from the SPID dashboard.
+// Fragments are public demands, never an authority. No cluster-id conversion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Does this Passport hold a canonical Cluster with this exact UUID? */
+function hasCanonicalCluster(clusterId) {
+  const vault = appState.vault
+  if (!vault || !clusterId) return false
+  if ((vault.ownClusters || []).some(c => c.id === clusterId)) return true
+  return (vault.credentials || []).some(c =>
+    c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+    c.status === 'approved' && c.cluster_id === clusterId)
+}
+
+/** #newcluster= → open the existing create-cluster screen with the endpoint. */
+function checkPendingNewCluster() {
+  const raw = appState.pendingNewClusterRaw
+  if (!raw) return false
+  appState.pendingNewClusterRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint) : null
+
+  clearApproveFragment()
+  if (!endpoint) { showToast('Invalid or incomplete cluster request.'); return false }
+
+  appState.pendingClusterEndpoint = endpoint
+  goTo('screen-create-cluster')
+  return true
+}
+
+/** #invite= → open the existing invite screen for a canonical Cluster only. */
+function checkPendingInvite() {
+  const raw = appState.pendingInviteRaw
+  if (!raw) return false
+  appState.pendingInviteRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint) : null
+
+  clearApproveFragment()
+
+  if (!endpoint) { showToast('Invalid or incomplete invite request.'); return false }
+  if (!demand.cluster_id) { showToast('Invite request missing cluster.'); return false }
+  if (!hasCanonicalCluster(demand.cluster_id)) {
+    showToast('This legacy cluster is not linked to your Passport.')
+    return false
+  }
+
+  appState.pendingInvite = demand
+  openInviteFromCluster(demand.cluster_id)   // opens + preselects the canonical cluster
+  return true
+}
