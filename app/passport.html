@@ -1561,11 +1561,16 @@ function openNodes() {
   const ownClusters = ((vault && vault.ownClusters) || [])
     .filter(c => c.id && c.name && c.founder_did)
 
-  // Primary: credentials array. Fallback: legacy memberships array
+  // Membership display: vine credentials + membership records (incl. pending
+  // Cluster invitations). Cluster-scope credentials are represented by their
+  // membership record, to avoid duplicates.
+  const allCreds  = ((vault && vault.credentials) || [])
+  const vineCreds = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope !== 'cluster')
   const memberships = [
-    ...((vault && vault.credentials) || []).filter(c => c.type === 'MembershipCredential'),
+    ...vineCreds,
     ...((vault && vault.memberships) || []).filter(m =>
-      !((vault && vault.credentials) || []).some(c => c.node_id === m.node_id)
+      !vineCreds.some(c => c.node_id === m.node_id)
     ),
   ]
 
@@ -1650,29 +1655,59 @@ function openNodes() {
         const card = document.createElement('div')
         card.className = 'cred-card'
         card.style.marginBottom = '12px'
-        const isLeft = m.status === 'left'
+
+        const status     = m.status || null            // null = vine credential
+        const isLeft     = status === 'left'
+        const isPending  = status === 'invited' || status === 'candidate' || status === 'temporary'
+        const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
+        const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
+        const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
+
         card.innerHTML = `
-          <p class="cred-type">${isLeft ? 'MEMBER · AWAY' : ((m.status ? m.status.toUpperCase() : '') || 'MEMBER')}</p>
-          <div class="cred-title">${escHtmlP((m.node_name || m.cluster_name || m.node_id || 'Unknown cluster'))}</div>
+          <p class="cred-type">${statusText}</p>
+          <div class="cred-title">${title}</div>
+          ${isPending ? '<div style="margin-top:6px;"><span class="badge badge-gold">Pending approval</span></div>' : ''}
           <div class="cred-meta" style="margin-top:12px;">
             <div class="cred-meta-item">
               Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
           </div>
-          ${!isLeft ? `
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="btn btn-ghost" style="font-size:11px;"
-              onclick="softLeaveMembership('${(m.id || m.node_id)}')">
-              Leave
-            </button>
-          </div>` : `
-          <div style="margin-top:8px;">
-            <p style="font-size:11px;color:var(--ink-dim);">
-              You left this cluster. Your credential remains as a personal record.
-              Rejoin by requesting a new invite from the founder.
-            </p>
-          </div>`}
         `
+
+        if (isPending) {
+          // Pending Cluster invitation: offer a manual check when an endpoint
+          // is known. Never invent an endpoint, never show a dead button.
+          if (m.vine_endpoint) {
+            const checkBtn = document.createElement('button')
+            checkBtn.className     = 'btn btn-primary'
+            checkBtn.style.cssText = 'font-size:11px;margin-top:12px;'
+            checkBtn.textContent   = 'Check approval'
+            checkBtn.addEventListener('click', () => checkClusterApproval(m, checkBtn))
+            card.appendChild(checkBtn)
+          } else {
+            const note = document.createElement('p')
+            note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
+            note.textContent = 'Approval endpoint unavailable'
+            card.appendChild(note)
+          }
+        } else if (isLeft) {
+          const note = document.createElement('p')
+          note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
+          note.textContent = 'You left this cluster. Your credential remains as a personal record. Rejoin by requesting a new invite from the founder.'
+          card.appendChild(note)
+        } else if (!isTerminal) {
+          const actions = document.createElement('div')
+          actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;'
+          const leaveBtn = document.createElement('button')
+          leaveBtn.className     = 'btn btn-ghost'
+          leaveBtn.style.fontSize = '11px'
+          leaveBtn.textContent   = 'Leave'
+          leaveBtn.addEventListener('click', () => softLeaveMembership(m.id || m.node_id))
+          actions.appendChild(leaveBtn)
+          card.appendChild(actions)
+        }
+        // terminal statuses (suspended/revoked/removed): show status only.
+
         list.appendChild(card)
       })
     }
@@ -1687,6 +1722,43 @@ function openNodes() {
   }
 
   goTo('screen-nodes')
+}
+
+
+/**
+ * Manual "Check approval" action for a pending Cluster membership.
+ * Reuses claimClusterApprovals(); disables the button to avoid double calls.
+ * Never corrupts local data: claimClusterApprovals restores its snapshot on
+ * a failed save, and a network failure returns before any mutation.
+ */
+async function checkClusterApproval(membership, btn) {
+  if (btn && btn.disabled) return                    // single active request
+  if (!membership || !membership.vine_endpoint) {
+    showToast('Approval endpoint unavailable')
+    return
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
+  try {
+    const r = await claimClusterApprovals(membership.vine_endpoint)
+    if (!r || !r.ok) {
+      showToast(r && r.error === 'SAVE_FAILED'
+        ? 'Could not save the approval locally.'
+        : 'Could not check approval.')
+      if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+      return
+    }
+    if (!r.stored || r.stored.length === 0) {
+      showToast('No approval available yet.')
+      if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+      return
+    }
+    showToast('Cluster approval received ✓')
+    openNodes()        // refresh My Clusters
+    populateHome()     // refresh counters + cred-count
+  } catch (e) {
+    showToast('Could not check approval.')
+    if (btn) { btn.disabled = false; btn.textContent = 'Check approval' }
+  }
 }
 
 

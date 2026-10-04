@@ -404,12 +404,18 @@ async function claimClusterApprovals(vineEndpoint) {
   const data      = await res.json().catch(() => ({}))
   const approvals = Array.isArray(data.approvals) ? data.approvals : []
 
+  // Work on copies so a failed local save never corrupts the in-memory vault.
+  const prevCreds = vault.credentials
+  const prevMems  = vault.memberships
+  const nextCreds = (vault.credentials || []).slice()
+  const nextMems  = (vault.memberships || []).map(m => Object.assign({}, m))
+
   const accepted = []
   for (const cred of approvals) {
     if (!cred || cred.type !== 'MembershipCredential' || cred.scope !== 'cluster') continue
     if (cred.subject_did !== did || cred.status !== 'approved') continue
 
-    const pendingIdx = (vault.memberships || []).findIndex(
+    const pendingIdx = nextMems.findIndex(
       m => m.status !== 'approved' &&
            (m.cluster_id === cred.cluster_id || m.node_id === cred.cluster_id)
     )
@@ -427,15 +433,14 @@ async function claimClusterApprovals(vineEndpoint) {
     } catch (e) { issuerOk = false }
     if (!issuerOk) continue
 
-    if (!vault.credentials) vault.credentials = []
-    const dup = vault.credentials.some(c =>
+    const dup = nextCreds.some(c =>
       c.type === 'MembershipCredential' && c.scope === 'cluster' &&
       c.cluster_id === cred.cluster_id && c.signature === cred.signature)
     if (!dup) {
-      vault.credentials.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+      nextCreds.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
     }
 
-    vault.memberships[pendingIdx] = Object.assign({}, vault.memberships[pendingIdx], {
+    nextMems[pendingIdx] = Object.assign({}, nextMems[pendingIdx], {
       status:            'approved',
       approval_required: false,
       approved_at:       new Date().toISOString(),
@@ -445,12 +450,16 @@ async function claimClusterApprovals(vineEndpoint) {
 
   if (accepted.length === 0) return { ok: true, stored: [], confirmed: [] }
 
-  // Save BEFORE confirming — a failed save sends no confirmation.
+  // Commit to memory only once, then save. On failure, restore the snapshot.
+  vault.credentials = nextCreds
+  vault.memberships = nextMems
   try {
     const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
     await persist(newPayload)
     appState.stored = newPayload
   } catch (e) {
+    vault.credentials = prevCreds
+    vault.memberships = prevMems
     return { ok: false, error: 'SAVE_FAILED', stored: [] }
   }
 
