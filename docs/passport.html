@@ -4970,13 +4970,23 @@ function populateHome() {
   const sh = document.getElementById('settings-handle-display')
   if (sh) sh.textContent = handle
 
-  // Memberships count — reads vault.credentials as primary source
-  // Falls back to vault.memberships for passports predating migration
-  const credCounts = (v.credentials || [])
-    .filter(c => c.type === 'MembershipCredential' || c.type === 'GrapeClusterCredential')
-  const legacyCounts = (v.memberships || [])
-    .filter(m => !(v.credentials || []).some(c => c.node_id === m.node_id))
-  const credCount = credCounts.length + legacyCounts.length
+  // Memberships count — ONLY Vines/Vignards actually shown in My Memberships.
+  // Clusters (founded or joined) are never counted here.
+  const allCreds = (v.credentials || [])
+  const vineCreds = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard')
+  const seenVine = {}
+  const vineCount = vineCreds.filter(c => {
+    if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
+    return true
+  }).length
+  const vignardCount = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope === 'vignard' &&
+    (c.issuer_did || c.vignard_did)).length
+  const legacyCount = (v.memberships || [])
+    .filter(m => !m.cluster_id)
+    .filter(m => !vineCreds.some(c => c.node_id === m.node_id)).length
+  const credCount = vineCount + vignardCount + legacyCount
   document.getElementById('cred-count').textContent =
     `${credCount} membership${credCount !== 1 ? 's' : ''}`
 
@@ -5040,18 +5050,22 @@ function openNodes() {
   const ownClusters = ((vault && vault.ownClusters) || [])
     .filter(c => c.id && c.name && c.founder_did)
 
-  // Membership display: vine credentials + membership records (incl. pending
-  // Cluster invitations). Cluster-scope credentials are represented by their
-  // membership record, to avoid duplicates.
-  const allCreds  = ((vault && vault.credentials) || [])
-  const vineCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' && c.scope !== 'cluster')
-  const memberships = [
-    ...vineCreds,
-    ...((vault && vault.memberships) || []).filter(m =>
-      !vineCreds.some(c => c.node_id === m.node_id)
-    ),
+  // Joined Clusters ONLY — canonical cluster_id, never a Vine, never a founder.
+  const allCreds = ((vault && vault.credentials) || [])
+  const ownIds   = new Set(ownClusters.map(c => c.id))
+  const clusterCandidates = [
+    ...((vault && vault.memberships) || []).filter(m => m.cluster_id),
+    ...allCreds.filter(c =>
+      (c.type === 'MembershipCredential' && c.scope === 'cluster' && c.cluster_id) ||
+      (c.type === 'GrapeClusterCredential' && c.cluster_id)),
   ]
+  const seenJoined = {}
+  const memberships = clusterCandidates.filter(m => {
+    const cid = m.cluster_id
+    if (!cid || ownIds.has(cid) || seenJoined[cid]) return false
+    seenJoined[cid] = true
+    return true
+  })
 
   list.innerHTML = ''
 
@@ -5147,15 +5161,9 @@ function openNodes() {
         const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
         const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
         const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
-        let markerScope = null
-        let markerId    = null
-        if (m.cluster_id || m.scope === 'cluster') {
-          markerScope = 'cluster'; markerId = m.cluster_id || m.node_id
-        } else if (m.type === 'MembershipCredential' && m.issuer_did) {
-          // Vigne card: the signed membership credential's issuer DID is the
-          // canonical id — never a handle, name or endpoint.
-          markerScope = 'vine'; markerId = m.issuer_did
-        }
+        // Every Joined card here is a canonical Cluster (cluster_id present).
+        const markerScope = 'cluster'
+        const markerId    = m.cluster_id
 
         card.innerHTML = `
           <p class="cred-type">${statusText}</p>
@@ -5273,70 +5281,94 @@ async function checkClusterApproval(membership, btn) {
  */
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SECTION 9 — CREDENTIALS
-// Renders vault.credentials — all credential types in one list.
-// MembershipCredential: vine-issued, has SD-JWT, copyable and presentable.
-// FounderCredential: self-issued, internal record only, no copy/present.
-// GrapeClusterCredential: founder-issued to members, copyable.
+// SECTION 9 — MY MEMBERSHIPS (screen-credentials)
+// Vines / Vignards ONLY. Clusters (founded or joined) live in My Clusters.
+//   MembershipCredential scope!=cluster,vignard → VINE MEMBERSHIP
+//   MembershipCredential scope===vignard        → VIGNARD MEMBERSHIP
+//   legacy vault.memberships without cluster_id → LEGACY VINE MEMBERSHIP
 // ═════════════════════════════════════════════════════════════════════════════
 
 function openCredentials() {
-  const vault       = appState.vault
-  const list        = document.getElementById('credentials-list')
-  const empty       = document.getElementById('credentials-empty')
-  const credentials = (vault && vault.credentials) || []
+  const vault    = appState.vault
+  const list     = document.getElementById('credentials-list')
+  const empty    = document.getElementById('credentials-empty')
+  const allCreds = (vault && vault.credentials) || []
+
+  // My Memberships = Vines / Vignards ONLY — never a Cluster, never a Founder.
+  const vineCreds = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard')
+  const vignardCreds = allCreds.filter(c =>
+    c.type === 'MembershipCredential' && c.scope === 'vignard' &&
+    (c.issuer_did || c.vignard_did))
+  const legacyMembers = ((vault && vault.memberships) || [])
+    .filter(m => !m.cluster_id)
+    .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
+
+  // Deduplicate canonical Vines by issuer_did.
+  const seenVine = {}
+  const vineList = vineCreds.filter(c => {
+    if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
+    return true
+  })
+
+  const items = [
+    ...vineList.map(c     => ({ kind: 'vine',    cred: c, idx: allCreds.indexOf(c) })),
+    ...vignardCreds.map(c => ({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })),
+    ...legacyMembers.map(m=> ({ kind: 'legacy',  cred: m, idx: -1 })),
+  ]
 
   list.innerHTML = ''
-
-  // Update home screen count — excludes FounderCredentials
-  const visibleCount = credentials.filter(c => c.type !== 'FounderCredential').length
   document.getElementById('cred-count').textContent =
-    `${visibleCount} membership${visibleCount !== 1 ? 's' : ''}`
+    `${items.length} membership${items.length !== 1 ? 's' : ''}`
 
-  if (credentials.length === 0) {
+  if (items.length === 0) {
     empty.style.display = 'block'
     list.style.display  = 'none'
   } else {
     empty.style.display = 'none'
     list.style.display  = 'block'
 
-    credentials.forEach((c, idx) => {
+    items.forEach(item => {
+      const c    = item.cred
+      const idx  = item.idx
       const card = document.createElement('div')
       card.className = 'cred-card'
       card.style.marginBottom = '12px'
 
-      const isFounder = c.type === 'FounderCredential'
+      let typeLabel, title, issuerLine
+      let markerScope = null
+      let markerId    = null
 
-      // Friendly type label
-      const typeLabel = isFounder
-        ? 'Founder'
-        : c.type === 'MembershipCredential'
-          ? 'Membership'
-          : (c.type || 'Credential')
+      if (item.kind === 'vine') {
+        typeLabel  = 'VINE MEMBERSHIP'
+        title      = c.node_name || c.issuer_did || 'Vine'
+        issuerLine = c.issuer_did || ''
+        if (c.issuer_did) { markerScope = 'vine'; markerId = c.issuer_did }
+      } else if (item.kind === 'vignard') {
+        typeLabel  = 'VIGNARD MEMBERSHIP'
+        title      = c.node_name || c.issuer_did || c.vignard_did || 'Vignard'
+        issuerLine = c.issuer_did || c.vignard_did || ''
+        const vid  = c.issuer_did || c.vignard_did
+        if (vid) { markerScope = 'vignard'; markerId = vid }
+      } else {
+        // Legacy Vine membership without a canonical DID → no markers.
+        typeLabel  = 'LEGACY VINE MEMBERSHIP'
+        title      = c.node_name || c.node_id || 'Vine'
+        issuerLine = c.node_id || ''
+      }
 
-      // Title — cluster name for both types
-      const title = isFounder
-        ? ((c.cluster_name || (c.claims && c.claims.cluster_name) || 'My Cluster'))
-        : ((c.node_name || c.issuer_did || 'Unknown issuer'))
-
-      // Issuer line
-      const issuerLine = isFounder
-        ? 'Self-issued · Founder'
-        : (c.issuer_did || '')
-
-      // Expiry display
       const expiry = c.expires_at
         ? new Date(c.expires_at).toLocaleDateString()
         : 'No expiry'
 
-      // Revoked indicator
       const revokedBadge = c.revoked
         ? `<span class="badge" style="background:rgba(192,57,43,0.1);
             color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
         : `<span class="badge badge-green">✓ Valid</span>`
 
-      // Action buttons — FounderCredential has no SD-JWT to copy
-      const actions = isFounder ? '' : `
+      // SD-JWT actions only when a real credential is present.
+      const hasSdJwt = !!c.sd_jwt && idx >= 0
+      const actions = hasSdJwt ? `
         <div style="margin-top:12px;display:flex;gap:8px;">
           <button class="btn btn-primary"
             onclick="copyCredential(${idx})"
@@ -5348,10 +5380,10 @@ function openCredentials() {
             style="flex:1;padding:8px;">
             Present QR
           </button>
-        </div>`
+        </div>` : ''
 
       card.innerHTML = `
-        <p class="cred-type">${escHtmlP(typeLabel.toUpperCase())}</p>
+        <p class="cred-type">${escHtmlP(typeLabel)}</p>
         <div class="cred-title">${escHtmlP(title)}</div>
         <div class="cred-sub" style="font-size:10px;word-break:break-all;color:var(--ink-dim);">
           ${escHtmlP(issuerLine)}
@@ -5363,12 +5395,17 @@ function openCredentials() {
           <div class="cred-meta-item">
             Expires <span>${expiry}</span>
           </div>
+          ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;">
           ${revokedBadge}
         </div>
         ${actions}
       `
+
+      const slot = card.querySelector('[data-marker-slot]')
+      if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, openCredentials))
+
       list.appendChild(card)
     })
   }
