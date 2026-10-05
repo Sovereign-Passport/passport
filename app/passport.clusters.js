@@ -521,10 +521,15 @@ const PERSONAL_MARKER_KEYS = [
 
 const MARKER_NEXT = { yellow: 'green', green: 'red', red: 'yellow' }
 
+/** Canonical vault key for a marker subject: `<scope>:<id>`. */
+function markerSubjectKey(scope, id) {
+  return scope + ':' + id
+}
+
 /** Current stored colour for one marker (defaults to yellow, never written). */
-function getPersonalMarker(clusterId, key) {
+function getPersonalMarker(scope, id, key) {
   const store = (appState.vault && appState.vault.personal_markers) || {}
-  const entry = store['cluster:' + clusterId] || {}
+  const entry = store[markerSubjectKey(scope, id)] || {}
   const c     = entry[key]
   return (c === 'green' || c === 'red' || c === 'yellow') ? c : 'yellow'
 }
@@ -534,15 +539,15 @@ function getPersonalMarker(clusterId, key) {
  * vault. Creates only the concerned entry. On save failure, restores the
  * previous state and reports an error. Never performs any network call.
  */
-async function cyclePersonalMarker(clusterId, key, refresh) {
+async function cyclePersonalMarker(scope, id, key, refresh) {
   const vault = appState.vault
   if (!vault) return
 
-  const storeKey  = 'cluster:' + clusterId
+  const storeKey  = markerSubjectKey(scope, id)
   const prevStore = vault.personal_markers
     ? JSON.parse(JSON.stringify(vault.personal_markers)) : null
 
-  const next  = MARKER_NEXT[getPersonalMarker(clusterId, key)] || 'yellow'
+  const next  = MARKER_NEXT[getPersonalMarker(scope, id, key)] || 'yellow'
 
   if (!vault.personal_markers) vault.personal_markers = {}
   const entry = Object.assign({}, vault.personal_markers[storeKey] || {})
@@ -562,19 +567,20 @@ async function cyclePersonalMarker(clusterId, key, refresh) {
 }
 
 /**
- * Build the compact personal-marker strip for a Cluster card.
+ * Build the compact personal-marker strip for a subject card.
  * Purely decorative/private: clicks never trigger Invite/Revoke/Leave nor any
  * network request.
- * @param {string} clusterId
+ * @param {string} scope  'cluster' | 'vine' | 'vignard'
+ * @param {string} id     canonical id for that scope
  * @param {Function} [refresh] re-render callback
  * @returns {HTMLElement}
  */
-function buildPersonalMarkers(clusterId, refresh) {
+function buildPersonalMarkers(scope, id, refresh) {
   const wrap = document.createElement('div')
   wrap.className = 'personal-markers'
 
   PERSONAL_MARKER_KEYS.forEach(def => {
-    const color = getPersonalMarker(clusterId, def.key)
+    const color = getPersonalMarker(scope, id, def.key)
     const btn   = document.createElement('button')
     btn.type      = 'button'
     btn.className = 'personal-marker'
@@ -583,7 +589,7 @@ function buildPersonalMarkers(clusterId, refresh) {
     btn.title = def.label + ' — ' + color
     btn.setAttribute('aria-label', def.label + ' — ' + color)
     btn.textContent = def.icon
-    btn.addEventListener('click', () => cyclePersonalMarker(clusterId, def.key, refresh))
+    btn.addEventListener('click', () => cyclePersonalMarker(scope, id, def.key, refresh))
     wrap.appendChild(btn)
   })
 

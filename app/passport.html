@@ -1646,7 +1646,7 @@ function openNodes() {
         `
         // Personal markers — private, non-actionable (Cluster scope only).
         const slot = card.querySelector('[data-marker-slot]')
-        if (slot) slot.appendChild(buildPersonalMarkers(c.id, openNodes))
+        if (slot) slot.appendChild(buildPersonalMarkers('cluster', c.id, openNodes))
         list.appendChild(card)
       })
     }
@@ -1670,7 +1670,15 @@ function openNodes() {
         const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
         const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
         const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
-        const markerClusterId = m.cluster_id || (m.scope === 'cluster' ? m.node_id : null)
+        let markerScope = null
+        let markerId    = null
+        if (m.cluster_id || m.scope === 'cluster') {
+          markerScope = 'cluster'; markerId = m.cluster_id || m.node_id
+        } else if (m.type === 'MembershipCredential' && m.issuer_did) {
+          // Vigne card: the signed membership credential's issuer DID is the
+          // canonical id — never a handle, name or endpoint.
+          markerScope = 'vine'; markerId = m.issuer_did
+        }
 
         card.innerHTML = `
           <p class="cred-type">${statusText}</p>
@@ -1680,7 +1688,7 @@ function openNodes() {
             <div class="cred-meta-item">
               Joined <span>${(m.joined_at || m.issued_at) ? new Date((m.joined_at || m.issued_at)).toLocaleDateString() : '—'}</span>
             </div>
-            ${markerClusterId ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
+            ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
           </div>
         `
 
@@ -1720,7 +1728,7 @@ function openNodes() {
 
         // Personal markers — private, non-actionable (Cluster scope only).
         const markerSlot = card.querySelector('[data-marker-slot]')
-        if (markerClusterId && markerSlot) markerSlot.appendChild(buildPersonalMarkers(markerClusterId, openNodes))
+        if (markerScope && markerSlot) markerSlot.appendChild(buildPersonalMarkers(markerScope, markerId, openNodes))
 
         list.appendChild(card)
       })
