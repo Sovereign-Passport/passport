@@ -348,6 +348,10 @@ const CLUSTER_APPROVAL_ACTIONS = {
   CONFIRM: 'confirm_cluster_approvals',
 }
 
+// Cluster decisions delivered by a Vine (signed MembershipCredential, scope=cluster).
+const CLUSTER_DECISION_STATUSES = ['approved', 'suspended', 'revoked', 'removed']
+const CLUSTER_DECISION_UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function _signHolderPayload(payload) {
   const privateKey = await crypto.subtle.importKey(
     'jwk', appState.vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
@@ -410,16 +414,11 @@ async function claimClusterApprovals(vineEndpoint) {
   const nextCreds = (vault.credentials || []).slice()
   const nextMems  = (vault.memberships || []).map(m => Object.assign({}, m))
 
-  const accepted = []
+  const accepted = new Set()
   for (const cred of approvals) {
     if (!cred || cred.type !== 'MembershipCredential' || cred.scope !== 'cluster') continue
-    if (cred.subject_did !== did || cred.status !== 'approved') continue
-
-    const pendingIdx = nextMems.findIndex(
-      m => m.status !== 'approved' &&
-           (m.cluster_id === cred.cluster_id || m.node_id === cred.cluster_id)
-    )
-    if (pendingIdx < 0) continue
+    if (cred.subject_did !== did || !cred.cluster_id) continue
+    if (!CLUSTER_DECISION_STATUSES.includes(cred.status)) continue
 
     // Verify the issuer's Ed25519 signature over the payload sans `signature`.
     let issuerOk = false
@@ -433,22 +432,55 @@ async function claimClusterApprovals(vineEndpoint) {
     } catch (e) { issuerOk = false }
     if (!issuerOk) continue
 
-    const dup = nextCreds.some(c =>
-      c.type === 'MembershipCredential' && c.scope === 'cluster' &&
-      c.cluster_id === cred.cluster_id && c.signature === cred.signature)
-    if (!dup) {
-      nextCreds.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+    const hasId = typeof cred.id === 'string' && CLUSTER_DECISION_UUID_RE.test(cred.id)
+
+    if (hasId) {
+      // A canonical decision always states the state it was built on.
+      if (typeof cred.previous_status !== 'string' || !cred.previous_status) continue
+
+      const existing = nextCreds.find(c => c && c.id === cred.id)
+      if (existing) {
+        // Same id already stored: an identical replay is idempotent; a same id
+        // with different content is refused and mutates nothing.
+        const same = existing.signature === cred.signature &&
+                     existing.cluster_id === cred.cluster_id &&
+                     existing.status === cred.status
+        if (!same) continue
+      } else {
+        nextCreds.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+      }
+    } else {
+      // Legacy approval without id — keep the historical behaviour.
+      if (cred.status !== 'approved') continue
+      const dup = nextCreds.some(c =>
+        c.type === 'MembershipCredential' && c.scope === 'cluster' &&
+        c.cluster_id === cred.cluster_id && c.signature === cred.signature)
+      if (!dup) {
+        nextCreds.push(Object.assign({}, cred, { stored_at: new Date().toISOString() }))
+      }
     }
 
-    nextMems[pendingIdx] = Object.assign({}, nextMems[pendingIdx], {
-      status:            'approved',
-      approval_required: false,
-      approved_at:       new Date().toISOString(),
-    })
-    accepted.push(cred.cluster_id)
+    // Apply the resulting current state to the matching membership, if tracked.
+    const memIdx = nextMems.findIndex(
+      m => m.cluster_id === cred.cluster_id || m.node_id === cred.cluster_id
+    )
+    if (memIdx >= 0) {
+      const update = {
+        status:            cred.status,
+        approval_required: false,
+        updated_at:        new Date().toISOString(),
+        last_issued_at:    cred.issued_at ?? nextMems[memIdx].last_issued_at ?? null,
+      }
+      if (hasId) update.last_decision_id = cred.id
+      if ('is_issuer' in cred) update.is_issuer = !!cred.is_issuer
+      if (cred.status === 'approved') update.approved_at = new Date().toISOString()
+      nextMems[memIdx] = Object.assign({}, nextMems[memIdx], update)
+    }
+
+    accepted.add(cred.cluster_id)
   }
 
-  if (accepted.length === 0) return { ok: true, stored: [], confirmed: [] }
+  if (accepted.size === 0) return { ok: true, stored: [], confirmed: [] }
 
   // Commit to memory only once, then save. On failure, restore the snapshot.
   vault.credentials = nextCreds
@@ -463,8 +495,9 @@ async function claimClusterApprovals(vineEndpoint) {
     return { ok: false, error: 'SAVE_FAILED', stored: [] }
   }
 
-  const confirmed = await confirmClusterApprovals(vineEndpoint, accepted)
-  return { ok: true, stored: accepted, confirmed: confirmed.confirmed || [] }
+  const acceptedList = [...accepted]
+  const confirmed = await confirmClusterApprovals(vineEndpoint, acceptedList)
+  return { ok: true, stored: acceptedList, confirmed: confirmed.confirmed || [] }
 }
 
 
@@ -585,6 +618,165 @@ async function approveClusterMember() {
   } catch (e) {
     if (errEl) { errEl.style.display = 'flex'; if (errText) errText.textContent = e.message }
     if (btn)   { btn.disabled = false; btn.textContent = 'Approve' }
+  }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUSTER DECISION CONFIRMATION SCREEN — opened from a public #decision= demand.
+// The demand is NOT an authority; the server re-verifies everything.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Human-readable message for a decision failure, keyed by server error code. */
+function decisionErrorMessage(data) {
+  const code = (data && (data.error || data.status)) || ''
+  switch (code) {
+    case 'STALE_STATE':
+    case 'STALE_ROLE':
+      return 'This member card is out of date. Refresh the member list and try again.'
+    case 'LAST_ISSUER':
+      return 'This is the last issuer. Name another issuer before revoking this one.'
+    case 'NOT_ISSUER':
+      return 'This Passport is not an approved issuer of this Cluster.'
+    case 'INVALID_TRANSITION':
+      return 'This status change is not allowed from the current state.'
+    case 'INVALID_ISSUER_STATUS':
+      return 'Only an approved member can be an issuer.'
+    case 'CREDENTIAL_EXPIRED':
+      return 'This decision expired before it was signed.'
+    default:
+      return code || 'Could not send the decision.'
+  }
+}
+
+/**
+ * Detect a pending #decision= demand and render the confirmation screen.
+ * Required keys: vine_endpoint, cluster_id, subject_did, current_status, and a
+ * `decision` object holding exactly one of status / is_issuer.
+ * The fragment is always removed after handling.
+ * @returns {boolean} true if a screen was shown
+ */
+function checkPendingDecision() {
+  const raw = appState.pendingDecisionRaw
+  if (!raw) return false
+  appState.pendingDecisionRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint) : null
+
+  const decision  = demand && typeof demand === 'object' ? demand.decision : null
+  const hasStatus = !!decision && typeof decision === 'object' && typeof decision.status === 'string'
+  const hasRole   = !!decision && typeof decision === 'object' && typeof decision.is_issuer === 'boolean'
+
+  const valid = demand && typeof demand === 'object' &&
+    endpoint && demand.cluster_id && demand.subject_did &&
+    typeof demand.current_status === 'string' &&
+    (hasStatus !== hasRole)          // exactly one kind of decision
+
+  if (!valid) {
+    showToast('Invalid or incomplete decision request.')
+    clearApproveFragment()
+    return false
+  }
+
+  demand.vine_endpoint = endpoint
+  appState.pendingDecision     = demand
+  appState.pendingDecisionCred = null   // fresh context → fresh id
+
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+  const newStatus = hasStatus ? decision.status : demand.current_status
+
+  set('decision-cluster',  demand.cluster_id)
+  set('decision-subject',  demand.subject_label || demand.subject_did)
+  set('decision-current',  demand.current_status + (demand.current_is_issuer ? ' · issuer' : ''))
+  set('decision-new',      hasStatus ? newStatus : 'Issuer role only')
+  set('decision-role',     hasRole ? (decision.is_issuer ? 'Grant issuer' : 'Revoke issuer') : '—')
+  set('decision-endpoint', demand.vine_endpoint)
+
+  const roleRow = document.getElementById('decision-role-row')
+  if (roleRow) roleRow.style.display = hasRole ? '' : 'none'
+
+  const warn = document.getElementById('decision-warning')
+  if (warn) warn.style.display =
+    (newStatus === 'revoked' || newStatus === 'removed') ? 'flex' : 'none'
+
+  const errEl = document.getElementById('decision-error')
+  if (errEl) errEl.style.display = 'none'
+
+  clearApproveFragment()
+  goTo('screen-decision')
+  return true
+}
+
+/** Cancel — signs nothing, sends nothing. */
+function cancelPendingDecision() {
+  appState.pendingDecision     = null
+  appState.pendingDecisionCred = null
+  goTo('screen-home')
+}
+
+/**
+ * Sign ONE Cluster decision and POST it to the Vine.
+ * The signed credential (and its id) is kept in memory so a network retry
+ * sends the exact same body; a new id is generated only on a new demand.
+ */
+async function confirmClusterDecision() {
+  const demand  = appState.pendingDecision
+  const btn     = document.getElementById('btn-decision-confirm')
+  const errEl   = document.getElementById('decision-error')
+  const errText = document.getElementById('decision-error-text')
+
+  if (!demand) { showToast('No pending decision.'); return }
+  if (!appState.vault) { goTo('screen-unlock'); return }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing…' }
+  if (errEl) errEl.style.display = 'none'
+
+  try {
+    const base = normalizeVineEndpoint(demand.vine_endpoint)
+    if (!base) throw new Error('INVALID_ENDPOINT')
+
+    // Reuse the SAME signed credential and id across retries in this screen.
+    if (!appState.pendingDecisionCred) {
+      const d      = demand.decision || {}
+      const isRole = typeof d.is_issuer === 'boolean'
+      const opts = {
+        cluster_id:      demand.cluster_id,
+        subject_did:     demand.subject_did,
+        status:          isRole ? demand.current_status : d.status,
+        previous_status: demand.current_status,
+        referral_id:     demand.referral_id,
+      }
+      if (isRole) {
+        opts.is_issuer          = d.is_issuer
+        opts.previous_is_issuer = demand.current_is_issuer
+      }
+      appState.pendingDecisionCred = await buildClusterDecisionCredential(appState.vault, opts)
+    }
+    const cred = appState.pendingDecisionCred
+
+    const url = base + '/api/clusters/' + encodeURIComponent(demand.cluster_id) +
+                '/members/' + encodeURIComponent(demand.subject_did) + '/decision'
+
+    const res  = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(cred),       // exact same body on retry
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(decisionErrorMessage(data))
+
+    appState.pendingDecision     = null
+    appState.pendingDecisionCred = null
+    showToast(data.idempotent ? 'Decision already applied ✓' : 'Decision signed and applied ✓')
+    goTo('screen-home')
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'flex'; if (errText) errText.textContent = e.message }
+    if (btn)   { btn.disabled = false; btn.textContent = 'Confirm and sign' }
+    // Keep the signed credential so the next tap retries the same id/body.
   }
 }
 

@@ -469,31 +469,41 @@ async function dissolveCluster(clusterId) {
 }
 
 /**
- * Build and sign a Cluster-scoped MembershipCredential approval.
+ * Build and sign a Cluster-scoped MembershipCredential decision.
  *
- * Signed by the admin/founder DID with its own Ed25519 key. The signature
+ * Signed by the unlocked Passport DID with its own Ed25519 key. The signature
  * covers exactly JSON.stringify(payload without `signature`). This reuses the
- * existing credential type (`MembershipCredential`) with `scope:'cluster'`;
- * no new credential type is introduced.
+ * existing credential type (MembershipCredential) with scope:'cluster' — no
+ * new credential type is introduced.
  *
- * Exposed as a global for the existing/future approval action.
+ * `status` is always present. `is_issuer` / `previous_is_issuer` are present
+ * only for a role decision. `referral_id` is present only when the caller
+ * provides it (null is a valid explicit value).
  *
  * @param {Object} vault
- * @param {{ cluster_id:string, subject_did:string, referral_id?:string|null }} opts
+ * @param {{ cluster_id:string, subject_did:string, status:string,
+ *           previous_status:string, referral_id?:string|null,
+ *           is_issuer?:boolean, previous_is_issuer?:boolean }} opts
  * @returns {Promise<Object>} signed credential payload
  */
-async function buildClusterApprovalCredential(vault, opts) {
+async function buildClusterDecisionCredential(vault, opts) {
+  const roleProvided = opts.is_issuer === true || opts.is_issuer === false
+
   const payload = {
+    id:          crypto.randomUUID(),
     type:        'MembershipCredential',
     scope:       'cluster',
     cluster_id:  opts.cluster_id,
     issuer_did:  vault.identity.id,
     subject_did: opts.subject_did,
-    referral_id: opts.referral_id ?? null,
-    status:      'approved',
-    issued_at:   new Date().toISOString(),
-    expires_at:  null,
+    status:      opts.status,
   }
+  if (roleProvided)                     payload.is_issuer = opts.is_issuer
+  if (opts.referral_id !== undefined)   payload.referral_id = opts.referral_id ?? null
+  payload.previous_status = opts.previous_status
+  if (roleProvided)                     payload.previous_is_issuer = !!opts.previous_is_issuer
+  payload.issued_at  = new Date().toISOString()
+  payload.expires_at = null
 
   const privateKey = await crypto.subtle.importKey(
     'jwk', vault.keys.privateKey, { name: 'Ed25519' }, false, ['sign']
@@ -504,6 +514,25 @@ async function buildClusterApprovalCredential(vault, opts) {
 
   payload.signature = toB64(sigBuf)
   return payload
+}
+
+/**
+ * Legacy approval wrapper — same crypto, always an `approved` decision.
+ * Kept for the historical #approve= path.
+ *
+ * @param {Object} vault
+ * @param {{ cluster_id:string, subject_did:string, referral_id?:string|null,
+ *           previous_status?:string }} opts
+ * @returns {Promise<Object>} signed credential payload
+ */
+async function buildClusterApprovalCredential(vault, opts) {
+  return buildClusterDecisionCredential(vault, {
+    cluster_id:      opts.cluster_id,
+    subject_did:     opts.subject_did,
+    status:          'approved',
+    previous_status: opts.previous_status ?? 'invited',
+    referral_id:     opts.referral_id,
+  })
 }
 
 
