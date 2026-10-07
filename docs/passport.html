@@ -5320,6 +5320,12 @@ function populateHome() {
 // Shows all cluster memberships stored in vault.memberships
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Shared Billboard portal URL for a canonical Cluster UUID (UI preference only). */
+function billboardUrl(clusterId) {
+  return 'https://sovereign-passport.github.io/portail/portail.html#service=billboard&cluster=' +
+    encodeURIComponent(String(clusterId))
+}
+
 /**
  * Open the clusters screen.
  * Reads vault.credentials (type MembershipCredential) as primary source.
@@ -5415,6 +5421,8 @@ function openNodes() {
               onclick="confirmLeaveCluster('${c.id}')">
               Delete
             </button>
+            <a class="btn btn-ghost" style="font-size:11px;text-decoration:none;flex:1;"
+               href="${billboardUrl(c.id)}" target="_blank" rel="noopener">Billboard</a>
           </div>
         `
         // Personal markers — private, non-actionable (Cluster scope only).
@@ -5507,6 +5515,16 @@ function openNodes() {
 
           if (actions.children.length) card.appendChild(actions)
         }
+
+        // Billboard link — opens the shared portal on this Cluster (real cluster_id).
+        const bbLink = document.createElement('a')
+        bbLink.className = 'btn btn-ghost'
+        bbLink.style.cssText = 'font-size:11px;text-decoration:none;margin-top:8px;display:inline-block;'
+        bbLink.href = billboardUrl(m.cluster_id)
+        bbLink.target = '_blank'
+        bbLink.rel = 'noopener'
+        bbLink.textContent = 'Billboard'
+        card.appendChild(bbLink)
 
         // Personal markers — private, non-actionable (Cluster scope only).
         const markerSlot = card.querySelector('[data-marker-slot]')
