@@ -53,6 +53,8 @@ GRAPE CLUSTER (personal gathering)
   No server required — lives in the founder's passport
 
 VINE (community — spid-js)
+  Autonomous, self-hosted community node (any Node.js 18+ machine or Pi)
+  MduSL is the FIRST Vine — bootstrap infrastructure, never the center
   Issues MembershipCredential to grapes (signed SD-JWT)
   3-admin quorum governance
   did:web identity — resolvable at /.well-known/did.json
@@ -61,18 +63,44 @@ VINE (community — spid-js)
   $100 CAD one-time network membership
   Runs on any Node.js 18+ machine or VPS
 
-VIGNARD (regional witness layer)
-  Ghost DID — generated on first call, stored permanently
-  Witnesses grape clusters and vines in a region
-  3-admin quorum — same governance as vine
-  Geo-anchored by ISO 3166-2 (CA-QC, CA-ON, US-NC...)
-  Currently: mdusl VPS hosts Quebec Vignard (ghost status)
+VIGNARD (regional layer linking Vines) — FUTURE
+  The "Quebec Vignard" exists today only as a GHOST placeholder:
+    visible in the bootstrap, but NOT active and NOT operational.
+  Do not claim or invent an active Vignard DID.
+  Future activation does not change the hierarchy.
 
-VINEYARD (federation — not yet built)
+VINEYARD (federation of Vignards — not yet built)
   Vines recognizing each other
   Peer backup mesh — Shamir secret sharing
   Not purchased — earned through trust
 ```
+
+---
+
+## Architecture status & sovereignty (after Axis Mundi)
+
+- **Canonical hierarchy:** Grape → Cluster → Vine → Vignard → Vineyard.
+- **A Cluster exists without a server.** It lives first in Passports. Linking it to a Vine is **optional** and only enables that Vine's services.
+- **Switchboard is stateless** and is deployed **locally with each Vine**: signed DID presentation + fresh nonce on every request. It is **not** a global authority and **not** a central database.
+- **Orbit is an optional MduSL service**, never a SPID authority.
+- **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
+- **Existing:** Billboard `[existant · alpha MduSL]`. **Future:** Calendar, Messages.
+- **Issuer signs and forgets:** the holder keeps the proof; the verifier checks the math. A temporary delivery or a minimal log must never become a central identity database.
+
+---
+
+## Fragmentation fédérée future — réseau SPID
+
+- Fragmentation becomes possible as soon as **two distinct sovereign SPID servers** establish an **authorized network relation**.
+- The servers may **negotiate which fragments** each one keeps.
+- **Two Vines** can fragment **directly**, with no Vignard required.
+- A **Vine and a Vignard**, or **several Vignards**, may use the **same principle**.
+- **No party** may **durably** hold the whole dataset.
+- Each server keeps only the **consented fragments**.
+- The **Switchboard** verifies the **proofs**, retrieves the **needed fragments**, **composes the authorized response temporarily**, transmits it, then **forgets** that composition.
+- The **Vignard** coordinates this mechanism at the **regional scale**.
+- The **Vineyard** is the **broader federation of Vignards**.
+- This mechanism remains **future / not implemented**.
 
 ---
 

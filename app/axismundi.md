@@ -71,6 +71,31 @@ Every added feature must justify itself against this.
 
 ---
 
+## Architecture reaffirmed (Axis Mundi)
+
+- **Canonical hierarchy:** Grape → Cluster → Vine → Vignard → Vineyard.
+- **MduSL is the first Vine** and bootstrap infrastructure — **never the center** of the network.
+- **Switchboard is stateless** and deployed **locally with each Vine** (signed DID presentation + fresh nonce on every request). It is neither a global authority nor a central database.
+- **A Cluster exists without a server**; attaching it to a Vine is optional and enables that Vine's services.
+- **Orbit is an optional MduSL service** — never a SPID authority.
+- **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
+- **The “Quebec Vignard” exists today only as a ghost placeholder** — visible in the bootstrap, not active, no active Vignard DID; future activation does not change the hierarchy.
+
+## Fragmentation fédérée future — réseau SPID
+
+- Fragmentation becomes possible as soon as **two distinct sovereign SPID servers** establish an **authorized network relation**.
+- The servers may **negotiate which fragments** each one keeps.
+- **Two Vines** can fragment **directly**, with no Vignard required.
+- A **Vine and a Vignard**, or **several Vignards**, may use the **same principle**.
+- **No party** may **durably** hold the whole dataset.
+- Each server keeps only the **consented fragments**.
+- The **Switchboard** verifies the **proofs**, retrieves the **needed fragments**, **composes the authorized response temporarily**, transmits it, then **forgets** that composition.
+- The **Vignard** coordinates this mechanism at the **regional scale**.
+- The **Vineyard** is the **broader federation of Vignards**.
+- This mechanism remains **future / not implemented**.
+
+---
+
 ## Temporary infrastructure — needs migration
 
 The following live on `mdusl.sovereign-passport.id` as a practical
