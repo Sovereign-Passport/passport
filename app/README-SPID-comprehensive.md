@@ -104,6 +104,18 @@ VINEYARD (federation of Vignards — not yet built)
 
 ---
 
+## Cluster lifecycle & relations (practical)
+
+- A **Cluster** is created inside a **Passport**; it has one canonical **`cluster_id`** and **belongs to the Passport DID that created it**.
+- The founder is the **founding authority**: it may grant or revoke **administration** to other DIDs using **signed proofs**. A delegated **administrator** acts on the Cluster but does **not** own it.
+- **Membership** (member DIDs) is distinct from **ownership** and **administration**.
+- A Cluster can live **only in Passports (no server)**. Later it may **use a Vine's services** (service hosting), be **recognised** through network relations, and take part in a **regional Vignard** — without ever creating a new Cluster or changing its `cluster_id`.
+- **Hosting is not ownership:** a Vine that hosts a Cluster's services does **not** own the Cluster; a Vignard is an **affiliation**, never an owner.
+- The **Passport's local Cluster** and the **Cluster a Vine sees** are the **same canonical object**, viewed from two layers — not two copies.
+- A Cluster **never automatically becomes a Vine** as it grows.
+
+---
+
 ## Architectural choices — deliberate, not default
 
 | Choice | Why | What was considered and rejected |

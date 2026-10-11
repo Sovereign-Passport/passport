@@ -107,6 +107,8 @@ These are not preferences. They are load-bearing walls.
 - **Orbit is an optional MduSL service** — never a SPID authority.
 - **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
 - **The “Quebec Vignard” exists today only as a ghost placeholder** — visible in the bootstrap, not active, no active Vignard DID; future activation does not change the hierarchy.
+- **A Cluster belongs to the Passport DID that created it**; that DID remains the **founding authority** and may grant or revoke **administration** to other DIDs through **signed proofs**. A delegated administrator acts but never becomes owner.
+- **Ownership never depends on a Vine, a Vignard, or the server hosting the Cluster's services.** Using a Vine's services or entering regional **affiliations** never changes a Cluster's identity or `cluster_id`, and never turns a Cluster into a Vine.
 
 ## Fragmentation fédérée future — réseau SPID
 
