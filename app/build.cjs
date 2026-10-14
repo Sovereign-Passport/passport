@@ -89,7 +89,7 @@ if (watchMode) {
   build()
   const watched = [
     'passport.html', 'passport.css',
-    'passport.crypto.js', 'passport.state.js', 'passport.qr.js',
+    'passport.crypto.js', 'passport.state.js',
     'passport.ui.js', 'passport.sync.js', 'passport.files.js',
     'passport.clusters.js', 'passport.invites.js', 'passport.offers.js',
   ]

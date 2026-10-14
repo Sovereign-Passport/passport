@@ -36,7 +36,7 @@ function showDID() {
 // downloadBackup() — exports encrypted .passport blob to disk.
 // syncToDevice() — uploads encrypted blob to 15-min VPS relay, shows QR.
 //   QR points to passport.html#sync=TOKEN (not raw API endpoint).
-//   QR generated locally via passport.qr.js — no external calls.
+//   QR is provided by the server as SVG (no external call).
 //   FUTURE: move to sync.sovereign-passport.id when DNS is ready.
 // switchRestoreTab() — toggles between file restore and sync link restore.
 // restoreFromSyncLink() — fetches blob from relay, decrypts, restores.

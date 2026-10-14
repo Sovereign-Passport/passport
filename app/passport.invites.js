@@ -11,7 +11,7 @@
  *   copyInviteLink()    — copy invite URL to clipboard
  *   shareInviteLink()   — native share or copy fallback
  *
- * Dependencies: passport.crypto.js, passport.state.js, passport.qr.js
+ * Dependencies: passport.crypto.js, passport.state.js
  * SYNC_ENDPOINT: used for invite URL base (defined in passport.state.js)
  */
 
