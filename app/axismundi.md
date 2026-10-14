@@ -82,6 +82,12 @@ Every added feature must justify itself against this.
 - **The “Quebec Vignard” exists today only as a ghost placeholder** — visible in the bootstrap, not active, no active Vignard DID; future activation does not change the hierarchy.
 - **A Cluster belongs to the Passport DID that created it**; that DID remains the **founding authority** and may grant or revoke **administration** to other DIDs through **signed proofs**. A delegated administrator acts but never becomes owner.
 - **Ownership never depends on a Vine, a Vignard, or the server hosting the Cluster's services.** Using a Vine's services or entering regional **affiliations** never changes a Cluster's identity or `cluster_id`, and never turns a Cluster into a Vine.
+- **The SPID network is the chain of relations and signed proofs between DIDs** — not a registry, not a database. Authority is the **signature**, not the server.
+- **The Passport `did:key` is sovereign and self-referential:** it holds the **only valid metadata** of its own identity and of its Clusters. No other DID, Vine, Vignard or server holds an authoritative copy of it.
+- **Every other DID — including a device DID — carries its reference by signed credential.** Links (parent, level, role, membership) are **proven**, never declared.
+- **Referrals are relational proofs and a soft audit** — never a central registry, never an automatic authorization.
+- **A Vine signs only the statuses it grants inside its own Vine.** The Passport holds those proofs; the **Switchboard verifies them at every protected operation** and keeps only the **authorized fragments**.
+- **MduSL is a prototype / bootstrap, not a root of trust of the network.** No dependency on MduSL is universal.
 
 ## Fragmentation fédérée future — réseau SPID
 
@@ -123,10 +129,11 @@ Keep it architecturally optional. Never let it become governance authority.
 Someone will eventually want ranking, spam resistance, influence scores.
 That is where systems mutate. "No global score" is constitutional.
 
-**Risk 3 — Single founder trust root.**
-Necessary now. Dangerous long-term.
-Shamir transition plan is wise. Timing and social legitimacy matter
-more than the technical split. Don't rush it.
+**Risk 3 — A bootstrap founder mistaken for a trust root.**
+The mdusl founder key is a **bootstrap**, useful now, dangerous if read as
+the network's root of trust. The SPID network is the **chain of signed
+proofs between DIDs**, not this founder. Shamir transition is wise; timing
+and social legitimacy matter more than the technical split. Don't rush it.
 
 **Risk 4 — ES compatibility discipline.**
 Every JS file must pass `es-check es2017` before commit.
@@ -161,7 +168,6 @@ app/                          ← EDIT THESE
   passport.css                All visual styles
   passport.crypto.js          §1 crypto & identity (pure functions)
   passport.state.js           §2+§3 state, navigation, SYNC_ENDPOINT
-  passport.qr.js              Sovereign QR generator
   passport.ui.js              Shared UI: showToast, escHtmlP, isIOS
   passport.sync.js            §8 backup, sync, restore, reset
   passport.files.js           §7 vault file manager
@@ -214,7 +220,7 @@ GitHub Pages serves this. No CSP issues. Works offline. USB-transferable.
 
 Before committing any JS change:
 ```bash
-es-check es2017 passport.crypto.js passport.state.js passport.qr.js \
+es-check es2017 passport.crypto.js passport.state.js \
   passport.ui.js passport.sync.js passport.files.js \
   passport.clusters.js passport.invites.js passport.offers.js
 ```

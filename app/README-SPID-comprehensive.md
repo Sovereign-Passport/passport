@@ -86,6 +86,11 @@ VINEYARD (federation of Vignards — not yet built)
 - **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
 - **Existing:** Billboard `[existant · alpha MduSL]`. **Future:** Calendar, Messages.
 - **Issuer signs and forgets:** the holder keeps the proof; the verifier checks the math. A temporary delivery or a minimal log must never become a central identity database.
+- **The SPID network is the chain of relations and signed proofs between DIDs** — not a registry, not a database; the **signature is the authority**, not the server.
+- **The Passport `did:key` is sovereign and self-referential:** it holds the **only valid metadata** of its own identity and its Clusters. Every other DID — **including a device DID** — carries its reference by **signed credential** (parent, level, role, membership), proven, never declared.
+- **A Vine signs only the statuses it grants inside its own Vine.** The **Passport holds those proofs**; the **Switchboard verifies them at each protected operation** and keeps only the **authorized fragments**.
+- **Referrals are relational proofs and a soft audit** — never a central registry, never an automatic authorization.
+- **MduSL is a prototype / bootstrap, not a root of trust.** No dependency on MduSL is universal.
 
 ---
 
@@ -142,7 +147,6 @@ app/                          SOURCE (edit these)
   passport.css                All styles                          ( 669 lines)
   passport.crypto.js          §1 crypto & identity               ( 375 lines)
   passport.state.js           §2+§3 state & navigation           ( 118 lines)
-  passport.qr.js              Sovereign QR generator             ( 335 lines)
   passport.ui.js              Shared UI utilities                (  39 lines)
   passport.sync.js            §8 backup, sync, restore           ( 348 lines)
   passport.files.js           §7 vault file manager              ( 260 lines)
