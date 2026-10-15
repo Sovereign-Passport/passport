@@ -391,19 +391,69 @@ async function _executeClusterDelete(clusterId) {
   const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
-  const memberCount = (cluster.members && cluster.members.length) || 0
+  const endpoint = (typeof normalizeVineEndpoint === 'function')
+    ? normalizeVineEndpoint(cluster.vine_endpoint) : null
 
+  // ── Attached to a Vine → NOT automatic: the owner initiates (1st), then the
+  // owner confirms (2nd) OR an admin of the Cluster approves from the Vine side.
+  if (endpoint) {
+    if (cluster.status !== 'deletion-pending') {
+      try {
+        await sendClusterRevoke(endpoint, cluster.id)
+        cluster.status                = 'deletion-pending'
+        cluster.deletion_requested_at = new Date().toISOString()
+        const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+        await persist(p); appState.stored = p
+        populateHome(); goTo('screen-nodes')
+        showToast('Deletion requested — an admin must confirm (here or in the Vine).')
+      } catch (e) {
+        showToast('Could not request deletion: ' + (e && e.message))
+      }
+      return
+    }
+    try {
+      await sendClusterRevoke(endpoint, cluster.id)   // owner confirms
+      await dissolveCluster(cluster.id)
+    } catch (e) {
+      showToast('Could not confirm deletion: ' + (e && e.message))
+    }
+    return
+  }
+
+  // ── No Vine → local deletion (the Vine never knew this Cluster).
+  const memberCount = (cluster.members && cluster.members.length) || 0
   if (memberCount === 0) {
     await dissolveCluster(clusterId)
     return
   }
-
-  // Find highest-weight member for succession
   const successor = cluster.members.reduce((best, m) =>
     (m.weight || 0) > (best.weight || 0) ? m : best
   , cluster.members[0])
-
   await leaveCluster(clusterId, successor.did)
+}
+
+/**
+ * Request/confirm a Cluster deletion on the Vine's Switchboard (owner-signed).
+ * The Vine applies it on the owner's confirmation, or on an admin's approval.
+ */
+async function sendClusterRevoke(endpoint, clusterId) {
+  const did       = appState.vault.identity.id
+  const timestamp = Date.now()
+  const priv = await crypto.subtle.importKey('jwk', appState.vault.keys.privateKey,
+    { name: 'Ed25519' }, false, ['sign'])
+  const sigBuf = await crypto.subtle.sign('Ed25519', priv,
+    new TextEncoder().encode(JSON.stringify({ action: 'cluster_revoke', did, cluster_id: clusterId, timestamp })))
+  const res = await fetch(endpoint + '/api/clusters/revoke', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ did, cluster_id: clusterId, timestamp, signature: toB64(sigBuf) }),
+  })
+  if (!res.ok) {
+    let code = null
+    try { code = (await res.json()).error } catch (e) { code = null }
+    throw new Error(code || ('HTTP ' + res.status))
+  }
+  return res.json()
 }
 
 /**
