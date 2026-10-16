@@ -5549,6 +5549,15 @@ function openNodes() {
   // Joined Clusters ONLY — canonical cluster_id, never a Vine, never a founder.
   const allCreds = ((vault && vault.credentials) || [])
   const ownIds   = new Set(ownClusters.map(c => c.id))
+  // A Cluster we hold an ownership proof for is FOUNDED, never "joined".
+  const ownerIds = new Set()
+  allCreds.forEach(c => {
+    if (c.type === 'ClusterOwnerCredential' && c.cluster_id) ownerIds.add(c.cluster_id)
+    if (c.type === 'FounderCredential') {
+      const cid = c.cluster_id || (c.claims && c.claims.cluster_id)
+      if (cid) ownerIds.add(cid)
+    }
+  })
   const clusterCandidates = [
     ...((vault && vault.memberships) || []).filter(m => m.cluster_id),
     ...allCreds.filter(c =>
@@ -5558,7 +5567,7 @@ function openNodes() {
   const seenJoined = {}
   const memberships = clusterCandidates.filter(m => {
     const cid = m.cluster_id
-    if (!cid || ownIds.has(cid) || seenJoined[cid]) return false
+    if (!cid || ownIds.has(cid) || ownerIds.has(cid) || seenJoined[cid]) return false
     seenJoined[cid] = true
     return true
   })
