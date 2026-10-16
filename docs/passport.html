@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#080b12">
+  <meta name="theme-color" content="#0a0a0b">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -26,17 +26,17 @@
 
     /* ── TOKENS ─────────────────────────────────────────────────── */
     :root {
-      --ink:       #e8e2d9;
-      --ink-dim:   #7a7468;
-      --ink-faint: #2e2d2a;
-      --bg:        #080b12;
-      --bg-card:   #0d1018;
-      --bg-lift:   #131720;
-      --gold:      #c9a84c;
+      --ink:       #ece7dc;
+      --ink-dim:   #8a8578;
+      --ink-faint: rgba(201,169,97,0.30);   /* gold-tinted borders (Portail look) */
+      --bg:        #0a0a0b;                 /* near-black, neutral */
+      --bg-card:   #111113;
+      --bg-lift:   #17171a;
+      --gold:      #c9a961;                 /* matches the Portail */
       --gold-dim:  #6b5420;
-      --gold-glow: rgba(201,168,76,0.15);
-      --red:       #c0392b;
-      --green:     #27ae60;
+      --gold-glow: rgba(201,169,97,0.15);
+      --red:       #c94961;
+      --green:     #6fbf73;
       --radius:    12px;
       --ease:      cubic-bezier(0.22, 1, 0.36, 1);
     }
@@ -789,7 +789,7 @@
       <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
-        <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 28L25 33L36 22" stroke="#c9a961" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
@@ -1278,8 +1278,8 @@
       <svg viewBox="0 0 56 56" fill="none">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
-        <circle cx="28" cy="27" r="6" stroke="#c9a84c" stroke-width="1.5"/>
-        <path d="M28 33V38" stroke="#c9a84c" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="28" cy="27" r="6" stroke="#c9a961" stroke-width="1.5"/>
+        <path d="M28 33V38" stroke="#c9a961" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
     </div>
 
@@ -1468,7 +1468,7 @@
       <svg viewBox="0 0 56 56" fill="none">
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
-        <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 28L25 33L36 22" stroke="#c9a961" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
     <p class="logotype fade-up fade-up-1">Credential Offer</p>
@@ -1960,8 +1960,8 @@
         <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
           fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
         <path d="M20 20L28 14L36 20V30C36 34 32 37 28 38C24 37 20 34 20 30V20Z"
-          stroke="#c9a84c" stroke-width="1.5" fill="none"/>
-        <circle cx="28" cy="27" r="3" fill="#c9a84c"/>
+          stroke="#c9a961" stroke-width="1.5" fill="none"/>
+        <circle cx="28" cy="27" r="3" fill="#c9a961"/>
       </svg>
     </div>
 
@@ -2082,7 +2082,7 @@
   <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
       fill="rgba(201,168,76,0.1)" stroke="rgba(201,168,76,0.5)" stroke-width="1.5"/>
-    <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2"
+    <path d="M20 28L25 33L36 22" stroke="#c9a961" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
 </button>
@@ -2095,7 +2095,7 @@
     <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
         fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
-      <path d="M20 28L25 33L36 22" stroke="#c9a84c" stroke-width="2"
+      <path d="M20 28L25 33L36 22" stroke="#c9a961" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   </div>
@@ -5276,7 +5276,7 @@ function checkPasswordStrength() {
     {w:'40%', c:'#e67e22',     t:'Weak'},
     {w:'60%', c:'#f1c40f',     t:'Fair'},
     {w:'80%', c:'#27ae60',     t:'Strong'},
-    {w:'100%',c:'#c9a84c',     t:'Very strong'},
+    {w:'100%',c:'#c9a961',     t:'Very strong'},
   ]
 
   const l = levels[Math.min(score, 5)]
