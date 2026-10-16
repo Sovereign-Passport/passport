@@ -391,44 +391,65 @@ async function _executeClusterDelete(clusterId) {
   const cluster = (vault.ownClusters || []).find(c => c.id === clusterId)
   if (!cluster) return
 
+  // Target = the Cluster's own Vine, else the Switchboard this Passport syncs
+  // with. The sync origin is used ONLY as the delete target — it is never
+  // written into vine_endpoint. If the Switchboard does not know the Cluster
+  // (404), the deletion falls back to local.
   const endpoint = (typeof normalizeVineEndpoint === 'function')
-    ? normalizeVineEndpoint(cluster.vine_endpoint) : null
+    ? (normalizeVineEndpoint(cluster.vine_endpoint) || syncOrigin())
+    : null
 
-  // ── Attached to a Vine → NOT automatic: the owner initiates (1st), then the
-  // owner confirms (2nd) OR an admin of the Cluster approves from the Vine side.
   if (endpoint) {
-    if (cluster.status !== 'deletion-pending') {
+    // Already pending → this click is the CONFIRMATION (the owner confirms).
+    if (cluster.status === 'deletion-pending') {
       try {
         await sendClusterRevoke(endpoint, cluster.id)
-        cluster.status                = 'deletion-pending'
-        cluster.deletion_requested_at = new Date().toISOString()
-        const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-        await persist(p); appState.stored = p
-        populateHome(); goTo('screen-nodes')
-        showToast('Deletion requested — an admin must confirm (here or in the Vine).')
+        await dissolveCluster(cluster.id)
       } catch (e) {
-        showToast('Could not request deletion: ' + (e && e.message))
+        if (e && e.message === 'CLUSTER_NOT_FOUND') return _localClusterDelete(clusterId)
+        showToast('Could not confirm deletion: ' + (e && e.message))
       }
       return
     }
+    // First click → INITIATE. The Vine decides: applied at once (Cluster not
+    // attached to it) or held pending until the owner confirms / an admin approves.
     try {
-      await sendClusterRevoke(endpoint, cluster.id)   // owner confirms
-      await dissolveCluster(cluster.id)
+      const data = await sendClusterRevoke(endpoint, cluster.id)
+      if (data && data.status === 'revoked') {
+        await dissolveCluster(cluster.id)          // already applied by the Vine
+        showToast('Cluster deleted ✓')
+        return
+      }
+      cluster.status                = 'deletion-pending'
+      cluster.deletion_requested_at = new Date().toISOString()
+      const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      await persist(p); appState.stored = p
+      populateHome(); goTo('screen-nodes')
+      showToast('Deletion requested — an admin must confirm (here or in the Vine).')
     } catch (e) {
-      showToast('Could not confirm deletion: ' + (e && e.message))
+      if (e && e.message === 'CLUSTER_NOT_FOUND') return _localClusterDelete(clusterId)
+      showToast('Could not request deletion: ' + (e && e.message))
     }
     return
   }
 
-  // ── No Vine → local deletion (the Vine never knew this Cluster).
+  // ── No Vine at all → local deletion.
+  await _localClusterDelete(clusterId)
+}
+
+/** The Switchboard origin this Passport syncs with (delete fallback target). */
+function syncOrigin() {
+  try { return new URL(SYNC_ENDPOINT).origin } catch (e) { return null }
+}
+
+/** Purely local removal — soft succession if the Cluster still has members. */
+async function _localClusterDelete(clusterId) {
+  const cluster = (appState.vault.ownClusters || []).find(c => c.id === clusterId)
+  if (!cluster) return
   const memberCount = (cluster.members && cluster.members.length) || 0
-  if (memberCount === 0) {
-    await dissolveCluster(clusterId)
-    return
-  }
+  if (memberCount === 0) { await dissolveCluster(clusterId); return }
   const successor = cluster.members.reduce((best, m) =>
-    (m.weight || 0) > (best.weight || 0) ? m : best
-  , cluster.members[0])
+    (m.weight || 0) > (best.weight || 0) ? m : best, cluster.members[0])
   await leaveCluster(clusterId, successor.did)
 }
 
