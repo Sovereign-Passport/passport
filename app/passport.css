@@ -15,8 +15,8 @@
       --ink-dim:   #8a8578;
       --ink-faint: rgba(201,169,97,0.30);   /* gold-tinted borders (Portail look) */
       --bg:        #0a0a0b;                 /* near-black, neutral */
-      --bg-card:   #111113;
-      --bg-lift:   #17171a;
+      --bg-card:   rgba(17,17,19,0.80);     /* ~20% transparent — photo shows through */
+      --bg-lift:   rgba(23,23,26,0.80);
       --gold:      #c9a961;                 /* matches the Portail */
       --gold-bright: #e8c877;               /* Portail hover/active gold */
       --gold-dim:  #6b5420;
@@ -313,7 +313,7 @@
       opacity: 0.4; cursor: not-allowed; transform: none;
     }
     .btn-ghost {
-      background: transparent;
+      background: rgba(17,17,19,0.70);
       color: var(--ink-dim);
       border: 1px solid var(--ink-faint);
     }
