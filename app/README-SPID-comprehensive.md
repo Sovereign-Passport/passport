@@ -1,4 +1,4 @@
-# Sovereign Passport — SPID
+# Sovereign Passport — SP.id
 
 > *"The math is the authority. Not the institution."*
 
@@ -16,7 +16,7 @@
 Every platform you use today knows who you are. They decide what you can access,
 what you can say, who you can reach. Your identity is their asset.
 
-SPID is built on a different premise.
+Sovereign Passport is built on a different premise.
 
 Your identity is a cryptographic keypair generated on your device. It never leaves.
 No company issued it. No server stores it. No password reset email can compromise it.
@@ -25,7 +25,7 @@ Communities — eco-villages, municipalities, cooperatives, families, chess club
 issue verifiable credentials to their members. You hold them. You present only
 what you choose, to whom you choose, when you choose.
 
-SPID is not a social network. It is not a platform. It is infrastructure —
+Sovereign Passport is not a social network. It is not a platform. It is infrastructure —
 like roads, like postal systems — that makes it possible for people who know each
 other to recognize each other cryptographically across distance.
 
@@ -82,11 +82,11 @@ VINEYARD (federation of Vignards — not yet built)
 - **Canonical hierarchy:** Grape → Cluster → Vine → Vignard → Vineyard.
 - **A Cluster exists without a server.** It lives first in Passports. Linking it to a Vine is **optional** and only enables that Vine's services.
 - **Switchboard is stateless** and is deployed **locally with each Vine**: signed DID presentation + fresh nonce on every request. It is **not** a global authority and **not** a central database.
-- **Orbit is an optional MduSL service**, never a SPID authority.
+- **Orbit is an optional MduSL service**, never a Sovereign Passport authority.
 - **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
 - **Existing:** Billboard `[existant · alpha MduSL]`. **Future:** Calendar, Messages.
 - **Issuer signs and forgets:** the holder keeps the proof; the verifier checks the math. A temporary delivery or a minimal log must never become a central identity database.
-- **The SPID network is the chain of relations and signed proofs between DIDs** — not a registry, not a database; the **signature is the authority**, not the server.
+- **The Sovereign Passport network is the chain of relations and signed proofs between DIDs** — not a registry, not a database; the **signature is the authority**, not the server.
 - **The Passport `did:key` is sovereign and self-referential:** it holds the **only valid metadata** of its own identity and its Clusters. Every other DID — **including a device DID** — carries its reference by **signed credential** (parent, level, role, membership), proven, never declared.
 - **A Vine signs only the statuses it grants inside its own Vine.** The **Passport holds those proofs**; the **Switchboard verifies them at each protected operation** and keeps only the **authorized fragments**.
 - **Referrals are relational proofs and a soft audit** — never a central registry, never an automatic authorization.
@@ -94,9 +94,9 @@ VINEYARD (federation of Vignards — not yet built)
 
 ---
 
-## Fragmentation fédérée future — réseau SPID
+## Fragmentation fédérée future — réseau Sovereign Passport
 
-- Fragmentation becomes possible as soon as **two distinct sovereign SPID servers** establish an **authorized network relation**.
+- Fragmentation becomes possible as soon as **two distinct sovereign Sovereign Passport servers** establish an **authorized network relation**.
 - The servers may **negotiate which fragments** each one keeps.
 - **Two Vines** can fragment **directly**, with no Vignard required.
 - A **Vine and a Vignard**, or **several Vignards**, may use the **same principle**.

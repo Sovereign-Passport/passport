@@ -265,7 +265,7 @@ async function shareInviteLink() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SIGNED FLOW HAND-OFFS — #newcluster= / #invite= from the SPID dashboard.
+// SIGNED FLOW HAND-OFFS — #newcluster= / #invite= from the Sovereign Passport dashboard.
 // Fragments are public demands, never an authority. No cluster-id conversion.
 // ─────────────────────────────────────────────────────────────────────────────
 

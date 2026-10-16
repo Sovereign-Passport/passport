@@ -610,7 +610,7 @@ async function buildClusterApprovalCredential(vault, opts) {
 // ═════════════════════════════════════════════════════════════════════════════
 // PERSONAL MARKERS — optional, private, non-actionable notes on Cluster cards.
 // Stored in the encrypted vault under vault.personal_markers.
-// Colours have NO official meaning and never affect permissions or SPID actions.
+// Colours have NO official meaning and never affect permissions or Sovereign Passport actions.
 // ═════════════════════════════════════════════════════════════════════════════
 
 const PERSONAL_MARKER_KEYS = [
@@ -701,7 +701,7 @@ function buildPersonalMarkers(scope, id, refresh) {
   help.setAttribute('aria-label', 'About personal markers')
   help.addEventListener('click', () => showToast(
     'Personal markers are optional private notes. Colours have no official ' +
-    'meaning and never affect permissions, status or SPID actions.'))
+    'meaning and never affect permissions, status or Sovereign Passport actions.'))
   wrap.appendChild(help)
 
   return wrap

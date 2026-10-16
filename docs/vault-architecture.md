@@ -1,4 +1,4 @@
-# SPID Vault Architecture
+# Sovereign Passport Vault Architecture
 **Version:** draft-1  
 **Branch:** feature/vault-architecture  
 **Status:** design document — no code changes
@@ -7,7 +7,7 @@
 
 ## Purpose
 
-This document defines the vault architecture for SPID at all three sovereignty layers: grape (individual), vine (community), and vignard (network). It serves as the contract that all vault feature branches must respect.
+This document defines the vault architecture for Sovereign Passport at all three sovereignty layers: grape (individual), vine (community), and vignard (network). It serves as the contract that all vault feature branches must respect.
 
 ---
 
@@ -44,7 +44,7 @@ CONTENTS
 ```
 
 **Access rules:**
-- System (SPID client): reads identity for signing operations only
+- System (Sovereign Passport client): reads identity for signing operations only
 - Grape: full read/write
 - Vine: never
 - Other grapes: never directly — only via share credentials
@@ -109,7 +109,7 @@ Every file in a grape vault has exactly one visibility state, chosen at creation
 
 ### Copyright
 - Signed by grape's DID + timestamp at creation
-- Viewed on SPID only — UI renders in protected viewer
+- Viewed on Sovereign Passport only — UI renders in protected viewer
   - No download button
   - Right-click disabled on viewer
   - Text rendered as canvas (not selectable DOM)
@@ -125,7 +125,7 @@ Every file in a grape vault has exactly one visibility state, chosen at creation
 Share "[filename]" with [cluster name]
 
   ○ Public    — anonymous, free, no tracking
-  ● Copyright — signed by your DID, SPID viewer only
+  ● Copyright — signed by your DID, Sovereign Passport viewer only
 
   [ Share ]
 ```
@@ -166,7 +166,7 @@ When a grape shares a copyright file with a cluster, a share credential is issue
 
 Any sharing system faces this: once data arrives on someone else's device, technical controls cannot prevent copying.
 
-SPID's response is not DRM. It is **signed memory**:
+Sovereign Passport's response is not DRM. It is **signed memory**:
 
 - Every file share is a signed event in the weight ledger
 - Every receipt is acknowledged by the recipient's client
@@ -174,7 +174,7 @@ SPID's response is not DRM. It is **signed memory**:
 - If a file leaks, the provenance chain identifies the point of origin
 - Social consequence enforced by community, not software
 
-> SPID doesn't prevent copying. SPID makes copying a signed, traceable, socially costly act. The community is the enforcement layer.
+> Sovereign Passport doesn't prevent copying. Sovereign Passport makes copying a signed, traceable, socially costly act. The community is the enforcement layer.
 
 ---
 
@@ -265,15 +265,15 @@ These will never be part of the vault:
 
 ## Interoperability
 
-The minimum SPID network interoperability requirement is:
+The minimum Sovereign Passport network interoperability requirement is:
 
 ```
 did:key               → W3C standard, any implementation can verify
 Ed25519 signature     → standard, any implementation can verify
-membership VC schema  → defined by SPID-js, other implementations may adopt
+membership VC schema  → defined by Sovereign Passport engine, other implementations may adopt
 ```
 
-Vault contents above this minimum are implementation-specific. A Pokemon SPID fork and a MduSL SPID vine can verify each other's grape credentials. Neither needs to understand the other's vault internals.
+Vault contents above this minimum are implementation-specific. A Pokemon Sovereign Passport fork and a MduSL Sovereign Passport vine can verify each other's grape credentials. Neither needs to understand the other's vault internals.
 
 ---
 

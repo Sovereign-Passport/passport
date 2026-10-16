@@ -16,7 +16,7 @@
  *
  * Dependencies: passport.crypto.js, passport.state.js
  * VPS: acceptOffer() POSTs to offer.issue_endpoint (vine issuer on VPS)
- * SPID rule: cross-origin restore must work — offer URLs are portable
+ * Sovereign Passport rule: cross-origin restore must work — offer URLs are portable
  */
 
 function openOfficialize() {
@@ -225,7 +225,7 @@ async function acceptOffer() {
         }
       } catch(e) {
         // Non-fatal — ref is optional for open issuance vines
-        console.warn('[SPID] Could not resolve ref token:', e.message)
+        console.warn('[SP.id] Could not resolve ref token:', e.message)
       }
     }
 

@@ -1,5 +1,5 @@
 {
-  "name": "SP.id - Sovereign Passport ID",
+  "name": "Sovereign Passport",
   "short_name": "SP.id",
   "description": "Your sovereign digital identity. No central server. Your keys, your data.",
   "start_url": "./passport.html",

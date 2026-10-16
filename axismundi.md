@@ -1,4 +1,4 @@
-# Axis Mundi — SPID Strategic Compass
+# Axis Mundi — Sovereign Passport Strategic Compass
 
 > The center that holds. Return here when the project feels complex.
 
@@ -6,7 +6,7 @@
 
 ---
 
-## What SPID actually is
+## What Sovereign Passport actually is
 
 Not a product. Not a platform. Not a web3 project.
 
@@ -18,13 +18,13 @@ The math is the authority. Not the institution.
 
 ---
 
-## What makes SPID unusual
+## What makes Sovereign Passport unusual
 
 Most identity systems choose one of two paths:
 - Corporate identity (convenient, centralized, revocable)
 - Anarchic pseudonymity (free, unaccountable, untrustworthy)
 
-SPID explores a third path:
+Sovereign Passport explores a third path:
 - Persistent identity
 - Voluntary trust
 - Community-scale federation
@@ -56,7 +56,7 @@ What was kept:
 This is not a tagline. It is a constitutional rule.
 
 The moment weight becomes ranking, optimization, platform influence,
-or social scoring — the spirit of SPID changes completely.
+or social scoring — the spirit of Sovereign Passport changes completely.
 
 **Make this explicit in the codebase. Document it. Protect it.**
 
@@ -81,11 +81,11 @@ These are not preferences. They are load-bearing walls.
 
 1. **No global score.** Weight is local and contextual. Always.
 
-2. **AI is optional.** SPID functions fully without it. AI is never
+2. **AI is optional.** Sovereign Passport functions fully without it. AI is never
    required trust infrastructure, governance authority, or ranking authority.
    Sovereignty quietly collapses otherwise.
 
-3. **The SPID rule.** A .passport backup restores successfully regardless
+3. **The Sovereign Passport rule.** A .passport backup restores successfully regardless
    of where it was created. Cross-origin restore is a hard requirement. Always.
 
 4. **Issuer forgets.** The vine signs and forgets. The grape holds.
@@ -104,21 +104,21 @@ These are not preferences. They are load-bearing walls.
 - **MduSL is the first Vine** and bootstrap infrastructure — **never the center** of the network.
 - **Switchboard is stateless** and deployed **locally with each Vine** (signed DID presentation + fresh nonce on every request). It is neither a global authority nor a central database.
 - **A Cluster exists without a server**; attaching it to a Vine is optional and enables that Vine's services.
-- **Orbit is an optional MduSL service** — never a SPID authority.
+- **Orbit is an optional MduSL service** — never a Sovereign Passport authority.
 - **MduSL services are an alpha implementation**; they do not define a universal dependency on MduSL.
 - **The “Quebec Vignard” exists today only as a ghost placeholder** — visible in the bootstrap, not active, no active Vignard DID; future activation does not change the hierarchy.
 - **A Cluster belongs to the Passport DID that created it**; that DID remains the **founding authority** and may grant or revoke **administration** to other DIDs through **signed proofs**. A delegated administrator acts but never becomes owner.
 - **Ownership never depends on a Vine, a Vignard, or the server hosting the Cluster's services.** Using a Vine's services or entering regional **affiliations** never changes a Cluster's identity or `cluster_id`, and never turns a Cluster into a Vine.
-- **The SPID network is the chain of relations and signed proofs between DIDs** — not a registry, not a database. Authority is the **signature**, not the server.
+- **The Sovereign Passport network is the chain of relations and signed proofs between DIDs** — not a registry, not a database. Authority is the **signature**, not the server.
 - **The Passport `did:key` is sovereign and self-referential:** it holds the **only valid metadata** of its own identity and of its Clusters. No other DID, Vine, Vignard or server holds an authoritative copy of it.
 - **Every other DID — including a device DID — carries its reference by signed credential.** Links (parent, level, role, membership) are **proven**, never declared.
 - **Referrals are relational proofs and a soft audit** — never a central registry, never an automatic authorization.
 - **A Vine signs only the statuses it grants inside its own Vine.** The Passport holds those proofs; the **Switchboard verifies them at every protected operation** and keeps only the **authorized fragments**.
 - **MduSL is a prototype / bootstrap, not a root of trust of the network.** No dependency on MduSL is universal.
 
-## Fragmentation fédérée future — réseau SPID
+## Fragmentation fédérée future — réseau Sovereign Passport
 
-- Fragmentation becomes possible as soon as **two distinct sovereign SPID servers** establish an **authorized network relation**.
+- Fragmentation becomes possible as soon as **two distinct sovereign Sovereign Passport servers** establish an **authorized network relation**.
 - The servers may **negotiate which fragments** each one keeps.
 - **Two Vines** can fragment **directly**, with no Vignard required.
 - A **Vine and a Vignard**, or **several Vignards**, may use the **same principle**.
@@ -193,7 +193,7 @@ That is where systems mutate. "No global score" is constitutional.
 
 **Risk 3 — A bootstrap founder mistaken for a trust root.**
 The mdusl founder key is a **bootstrap**, useful now, dangerous if read as
-the network's root of trust. The SPID network is the **chain of signed
+the network's root of trust. The Sovereign Passport network is the **chain of signed
 proofs between DIDs**, not this founder. Shamir transition is wise; timing
 and social legitimacy matter more than the technical split.
 
@@ -267,7 +267,7 @@ The network infrastructure grows out of it naturally.
 
 ---
 
-## What to say when someone asks what SPID is
+## What to say when someone asks what Sovereign Passport is
 
 *"It's infrastructure for human communities — like a postal system,
 but cryptographic. Your identity belongs to you, mathematically.
@@ -279,7 +279,7 @@ your membership. The math is the authority."*
 
 ## The macro picture in one paragraph
 
-SPID is a serious sovereign identity experiment grounded in practical
+Sovereign Passport is a serious sovereign identity experiment grounded in practical
 community infrastructure rather than speculative crypto ideology.
 The next challenge is no longer invention. It is disciplined simplification.
 Nail one vine. Let real people use it. Let reality shape the architecture.

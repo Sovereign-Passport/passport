@@ -22,7 +22,7 @@ The following brand assets are **not** covered by the MIT License
 and remain the intellectual property of JF Bertrand:
 
 - The name **"Sovereign Passport ID"**
-- The abbreviation **SPID** as used in the context of this project
+- The abbreviation **Sovereign Passport** as used in the context of this project
 - The **phoenix** logo and all associated visual identity
 - The **grape / vine / vineyard** trust model and terminology as a branded system
 - The tagline **"The math is the authority. Not the institution."**
@@ -47,7 +47,7 @@ to use, reproduce, or represent the brand assets above.
 
 ## What you cannot do
 
-- Launch a competing service using the name "Sovereign Passport ID" or "SPID"
+- Launch a competing service using the name "Sovereign Passport ID" or "Sovereign Passport"
 - Use the phoenix logo or vine visual language for a different product
 - Imply endorsement or affiliation with this project without written permission
 
@@ -57,7 +57,7 @@ to use, reproduce, or represent the brand assets above.
 
 Vines running `spid-js` may:
 - Identify themselves as **"a Sovereign Passport vine"**
-- Display the SPID mark to their members as proof of network membership
+- Display the Sovereign Passport mark to their members as proof of network membership
 - Link to sovereign-passport.com and sovereign-passport.id
 
 This usage is encouraged — it grows the network.

@@ -836,7 +836,7 @@ async function boot() {
   // Public signed cluster-deletion demand: passport.html#revoke=<base64url(payload)>
   const revokeRaw = params.get('revoke') || hashParams.get('revoke')
   if (revokeRaw) appState.pendingRevokeRaw = revokeRaw
-  // Signed-flow hand-offs from the SPID dashboard.
+  // Signed-flow hand-offs from the Sovereign Passport dashboard.
   const newClusterRaw = params.get('newcluster') || hashParams.get('newcluster')
   const inviteRaw     = params.get('invite')     || hashParams.get('invite')
   if (newClusterRaw) appState.pendingNewClusterRaw = newClusterRaw
@@ -920,7 +920,7 @@ function checkPendingOffer() {
       setTimeout(() => goTo('screen-offer'), 500)
     } catch(e) {
       // Not JSON — ignore silently (was a ref token or malformed data)
-      console.warn('[SPID] pendingOfferData was not valid JSON — ignored')
+      console.warn('[SP.id] pendingOfferData was not valid JSON — ignored')
     }
   }
 }

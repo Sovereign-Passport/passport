@@ -1,4 +1,4 @@
-# 🛂 Sovereign Passport — SPID
+# 🛂 Sovereign Passport — SP.id
 
 **Sovereign digital identity for communities.**  
 No central server. No company holds your data. Your keys live on your device.
@@ -12,7 +12,7 @@ No central server. No company holds your data. Your keys live on your device.
 
 ## What is Sovereign Passport?
 
-Sovereign Passport (SPID) is an open-source sovereign digital identity system built for communities — eco-villages, municipalities, cooperatives, and any group of people who believe identity should belong to people, not platforms.
+Sovereign Passport (SP.id) is an open-source sovereign digital identity system built for communities — eco-villages, municipalities, cooperatives, and any group of people who believe identity should belong to people, not platforms.
 
 A **Passport** is a cryptographic keypair generated on your device. It never leaves. No company issues it, no server stores it, no password reset email can compromise it.
 
