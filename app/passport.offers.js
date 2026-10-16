@@ -623,6 +623,94 @@ async function approveClusterMember() {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+// CLUSTER DELETION CONFIRMATION SCREEN — opened from a public #revoke= demand.
+// The demand is NOT an authority; the server re-verifies owner/admin rights
+// and the pending request before applying.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Remove the #revoke= fragment without reloading (avoids a reload loop). */
+function clearRevokeFragment() {
+  try {
+    const base = (window.location.pathname || '') + (window.location.search || '')
+    window.history.replaceState(null, '', base)
+  } catch (e) { /* non-fatal */ }
+}
+
+/**
+ * Detect a pending #revoke= demand and render the confirmation screen.
+ * Required keys: vine_endpoint, cluster_id. The fragment is always removed.
+ * @returns {boolean} true if a screen was shown
+ */
+function checkPendingRevoke() {
+  const raw = appState.pendingRevokeRaw
+  if (!raw) return false
+  appState.pendingRevokeRaw = null
+
+  let demand = null
+  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
+
+  const endpoint = demand && typeof demand === 'object'
+    ? normalizeVineEndpoint(demand.vine_endpoint)
+    : null
+
+  const valid = demand && typeof demand === 'object' && endpoint && demand.cluster_id
+  if (!valid) {
+    showToast('Invalid or incomplete deletion request.')
+    clearRevokeFragment()
+    return false
+  }
+
+  demand.vine_endpoint = endpoint
+  appState.pendingRevoke = demand
+
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+  set('revoke-cluster',  demand.cluster_name || demand.cluster_id)
+  set('revoke-id',       demand.cluster_id)
+  set('revoke-endpoint', demand.vine_endpoint)
+  const errEl = document.getElementById('revoke-error')
+  if (errEl) errEl.style.display = 'none'
+
+  clearRevokeFragment()
+  goTo('screen-revoke')
+  return true
+}
+
+/** Cancel — signs nothing, sends nothing. */
+function cancelPendingRevoke() {
+  appState.pendingRevoke = null
+  goTo('screen-home')
+}
+
+/** Explicit admin action: sign the Cluster deletion and POST it. */
+async function confirmClusterRevoke() {
+  const demand  = appState.pendingRevoke
+  const btn     = document.getElementById('btn-revoke-confirm')
+  const errEl   = document.getElementById('revoke-error')
+  const errText = document.getElementById('revoke-error-text')
+
+  if (!demand) { showToast('No pending deletion.'); return }
+  if (!appState.vault) { goTo('screen-unlock'); return }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Confirming…' }
+  if (errEl) errEl.style.display = 'none'
+
+  try {
+    const base = normalizeVineEndpoint(demand.vine_endpoint)
+    if (!base) throw new Error('INVALID_ENDPOINT')
+    const data = await sendClusterRevoke(base, demand.cluster_id)
+    appState.pendingRevoke = null
+    showToast(data && data.status === 'deletion_pending'
+      ? 'Deletion requested — another actor must confirm.'
+      : 'Cluster deleted ✓')
+    goTo('screen-home')
+  } catch (e) {
+    if (errEl) { errEl.style.display = 'flex'; if (errText) errText.textContent = e.message }
+    if (btn)   { btn.disabled = false; btn.textContent = 'Confirm and sign' }
+  }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 // CLUSTER DECISION CONFIRMATION SCREEN — opened from a public #decision= demand.
 // The demand is NOT an authority; the server re-verifies everything.
 // ═════════════════════════════════════════════════════════════════════════════
