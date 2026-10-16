@@ -125,7 +125,7 @@ VINEYARD (federation of Vignards — not yet built)
 
 | Choice | Why | What was considered and rejected |
 |---|---|---|
-| Modular source, single-file deploy | Maintainable source, sovereign artifact | React/Vue + bundler |
+| Modular source, separate-file deploy | Maintainable source, small index | React/Vue + bundler |
 | did:key for grapes | Self-contained, offline, no registry | did:ion, did:ethr, blockchain |
 | did:web for vines | Human-resolvable, no CA needed | did:peer, Hyperledger |
 | SQLite for vine | Portable, simple backup, Raspberry Pi | PostgreSQL, MySQL |

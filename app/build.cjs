@@ -32,7 +32,7 @@ function build() {
   let html = fs.readFileSync(SRC_FILE, 'utf8')
 
   let cssCopied   = 0
-  let jsInlined   = 0
+  let jsCopied    = 0
   let totalBytes  = 0
 
   // ── CSS stays a SEPARATE file (never inlined into the artifact) ─
@@ -54,7 +54,8 @@ function build() {
     }
   )
 
-  // ── Inline JS <script src="..."></script> ──────────────────────
+  // ── JS stays a SEPARATE file (never inlined into the artifact) ─
+  // Copy every local script next to the artifact and KEEP its <script src>.
   html = html.replace(
     /<script\s+src="([^"]+)"><\/script>/g,
     (match, src) => {
@@ -65,9 +66,10 @@ function build() {
         return match
       }
       const js = fs.readFileSync(jsPath, 'utf8')
+      fs.writeFileSync(path.join(DIST_DIR, path.basename(src)), js, 'utf8')
       totalBytes += js.length
-      jsInlined++
-      return `<script>\n/* ${src} */\n${js}\n</script>`
+      jsCopied++
+      return match            // keep <script src="passport.crypto.js"></script>
     }
   )
 
@@ -78,7 +80,7 @@ function build() {
 
   console.log(`\n✓ Built docs/passport.html`)
   console.log(`  CSS (separate, copied): ${cssCopied} file(s)`)
-  console.log(`  JS inlined:   ${jsInlined} file(s)`)
+  console.log(`  JS  (separate, copied): ${jsCopied} file(s)`)
   console.log(`  Output size:  ${(outSize / 1024).toFixed(1)} KB`)
   console.log(`  Built in:     ${elapsed}ms\n`)
 }
@@ -93,7 +95,7 @@ if (watchMode) {
     'passport.html', 'passport.css',
     'passport.crypto.js', 'passport.state.js',
     'passport.ui.js', 'passport.sync.js', 'passport.files.js',
-    'passport.clusters.js', 'passport.invites.js', 'passport.offers.js',
+    'passport.clusters.js', 'passport.invites.js', 'passport.offers.js', 'passport.boot.js',
   ]
   watched.forEach(f => {
     const fp = path.join(SRC_DIR, f)
