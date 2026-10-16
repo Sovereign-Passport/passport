@@ -85,29 +85,45 @@ Sovereign-Passport/
 
 ```
 passport/
-├── app/
-│   ├── passport.html           ← Complete PWA (single file, no build step)
-│   └── src/
-│       ├── crypto/
-│       │   └── vault.js        ← Key generation, encryption, DID derivation
-│       ├── identity/
-│       │   └── identity.js     ← Profile, memberships, referrals, keychain
-│       ├── nodes/
-│       │   └── node.js         ← Community lifecycle, members, sessions
-│       └── credentials/
-│           └── credentials.js  ← SD-JWT issue, present, verify
-├── shared/
-│   ├── models.js               ← Canonical data models
-│   ├── status.js               ← State machine
-│   └── rules.js                ← Governance logic
-└── tests/
-    ├── test-vault.html         ← Crypto layer (19 tests)
-    ├── test-identity.html      ← Identity layer (34 tests)
-    ├── test-node.html          ← Node layer (41 tests)
-    └── test-credentials.html   ← Credentials layer (35 tests)
+├── app/                        ← EDIT THESE (modular source)
+│   ├── passport.html           ← structure: screens + <link>/<script src>
+│   ├── passport.css            ← all visual styles
+│   ├── passport.crypto.js      ← §1 crypto & identity
+│   ├── passport.state.js       ← §2/§3 state, navigation
+│   ├── passport.ui.js          ← shared UI helpers
+│   ├── passport.sync.js        ← §8 backup / sync / restore
+│   ├── passport.files.js       ← §7 vault file manager
+│   ├── passport.clusters.js    ← §10a cluster lifecycle
+│   ├── passport.invites.js     ← §10b invites
+│   ├── passport.offers.js      ← §10c credential offers
+│   ├── passport.boot.js        ← boot + onboarding handlers
+│   ├── manifest.json           ← PWA manifest
+│   └── passport-bg.jpg / spid-logo.jpg
+└── docs/                       ← NEVER EDIT DIRECTLY (built artifact)
+    ├── passport.html           ← small index (~60 KB)
+    ├── passport.css            ← copied, not inlined
+    ├── passport.*.js           ← one copied file per source
+    └── manifest.json, *.jpg
 ```
 
-**129 tests. Zero failures.**
+### Build & deploy — the only workflow
+
+Modular source, **separate-file deploy**: JS and CSS stay **separate** files
+(nothing is inlined) so the index stays small.
+
+```bash
+# 1. Edit the relevant source file(s) in app/
+# 2. Assemble the deploy artifact (copies CSS/JS next to docs/, keeps the links)
+node app/build.cjs
+# 3. Commit source + built artifact together
+git add app/ docs/ && git commit -m "..." && git push
+```
+
+- `app/` = the **sources** (work here). `docs/` = the **artifact** (regenerated).
+- The build **never inlines** — it copies `passport.css` and every
+  `passport.*.js` into `docs/`. GitHub Pages serves `docs/`.
+- Because `app/passport.html` links its siblings, you can still open
+  `app/passport.html` directly for a quick local check.
 
 ---
 
@@ -115,17 +131,18 @@ passport/
 
 ### Run the wallet
 
-No build step. No npm. No server required for the wallet itself.
+No npm. No server required for the wallet itself. (Run `node app/build.cjs`
+only to refresh the `docs/` deploy artifact.)
 
 ```bash
 # Clone
 git clone https://github.com/Sovereign-Passport/passport.git
 cd passport
 
-# Open in browser — that's it
+# Open the modular source directly — it links its sibling CSS/JS
 firefox app/passport.html
-# or
-open app/passport.html
+# or the built artifact
+open docs/passport.html
 ```
 
 ### Run the tests
