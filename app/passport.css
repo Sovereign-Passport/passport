@@ -18,6 +18,7 @@
       --bg-card:   #111113;
       --bg-lift:   #17171a;
       --gold:      #c9a961;                 /* matches the Portail */
+      --gold-bright: #e8c877;               /* Portail hover/active gold */
       --gold-dim:  #6b5420;
       --gold-glow: rgba(201,169,97,0.15);
       --red:       #c94961;
@@ -32,7 +33,7 @@
       height: 100%; overflow: hidden;
       background: var(--bg);
       color: var(--ink);
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
@@ -104,7 +105,7 @@
     }
     .tab-btn {
       flex: 1; padding: 8px;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 11px; cursor: pointer;
       letter-spacing: 0.05em;
       border: 1px solid var(--ink-faint);
@@ -142,7 +143,7 @@
     }
     .pad-filename {
       font-size: 11px; color: var(--ink-dim);
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
     }
     .pad-content {
       flex: 1; overflow-y: auto;
@@ -150,7 +151,7 @@
       font-size: 12px; line-height: 1.8;
       color: var(--ink);
       white-space: pre-wrap; word-break: break-word;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
     }
 
     /* Danger zone label and items */
@@ -166,9 +167,12 @@
     body::before {
       content: '';
       position: fixed; inset: 0;
+      /* Portail-like dark backdrop: gold-tinted vignette over near-black. */
       background:
-        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(201,168,76,0.04) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(30,60,120,0.06) 0%, transparent 60%);
+        radial-gradient(ellipse 80% 55% at 50% 0%,    rgba(201,169,97,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 60% at 12% 18%,   rgba(201,169,97,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 90% 70% at 100% 100%, rgba(201,169,97,0.04) 0%, transparent 60%),
+        linear-gradient(180deg, #0e0e10 0%, #0a0a0b 45%, #060607 100%);
       pointer-events: none; z-index: 0;
     }
     .screen { z-index: 1; }
@@ -251,7 +255,7 @@
       border-radius: 8px;
       padding: 12px 14px;
       color: var(--ink);
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 14px;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
@@ -289,7 +293,7 @@
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 14px 24px;
       border: none; border-radius: 8px;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 13px; font-weight: 500;
       letter-spacing: 0.05em;
       cursor: pointer;
@@ -300,7 +304,7 @@
       background: var(--gold);
       color: #080b12;
     }
-    .btn-primary:hover { background: #d4b05a; transform: translateY(-1px); }
+    .btn-primary:hover { background: var(--gold-bright); transform: translateY(-1px); }
     .btn-primary:active { transform: translateY(0); }
     .btn-primary:disabled {
       opacity: 0.4; cursor: not-allowed; transform: none;
@@ -361,7 +365,7 @@
     }
     .did-value {
       color: var(--ink);
-      font-family: 'Courier New', Courier, monospace;
+      font-family: Georgia, 'Times New Roman', serif;
     }
 
     /* ── CREDENTIAL CARD ────────────────────────────────────────── */

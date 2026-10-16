@@ -31,11 +31,12 @@ function build() {
 
   let html = fs.readFileSync(SRC_FILE, 'utf8')
 
-  let cssInlined  = 0
+  let cssCopied   = 0
   let jsInlined   = 0
   let totalBytes  = 0
 
-  // ── Inline CSS <link rel="stylesheet" href="..."> ──────────────
+  // ── CSS stays a SEPARATE file (never inlined into the artifact) ─
+  // Copy every local stylesheet next to the artifact and KEEP its <link>.
   html = html.replace(
     /<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g,
     (match, href) => {
@@ -46,9 +47,10 @@ function build() {
         return match
       }
       const css = fs.readFileSync(cssPath, 'utf8')
+      fs.writeFileSync(path.join(DIST_DIR, path.basename(href)), css, 'utf8')
       totalBytes += css.length
-      cssInlined++
-      return `<style>\n${css}\n</style>`
+      cssCopied++
+      return match            // keep <link rel="stylesheet" href="passport.css">
     }
   )
 
@@ -74,8 +76,8 @@ function build() {
   const outSize  = fs.statSync(OUT_FILE).size
   const elapsed  = Date.now() - start
 
-  console.log(`\n✓ Built dist/passport.html`)
-  console.log(`  CSS inlined:  ${cssInlined} file(s)`)
+  console.log(`\n✓ Built docs/passport.html`)
+  console.log(`  CSS (separate, copied): ${cssCopied} file(s)`)
   console.log(`  JS inlined:   ${jsInlined} file(s)`)
   console.log(`  Output size:  ${(outSize / 1024).toFixed(1)} KB`)
   console.log(`  Built in:     ${elapsed}ms\n`)
