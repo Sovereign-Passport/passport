@@ -437,7 +437,7 @@
 
     /* Assistant badge — sits on the shield, links to the Passport portal. */
     .assist-badge {
-      position: absolute; right: -5px; bottom: -5px;
+      position: absolute; right: -5px; top: -5px;
       width: 30px; height: 30px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       background: rgba(10,10,11,0.85);
