@@ -403,7 +403,7 @@ function openNodes() {
             ` : `
               <button class="btn btn-ghost" style="flex:1;font-size:11px;"
                 onclick="openInviteFromCluster('${c.id}')">
-                Invite a Grape
+                Invite a Member
               </button>
               <button class="btn btn-ghost" style="font-size:11px;"
                 onclick="softLeaveCluster('${c.id}')">
