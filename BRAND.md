@@ -22,7 +22,7 @@ The following brand assets are **not** covered by the MIT License
 and remain the intellectual property of JF Bertrand:
 
 - The name **"Sovereign Passport ID"**
-- The abbreviation **Sovereign Passport** as used in the context of this project
+- The abbreviation **SP.id** as used in the context of this project
 - The **phoenix** logo and all associated visual identity
 - The **grape / vine / vineyard** trust model and terminology as a branded system
 - The tagline **"The math is the authority. Not the institution."**
@@ -47,7 +47,7 @@ to use, reproduce, or represent the brand assets above.
 
 ## What you cannot do
 
-- Launch a competing service using the name "Sovereign Passport ID" or "Sovereign Passport"
+- Launch a competing service using the name "Sovereign Passport ID" or "SP.id"
 - Use the phoenix logo or vine visual language for a different product
 - Imply endorsement or affiliation with this project without written permission
 
