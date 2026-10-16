@@ -192,7 +192,7 @@ async function generateInvite() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: encodedRef }),
     })
-    if (!refRes.ok) throw new Error('Could not connect to SPID network')
+    if (!refRes.ok) throw new Error('Could not connect to SP.id network')
     const refData = await refRes.json()
 
     // Display the link + QR
@@ -244,7 +244,7 @@ async function shareInviteLink() {
   try {
     await navigator.share({
       title: 'Join my cluster on Sovereign Passport',
-      text:  `${handle} has invited you to join their community on SPID.`,
+      text:  `${handle} has invited you to join their community on SP.id.`,
       url:   link,
     })
   } catch (err) {

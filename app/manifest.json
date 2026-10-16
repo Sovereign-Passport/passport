@@ -1,6 +1,6 @@
 {
-  "name": "SPID - Sovereign Passport ID",
-  "short_name": "SPID",
+  "name": "SP.id - Sovereign Passport ID",
+  "short_name": "SP.id",
   "description": "Your sovereign digital identity. No central server. Your keys, your data.",
   "start_url": "./passport.html",
   "scope": "./",

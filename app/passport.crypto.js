@@ -183,7 +183,7 @@ Not to a company that sells your habits.
 Not to a service that disappears when the funding runs out.
 
 Your Passport is a small mathematical proof that you are you.
-It works anywhere SPID runs.
+It works anywhere SP.id runs.
 It travels with you.
 It answers to no one but you.
 
