@@ -44,20 +44,35 @@ function openInvite() {
     .filter(c => c.type === 'MembershipCredential' && c.scope === 'cluster' &&
                  c.status === 'approved' && c.cluster_id)
 
+  // Vines come from the SAME source as My Memberships (distinct space, by scope).
+  const vineItems = (typeof collectMembershipItems === 'function')
+    ? collectMembershipItems(vault).items.filter(it => it.kind === 'vine' && it.cred)
+    : []
+  const rawVines = vineItems.map(it => {
+    const c = it.cred
+    return {
+      kind:      'vine',
+      node_id:   c.issuer_did || c.node_id || null,   // the Vine's DID / id
+      node_name: c.node_name || c.issuer_did || 'Vine',
+      endpoint:  c.offer_endpoint || c.vine_endpoint || null,
+      own:       true,
+    }
+  })
+
   const rawClusters = [
-    ...ownClusters.map(c => ({ node_id: c.id,         node_name: c.name,         own: true  })),
-    ...grapeCreds.map(c  => ({ node_id: c.cluster_id,  node_name: c.cluster_name, own: false })),
-    ...clusterCreds.map(c=> ({ node_id: c.cluster_id,  node_name: c.cluster_name || 'Cluster', own: false })),
+    ...ownClusters.map(c => ({ kind:'cluster', node_id: c.id,         node_name: c.name,         own: true,  endpoint: c.vine_endpoint || null })),
+    ...grapeCreds.map(c  => ({ kind:'cluster', node_id: c.cluster_id,  node_name: c.cluster_name, own: false, endpoint: c.vine_endpoint || null })),
+    ...clusterCreds.map(c=> ({ kind:'cluster', node_id: c.cluster_id,  node_name: c.cluster_name || 'Cluster', own: false, endpoint: c.vine_endpoint || null })),
   ]
   const seen = {}
-  const allClusters = rawClusters.filter(c =>
+  const allTargets = [...rawClusters, ...rawVines].filter(c =>
     c.node_id && !seen[c.node_id] && (seen[c.node_id] = true))
 
-  select.innerHTML = '<option value="">— select a cluster —</option>'
-  allClusters.forEach(c => {
+  select.innerHTML = '<option value="">— select a membership —</option>'
+  allTargets.forEach(c => {
     const opt = document.createElement('option')
-    opt.value       = JSON.stringify({ node_id: c.node_id, node_name: c.node_name })
-    opt.textContent = (c.node_name || c.node_id) + (c.own ? ' ✦' : '')
+    opt.value       = JSON.stringify({ kind: c.kind, node_id: c.node_id, node_name: c.node_name, endpoint: c.endpoint })
+    opt.textContent = (c.node_name || c.node_id) + (c.own ? ' ✦' : '') + (c.kind === 'vine' ? ' · Vine' : '')
     select.appendChild(opt)
   })
 
@@ -71,9 +86,9 @@ function openInvite() {
   }
 
   // If no clusters available — explain and offer to create
-  if (allClusters.length === 0) {
+  if (allTargets.length === 0) {
     select.innerHTML =
-      '<option value="">No clusters yet — create one or receive a credential first</option>'
+      '<option value="">No memberships yet — create a cluster or receive a credential first</option>'
     btn.disabled = true
   }
 
@@ -107,8 +122,8 @@ async function generateInvite() {
   btn.disabled          = true
 
   try {
-    // Parse selected cluster
-    const cluster = JSON.parse(select.value)
+    // Parse the selected membership (Cluster OR Vine)
+    const target = JSON.parse(select.value)
 
     // Read disclosure choices
     const disclosures = {
@@ -119,7 +134,7 @@ async function generateInvite() {
 
     // Find this membership for status + weight
     const membership = (vault.memberships || []).find(
-      m => m.node_id === cluster.node_id
+      m => m.node_id === target.node_id
     )
 
     // Build the referral payload
@@ -128,8 +143,9 @@ async function generateInvite() {
       type:                'ReferralCredential',
       from_did:            vault.identity.id,
       to_did:              null,            // unknown until grape creates Passport
-      node_id:             cluster.node_id,
-      node_name:           cluster.node_name,
+      node_id:             target.node_id,
+      node_name:           target.node_name,
+      scope:               target.kind === 'vine' ? 'vine' : 'cluster',
       from_status_at_time: (membership && membership.status) || 'unknown',
       weight:              (membership && membership.status) === 'approved' ? 3 : 1,
       disclosed:           {},
@@ -165,16 +181,24 @@ async function generateInvite() {
     //   2. the matching cluster-membership record's vine_endpoint
     //   3. the one-shot #invite descriptor — ONLY if it targets this cluster_id
     // No global fallback: absent endpoint → clear error, no request.
-    const own = (vault.ownClusters || []).find(c => c.id === cluster.node_id)
-    let vineEndpoint = (own && own.vine_endpoint) || null
-    if (!vineEndpoint) {
-      const mem = (vault.memberships || []).find(m =>
-        m.cluster_id === cluster.node_id || m.node_id === cluster.node_id)
-      vineEndpoint = (mem && mem.vine_endpoint) || null
-    }
-    if (!vineEndpoint && appState.pendingInvite &&
-        appState.pendingInvite.cluster_id === cluster.node_id) {
-      vineEndpoint = appState.pendingInvite.vine_endpoint
+    let vineEndpoint = null
+    if (target.kind === 'vine') {
+      // Vine target → the Vine's own endpoint (membership record or the object).
+      const vm = (vault.memberships || []).find(m => !m.cluster_id &&
+        (m.issuer_did === target.node_id || m.node_id === target.node_id))
+      vineEndpoint = target.endpoint || (vm && vm.vine_endpoint) || null
+    } else {
+      const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
+      vineEndpoint = (own && own.vine_endpoint) || null
+      if (!vineEndpoint) {
+        const mem = (vault.memberships || []).find(m =>
+          m.cluster_id === target.node_id || m.node_id === target.node_id)
+        vineEndpoint = (mem && mem.vine_endpoint) || null
+      }
+      if (!vineEndpoint && appState.pendingInvite &&
+          appState.pendingInvite.cluster_id === target.node_id) {
+        vineEndpoint = appState.pendingInvite.vine_endpoint
+      }
     }
     const vineBase = (typeof normalizeVineEndpoint === 'function')
       ? normalizeVineEndpoint(vineEndpoint) : null
