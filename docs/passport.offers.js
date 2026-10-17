@@ -41,7 +41,7 @@ function openOfficialize() {
 
 /**
  * Open the receive credential screen.
- * Called from the home screen "Receive Credential" menu item.
+ * Called from "Open an invitation" in the invite screen.
  * Clears any previous input and error state before navigating.
  */
 function openReceiveCredential() {

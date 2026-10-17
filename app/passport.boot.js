@@ -256,7 +256,7 @@ function populateHome() {
   document.getElementById('cred-count').textContent =
     `${credCount} membership${credCount !== 1 ? 's' : ''}`
 
-  // Clusters count (Communities I Own)
+  // Clusters count (Groups and Communities)
   const nodeCount = (v.ownClusters || []).length
   document.getElementById('nodes-count').textContent =
     nodeCount > 0
@@ -403,7 +403,7 @@ function openNodes() {
             ` : `
               <button class="btn btn-ghost" style="flex:1;font-size:11px;"
                 onclick="openInviteFromCluster('${c.id}')">
-                Invite a Grape
+                Invite a member
               </button>
               <button class="btn btn-ghost" style="font-size:11px;"
                 onclick="softLeaveCluster('${c.id}')">
