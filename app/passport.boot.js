@@ -350,7 +350,9 @@ function openNodes() {
 
   list.innerHTML = ''
 
-  if (ownClusters.length === 0 && memberships.length === 0) {
+  const { items: vineItems, allCreds: vineAllCreds } = collectMembershipItems(vault)
+
+  if (ownClusters.length === 0 && memberships.length === 0 && vineItems.length === 0) {
     empty.style.display = 'block'
     list.style.display  = 'none'
   } else {
@@ -527,6 +529,16 @@ function openNodes() {
       })
     }
 
+    // Vine memberships — Vines / Vignards (distinct space, by credential scope).
+    if (vineItems.length > 0) {
+      const vLabel = document.createElement('p')
+      vLabel.className = 'section-label'
+      vLabel.textContent = 'Vine memberships'
+      vLabel.style.marginTop = '16px'
+      list.appendChild(vLabel)
+      vineItems.forEach(it => list.appendChild(buildMembershipCard(it, vineAllCreds, openNodes)))
+    }
+
     // Always show create button at bottom
     const createBtn = document.createElement('button')
     createBtn.className   = 'btn btn-ghost'
@@ -611,13 +623,9 @@ async function checkClusterUpdates(membership, btn) {
 //   legacy vault.memberships without cluster_id → LEGACY VINE MEMBERSHIP
 // ═════════════════════════════════════════════════════════════════════════════
 
-function openCredentials() {
-  const vault    = appState.vault
-  const list     = document.getElementById('credentials-list')
-  const empty    = document.getElementById('credentials-empty')
+/** Vines / Vignards / legacy memberships as display items (Cluster-free). */
+function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
-
-  // My Memberships = Vines / Vignards ONLY — never a Cluster, never a Founder.
   const vineCreds = allCreds.filter(c =>
     c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard')
   const vignardCreds = allCreds.filter(c =>
@@ -626,23 +634,93 @@ function openCredentials() {
   const legacyMembers = ((vault && vault.memberships) || [])
     .filter(m => !m.cluster_id)
     .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
-
-  // Deduplicate canonical Vines by issuer_did.
   const seenVine = {}
   const vineList = vineCreds.filter(c => {
     if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
     return true
   })
-
   const items = [
     ...vineList.map(c     => ({ kind: 'vine',    cred: c, idx: allCreds.indexOf(c) })),
     ...vignardCreds.map(c => ({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })),
     ...legacyMembers.map(m=> ({ kind: 'legacy',  cred: m, idx: -1 })),
   ]
+  return { items, allCreds }
+}
+
+/** Build a membership card (Vine / Vignard / legacy). Reused by openCredentials + openNodes. */
+function buildMembershipCard(item, allCreds, refreshFn) {
+  const c    = item.cred
+  const idx  = item.idx
+  const card = document.createElement('div')
+  card.className = 'cred-card'
+  card.style.marginBottom = '12px'
+
+  let typeLabel, title, issuerLine
+  let markerScope = null
+  let markerId    = null
+
+  if (item.kind === 'vine') {
+    typeLabel  = 'VINE MEMBERSHIP'
+    title      = c.node_name || c.issuer_did || 'Vine'
+    issuerLine = c.issuer_did || ''
+    if (c.issuer_did) { markerScope = 'vine'; markerId = c.issuer_did }
+  } else if (item.kind === 'vignard') {
+    typeLabel  = 'VIGNARD MEMBERSHIP'
+    title      = c.node_name || c.issuer_did || c.vignard_did || 'Vignard'
+    issuerLine = c.issuer_did || c.vignard_did || ''
+    const vid  = c.issuer_did || c.vignard_did
+    if (vid) { markerScope = 'vignard'; markerId = vid }
+  } else {
+    typeLabel  = 'LEGACY VINE MEMBERSHIP'
+    title      = c.node_name || c.node_id || 'Vine'
+    issuerLine = c.node_id || ''
+  }
+
+  const expiry = c.expires_at
+    ? new Date(c.expires_at).toLocaleDateString()
+    : 'No expiry'
+
+  const revokedBadge = c.revoked
+    ? `<span class="badge" style="background:rgba(192,57,43,0.1);
+        color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
+    : `<span class="badge badge-green">✓ Valid</span>`
+
+  const hasSdJwt = !!c.sd_jwt && idx >= 0
+  const actions = hasSdJwt ? `
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="copyCredential(${idx})" style="flex:1;padding:8px;">Copy credential</button>
+      <button class="btn btn-ghost" onclick="presentCredential(${idx})" style="flex:1;padding:8px;">Present QR</button>
+    </div>` : ''
+
+  card.innerHTML = `
+    <p class="cred-type">${escHtmlP(typeLabel)}</p>
+    <div class="cred-title">${escHtmlP(title)}</div>
+    <div class="cred-sub" style="font-size:10px;word-break:break-all;color:var(--ink-dim);">
+      ${escHtmlP(issuerLine)}
+    </div>
+    <div class="cred-meta" style="margin-top:12px;">
+      <div class="cred-meta-item">Issued <span>${c.issued_at ? new Date(c.issued_at).toLocaleDateString() : '—'}</span></div>
+      <div class="cred-meta-item">Expires <span>${expiry}</span></div>
+      ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">${revokedBadge}</div>
+    ${actions}
+  `
+
+  const slot = card.querySelector('[data-marker-slot]')
+  if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, refreshFn))
+  return card
+}
+
+function openCredentials() {
+  const vault = appState.vault
+  const list  = document.getElementById('credentials-list')
+  const empty = document.getElementById('credentials-empty')
+  const { items, allCreds } = collectMembershipItems(vault)
 
   list.innerHTML = ''
-  document.getElementById('cred-count').textContent =
-    `${items.length} membership${items.length !== 1 ? 's' : ''}`
+  const cc = document.getElementById('cred-count')
+  if (cc) cc.textContent = `${items.length} membership${items.length !== 1 ? 's' : ''}`
 
   if (items.length === 0) {
     empty.style.display = 'block'
@@ -650,89 +728,8 @@ function openCredentials() {
   } else {
     empty.style.display = 'none'
     list.style.display  = 'block'
-
-    items.forEach(item => {
-      const c    = item.cred
-      const idx  = item.idx
-      const card = document.createElement('div')
-      card.className = 'cred-card'
-      card.style.marginBottom = '12px'
-
-      let typeLabel, title, issuerLine
-      let markerScope = null
-      let markerId    = null
-
-      if (item.kind === 'vine') {
-        typeLabel  = 'VINE MEMBERSHIP'
-        title      = c.node_name || c.issuer_did || 'Vine'
-        issuerLine = c.issuer_did || ''
-        if (c.issuer_did) { markerScope = 'vine'; markerId = c.issuer_did }
-      } else if (item.kind === 'vignard') {
-        typeLabel  = 'VIGNARD MEMBERSHIP'
-        title      = c.node_name || c.issuer_did || c.vignard_did || 'Vignard'
-        issuerLine = c.issuer_did || c.vignard_did || ''
-        const vid  = c.issuer_did || c.vignard_did
-        if (vid) { markerScope = 'vignard'; markerId = vid }
-      } else {
-        // Legacy Vine membership without a canonical DID → no markers.
-        typeLabel  = 'LEGACY VINE MEMBERSHIP'
-        title      = c.node_name || c.node_id || 'Vine'
-        issuerLine = c.node_id || ''
-      }
-
-      const expiry = c.expires_at
-        ? new Date(c.expires_at).toLocaleDateString()
-        : 'No expiry'
-
-      const revokedBadge = c.revoked
-        ? `<span class="badge" style="background:rgba(192,57,43,0.1);
-            color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
-        : `<span class="badge badge-green">✓ Valid</span>`
-
-      // SD-JWT actions only when a real credential is present.
-      const hasSdJwt = !!c.sd_jwt && idx >= 0
-      const actions = hasSdJwt ? `
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-primary"
-            onclick="copyCredential(${idx})"
-            style="flex:1;padding:8px;">
-            Copy credential
-          </button>
-          <button class="btn btn-ghost"
-            onclick="presentCredential(${idx})"
-            style="flex:1;padding:8px;">
-            Present QR
-          </button>
-        </div>` : ''
-
-      card.innerHTML = `
-        <p class="cred-type">${escHtmlP(typeLabel)}</p>
-        <div class="cred-title">${escHtmlP(title)}</div>
-        <div class="cred-sub" style="font-size:10px;word-break:break-all;color:var(--ink-dim);">
-          ${escHtmlP(issuerLine)}
-        </div>
-        <div class="cred-meta" style="margin-top:12px;">
-          <div class="cred-meta-item">
-            Issued <span>${c.issued_at ? new Date(c.issued_at).toLocaleDateString() : '—'}</span>
-          </div>
-          <div class="cred-meta-item">
-            Expires <span>${expiry}</span>
-          </div>
-          ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px;">
-          ${revokedBadge}
-        </div>
-        ${actions}
-      `
-
-      const slot = card.querySelector('[data-marker-slot]')
-      if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, openCredentials))
-
-      list.appendChild(card)
-    })
+    items.forEach(item => list.appendChild(buildMembershipCard(item, allCreds, openCredentials)))
   }
-
   goTo('screen-credentials')
 }
 
