@@ -249,13 +249,13 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── COMMUNITIES I OWN ────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-2">Communities I Own</p>
+    <!-- ── GROUPS AND COMMUNITIES ───────────────────────────── -->
+    <p class="section-label fade-up fade-up-2">Groups and Communities</p>
 
     <div class="menu-item fade-up fade-up-2" onclick="openNodes()">
       <div class="menu-icon">🌱</div>
       <div class="menu-text">
-        <strong>My Clusters</strong>
+        <strong>My Memberships</strong>
         <small id="nodes-count">0 clusters — free forever</small>
       </div>
       <span class="menu-arrow">›</span>
@@ -264,8 +264,8 @@
     <div class="menu-item fade-up fade-up-2" onclick="openInvite()">
       <div class="menu-icon">🍇</div>
       <div class="menu-text">
-        <strong>Invite a Grape</strong>
-        <small>Invite someone to your community</small>
+        <strong>Invite a member</strong>
+        <small>Invite a member to a group or a Vine</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -275,27 +275,6 @@
       <div class="menu-text">
         <strong>Officialize my Cluster</strong>
         <small>Join the network · Become a Vine</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <!-- ── COMMUNITIES I'M PART OF ──────────────────────────── -->
-    <p class="section-label fade-up fade-up-3">Communities I'm Part Of</p>
-
-    <div class="menu-item fade-up fade-up-3" onclick="openCredentials()">
-      <div class="menu-icon">🎫</div>
-      <div class="menu-text">
-        <strong>My Memberships</strong>
-        <small id="cred-count">0 memberships</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <div class="menu-item fade-up fade-up-3" onclick="openReceiveCredential()">
-      <div class="menu-icon">📨</div>
-      <div class="menu-text">
-        <strong>Receive Credential</strong>
-        <small>Join a community with an invite link</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -664,7 +643,7 @@
 
     <div class="screen-header">
       <button class="btn-back" onclick="goTo('screen-home')">‹</button>
-      <p class="logotype">Join a Community</p>
+      <p class="logotype">Open an invitation</p>
     </div>
 
     <h1 class="display fade-up" style="margin-bottom:8px;">
@@ -939,7 +918,7 @@
       <div class="screen-header">
         <button class="btn-back" onclick="goTo('screen-home')">‹</button>
         <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:24px;">
-          My Clusters
+          My Memberships
         </h2>
       </div>
 
@@ -1181,6 +1160,12 @@
       <button class="btn btn-primary" id="btn-generate-invite"
         onclick="generateInvite()" style="margin-bottom:10px;" disabled>
         Generate invite link →
+      </button>
+
+      <!-- Received an invitation instead? Open it manually here. -->
+      <button class="btn btn-ghost" onclick="openReceiveCredential()"
+        style="width:100%;">
+        Open an invitation
       </button>
 
     </div>
