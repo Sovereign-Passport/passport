@@ -647,6 +647,64 @@ function collectMembershipItems(vault) {
   return { items, allCreds }
 }
 
+// ── Received Vine status — a VINE-SIGNED proof the DID RECEIVES & holds ──
+// The status is not the DID's own data: the Vine grants and signs it.
+const VINE_STATUS_LABELS = {
+  guest: 'Guest', invited: 'Invited', approved: 'Approved',
+  admin: 'Admin', revoked: 'Revoked', left: 'Left',
+}
+const VINE_STATUS_COLORS = {
+  invited:  'background:rgba(200,160,60,0.12);color:#c8a03c;border:1px solid rgba(200,160,60,0.35);',
+  approved: 'background:rgba(46,160,90,0.12);color:#2ea05a;border:1px solid rgba(46,160,90,0.35);',
+  admin:    'background:rgba(90,120,210,0.14);color:#6f86d6;border:1px solid rgba(90,120,210,0.40);',
+  revoked:  'background:rgba(192,57,43,0.12);color:#c0392b;border:1px solid rgba(192,57,43,0.35);',
+  left:     'background:rgba(140,140,140,0.12);color:var(--ink-dim);border:1px solid rgba(140,140,140,0.30);',
+  guest:    'background:rgba(140,140,140,0.12);color:var(--ink-dim);border:1px solid rgba(140,140,140,0.30);',
+}
+
+/** The received Vine status matching a Vine credential (by any known id). */
+function findReceivedVineStatus(cred) {
+  const list = (appState.vault && appState.vault.vineStatuses) || []
+  const ids  = [cred.issuer_did, cred.node_id, cred.vine_id, cred.vine_web_did].filter(Boolean)
+  return list.find(s => s && (
+    ids.includes(s.vine_id) || ids.includes(s.vine_did) || ids.includes(s.vine_web_did)
+  )) || null
+}
+
+/** Base https endpoint of the Vine that issued this credential. */
+function credVineEndpoint(c) {
+  const e = c.offer_endpoint || c.vine_endpoint || null
+  if (!e) return null
+  return String(e).replace(/\/api\/(offer|credentials\/issue)\/?$/, '')
+}
+
+/** Manual "Check status" — the DID asks the Vine for its current status. */
+async function checkVineStatus(cred, btn) {
+  const endpoint = credVineEndpoint(cred)
+  const idle = 'Check status'
+  if (!endpoint) { showToast('Status endpoint unavailable'); return }
+  if (btn && btn.disabled) return
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
+  try {
+    const r = await claimVineStatuses(endpoint)
+    if (!r || !r.ok) {
+      showToast(r && r.error === 'SAVE_FAILED' ? 'Could not save locally.' : 'Could not check status.')
+      if (btn) { btn.disabled = false; btn.textContent = idle }
+      return
+    }
+    if (!r.stored || r.stored.length === 0) {
+      showToast('No status from the Vine yet.')
+      if (btn) { btn.disabled = false; btn.textContent = idle }
+      return
+    }
+    showToast('Vine status received ✓')
+    openCredentials()
+  } catch (e) {
+    showToast('Could not check status.')
+    if (btn) { btn.disabled = false; btn.textContent = idle }
+  }
+}
+
 /** Build a membership card (Vine / Vignard / legacy). Reused by openCredentials + openNodes. */
 function buildMembershipCard(item, allCreds, refreshFn) {
   const c    = item.cred
@@ -654,7 +712,6 @@ function buildMembershipCard(item, allCreds, refreshFn) {
   const card = document.createElement('div')
   card.className = 'cred-card'
   card.style.marginBottom = '12px'
-
   let typeLabel, title, issuerLine
   let markerScope = null
   let markerId    = null
@@ -685,6 +742,13 @@ function buildMembershipCard(item, allCreds, refreshFn) {
         color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
     : `<span class="badge badge-green">✓ Valid</span>`
 
+  // Received Vine status (the Vine grants it; the DID receives & holds it).
+  const vineStatus = item.kind === 'vine' ? findReceivedVineStatus(c) : null
+  const vineStatusBadge = vineStatus
+    ? `<div style="margin-top:12px;"><span class="badge" style="${VINE_STATUS_COLORS[vineStatus.status] || ''}">` +
+      `Vine says: ${escHtmlP(VINE_STATUS_LABELS[vineStatus.status] || vineStatus.status)}</span></div>`
+    : ''
+
   const hasSdJwt = !!c.sd_jwt && idx >= 0
   const actions = hasSdJwt ? `
     <div style="margin-top:12px;display:flex;gap:8px;">
@@ -704,11 +768,22 @@ function buildMembershipCard(item, allCreds, refreshFn) {
       ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">${revokedBadge}</div>
+    ${vineStatusBadge}
     ${actions}
   `
 
   const slot = card.querySelector('[data-marker-slot]')
   if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, refreshFn))
+
+  // Vines only: a manual "Check status" when an endpoint is known.
+  if (item.kind === 'vine' && credVineEndpoint(c)) {
+    const btn = document.createElement('button')
+    btn.className     = 'btn btn-ghost'
+    btn.style.cssText = 'font-size:11px;margin-top:12px;'
+    btn.textContent   = 'Check status'
+    btn.addEventListener('click', () => checkVineStatus(c, btn))
+    card.appendChild(btn)
+  }
   return card
 }
 
