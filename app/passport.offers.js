@@ -315,8 +315,9 @@ async function acceptOffer() {
     await persist(newPayload)
     appState.stored = newPayload
 
-    // Update credential count on home screen
-    document.getElementById('cred-count').textContent =
+    // Update credential count on home screen (element may be absent — guard it)
+    const ccEl = document.getElementById('cred-count')
+    if (ccEl) ccEl.textContent =
       `${vault.credentials.length} credential${vault.credentials.length !== 1 ? 's' : ''}`
 
     // Show success screen

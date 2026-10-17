@@ -208,6 +208,14 @@ async function tryUnlock() {
     // Log real error to console
     console.error('[Unlock] Failed:', (e.code || e.message), e)
 
+    // Distinguish a genuine wrong password from any other failure (e.g. a DOM
+    // bug). Never mislabel an internal error as "Wrong password".
+    const msg = err.querySelector('.notice-text')
+    if (msg) {
+      msg.textContent = (e && e.code === 'WRONG_PASSWORD')
+        ? 'Wrong password. Try again.'
+        : 'Unlock failed: ' + ((e && (e.message || e.toString())) || 'unknown error')
+    }
     err.style.display = 'flex'
     btn.textContent   = 'Unlock →'
     btn.disabled      = false
@@ -230,11 +238,14 @@ function populateHome() {
   if (!v) return
   const handle = v.identity.handle
 
-  document.getElementById('home-handle').textContent = handle
+  // Defensive: a missing element must NEVER throw here — a throw was caught by
+  // tryUnlock and mislabelled as "Wrong password" (see the DOM-regression bug).
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+
+  setText('home-handle', handle)
 
   // Settings handle display
-  const sh = document.getElementById('settings-handle-display')
-  if (sh) sh.textContent = handle
+  setText('settings-handle-display', handle)
 
   // Memberships count — ONLY Vines/Vignards actually shown in My Memberships.
   // Clusters (founded or joined) are never counted here.
@@ -253,31 +264,27 @@ function populateHome() {
     .filter(m => !m.cluster_id)
     .filter(m => !vineCreds.some(c => c.node_id === m.node_id)).length
   const credCount = vineCount + vignardCount + legacyCount
-  document.getElementById('cred-count').textContent =
-    `${credCount} membership${credCount !== 1 ? 's' : ''}`
+  setText('cred-count', `${credCount} membership${credCount !== 1 ? 's' : ''}`)
 
   // Clusters count (Groups and Communities)
   const nodeCount = (v.ownClusters || []).length
-  document.getElementById('nodes-count').textContent =
+  setText('nodes-count',
     nodeCount > 0
       ? `${nodeCount} cluster${nodeCount !== 1 ? 's' : ''} — free forever`
-      : '0 clusters — free forever'
+      : '0 clusters — free forever')
 
   // Vault files count
   const fileCount = (v.files || []).length
-  document.getElementById('vault-file-count').textContent =
-    `${fileCount} file${fileCount !== 1 ? 's' : ''}`
+  setText('vault-file-count', `${fileCount} file${fileCount !== 1 ? 's' : ''}`)
 
   // DID short
   const did = v.identity.id
-  document.getElementById('did-short').textContent =
-    did.slice(0,16) + '…' + did.slice(-8)
+  setText('did-short', did.slice(0,16) + '…' + did.slice(-8))
 
   // Health summary
   const issues = []
   if (credCount === 0) issues.push('no memberships yet')
-  document.getElementById('health-summary').textContent =
-    issues.length === 0 ? 'All good ✓' : issues.join(' · ')
+  setText('health-summary', issues.length === 0 ? 'All good ✓' : issues.join(' · '))
 
   // Health screen — only update if on health screen
   const hDid   = document.getElementById('h-did')
