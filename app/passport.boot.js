@@ -705,6 +705,42 @@ async function checkVineStatus(cred, btn) {
   }
 }
 
+/** The received Vignard status matching a Vignard credential (by any known id). */
+function findReceivedVignardStatus(cred) {
+  const list = (appState.vault && appState.vault.vignardStatuses) || []
+  const ids  = [cred.issuer_did, cred.vignard_did, cred.node_id].filter(Boolean)
+  return list.find(s => s && (
+    ids.includes(s.vignard_id) || ids.includes(s.vine_did) || ids.includes(s.vine_web_did)
+  )) || null
+}
+
+/** Manual "Check status" — the DID asks the Vignard for its current status. */
+async function checkVignardStatus(cred, btn) {
+  const endpoint = credVineEndpoint(cred)
+  const idle = 'Check status'
+  if (!endpoint) { showToast('Status endpoint unavailable'); return }
+  if (btn && btn.disabled) return
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
+  try {
+    const r = await claimVignardStatuses(endpoint)
+    if (!r || !r.ok) {
+      showToast(r && r.error === 'SAVE_FAILED' ? 'Could not save locally.' : 'Could not check status.')
+      if (btn) { btn.disabled = false; btn.textContent = idle }
+      return
+    }
+    if (!r.stored || r.stored.length === 0) {
+      showToast('No status from the Vignard yet.')
+      if (btn) { btn.disabled = false; btn.textContent = idle }
+      return
+    }
+    showToast('Vignard status received ✓')
+    openCredentials()
+  } catch (e) {
+    showToast('Could not check status.')
+    if (btn) { btn.disabled = false; btn.textContent = idle }
+  }
+}
+
 /** Build a membership card (Vine / Vignard / legacy). Reused by openCredentials + openNodes. */
 function buildMembershipCard(item, allCreds, refreshFn) {
   const c    = item.cred
@@ -742,11 +778,14 @@ function buildMembershipCard(item, allCreds, refreshFn) {
         color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
     : `<span class="badge badge-green">✓ Valid</span>`
 
-  // Received Vine status (the Vine grants it; the DID receives & holds it).
-  const vineStatus = item.kind === 'vine' ? findReceivedVineStatus(c) : null
-  const vineStatusBadge = vineStatus
-    ? `<div style="margin-top:12px;"><span class="badge" style="${VINE_STATUS_COLORS[vineStatus.status] || ''}">` +
-      `Vine says: ${escHtmlP(VINE_STATUS_LABELS[vineStatus.status] || vineStatus.status)}</span></div>`
+  // Received status (the space grants it; the DID receives & holds it).
+  const receivedStatus = item.kind === 'vine'    ? findReceivedVineStatus(c)
+                       : item.kind === 'vignard' ? findReceivedVignardStatus(c)
+                       : null
+  const statusSource = item.kind === 'vignard' ? 'Vignard' : 'Vine'
+  const receivedStatusBadge = receivedStatus
+    ? `<div style="margin-top:12px;"><span class="badge" style="${VINE_STATUS_COLORS[receivedStatus.status] || ''}">` +
+      `${statusSource} says: ${escHtmlP(VINE_STATUS_LABELS[receivedStatus.status] || receivedStatus.status)}</span></div>`
     : ''
 
   const hasSdJwt = !!c.sd_jwt && idx >= 0
@@ -768,20 +807,21 @@ function buildMembershipCard(item, allCreds, refreshFn) {
       ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">${revokedBadge}</div>
-    ${vineStatusBadge}
+    ${receivedStatusBadge}
     ${actions}
   `
 
   const slot = card.querySelector('[data-marker-slot]')
   if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, refreshFn))
 
-  // Vines only: a manual "Check status" when an endpoint is known.
-  if (item.kind === 'vine' && credVineEndpoint(c)) {
+  // Vines/Vignards only: a manual "Check status" when an endpoint is known.
+  if ((item.kind === 'vine' || item.kind === 'vignard') && credVineEndpoint(c)) {
     const btn = document.createElement('button')
     btn.className     = 'btn btn-ghost'
     btn.style.cssText = 'font-size:11px;margin-top:12px;'
     btn.textContent   = 'Check status'
-    btn.addEventListener('click', () => checkVineStatus(c, btn))
+    btn.addEventListener('click', () =>
+      item.kind === 'vignard' ? checkVignardStatus(c, btn) : checkVineStatus(c, btn))
     card.appendChild(btn)
   }
   return card
