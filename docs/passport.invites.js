@@ -183,10 +183,15 @@ async function generateInvite() {
     // No global fallback: absent endpoint → clear error, no request.
     let vineEndpoint = null
     if (target.kind === 'vine') {
-      // Vine target → the Vine's own endpoint (membership record or the object).
+      // Vine target → the Vine's own endpoint (membership record or the object),
+      // else the signed #invite= hand-off that targeted THIS Vine.
       const vm = (vault.memberships || []).find(m => !m.cluster_id &&
         (m.issuer_did === target.node_id || m.node_id === target.node_id))
       vineEndpoint = target.endpoint || (vm && vm.vine_endpoint) || null
+      if (!vineEndpoint && appState.pendingInvite &&
+          appState.pendingInvite.vine_id === target.node_id) {
+        vineEndpoint = appState.pendingInvite.vine_endpoint
+      }
     } else {
       const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
       vineEndpoint = (own && own.vine_endpoint) || null
@@ -203,7 +208,23 @@ async function generateInvite() {
     const vineBase = (typeof normalizeVineEndpoint === 'function')
       ? normalizeVineEndpoint(vineEndpoint) : null
     if (!vineBase) {
-      throw new Error('No vine endpoint for this cluster.')
+      throw new Error(target.kind === 'vine'
+        ? 'No endpoint for this Vine. Open the invite from your Vine dashboard.'
+        : 'This Cluster is not linked to a Vine yet — open the invite from your Vine dashboard.')
+    }
+
+    // Self-heal: when the endpoint came from a signed hand-off (#invite=), keep
+    // it on the owned Cluster so the NEXT invite needs no hand-off.
+    if (target.kind === 'cluster') {
+      const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
+      if (own && !own.vine_endpoint) {
+        own.vine_endpoint = vineBase
+        try {
+          const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+          await persist(p)
+          appState.stored = p
+        } catch (e) { console.warn('[Invite] could not remember vine_endpoint:', e) }
+      }
     }
     const offerBase    = vineBase + '/api/offer'
     const refEndpoint  = vineBase + '/api/passport/ref'
@@ -322,7 +343,16 @@ function checkPendingNewCluster() {
   return true
 }
 
-/** #invite= → open the existing invite screen for a canonical Cluster only. */
+/** Does this Passport hold a membership of this Vine (by DID or id)? */
+function hasVineMembershipItem(vineId) {
+  const vault = appState.vault
+  if (!vault || !vineId) return false
+  return (vault.credentials || []).some(c =>
+    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard' &&
+    (c.issuer_did === vineId || c.node_id === vineId))
+}
+
+/** #invite= → open the existing invite screen for a canonical Cluster OR a Vine. */
 function checkPendingInvite() {
   const raw = appState.pendingInviteRaw
   if (!raw) return false
@@ -336,6 +366,18 @@ function checkPendingInvite() {
   clearApproveFragment()
 
   if (!endpoint) { showToast('Invalid or incomplete invite request.'); return false }
+
+  // Vine (community) target — the Passport must be a member of that Vine.
+  if (demand.vine_id) {
+    if (!hasVineMembershipItem(demand.vine_id)) {
+      showToast('This Vine is not linked to your Passport.')
+      return false
+    }
+    appState.pendingInvite = demand
+    openInviteFromCluster(demand.vine_id)   // preselects by node_id (Vine DID)
+    return true
+  }
+
   if (!demand.cluster_id) { showToast('Invite request missing cluster.'); return false }
   if (!hasCanonicalCluster(demand.cluster_id)) {
     showToast('This legacy cluster is not linked to your Passport.')
