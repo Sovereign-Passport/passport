@@ -1379,7 +1379,12 @@
   if (typeof orig === 'function') {
     window.unlockVault = function () {
       return Promise.resolve(orig.apply(this, arguments)).then(function (r) {
-        try { if (r && r.vault && r.vault.prefs && r.vault.prefs.lang) window.spidAdoptLang(r.vault.prefs.lang); } catch (e) {}
+        try {
+          var vlang = r && r.vault && r.vault.prefs && r.vault.prefs.lang;
+          var llang = null; try { llang = localStorage.getItem('spidLang'); } catch (e) {}
+          if (!llang && vlang) window.spidAdoptLang(vlang);
+          else if (llang && llang !== vlang && window.spidPersistLang) window.spidPersistLang(llang);
+        } catch (e) {}
         return r;
       });
     };
