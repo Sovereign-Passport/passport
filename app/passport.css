@@ -456,6 +456,23 @@
     .assist-badge:active { transform: translateY(-1px); border-color: var(--gold); color: var(--gold-bright); }
     .assist-badge svg { width: 24px; height: 24px; display: block; }
 
+    /* Language switch — round flag buttons, fixed top-left of the screen. */
+    .lang-bar {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top));
+      left: max(14px, env(safe-area-inset-left));
+      z-index: 90; display: flex; gap: 6px;
+    }
+    .lang-btn {
+      width: 26px; height: 26px; padding: 0; line-height: 0; cursor: pointer;
+      border-radius: 50%; overflow: hidden; background: none;
+      border: 1px solid var(--gold-dim);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+    }
+    .lang-btn svg { width: 100%; height: 100%; display: block; }
+    .lang-btn:hover { transform: translateY(-1px); }
+    .lang-btn[aria-pressed="true"] { border-color: var(--gold-bright); box-shadow: 0 0 0 2px var(--gold-glow); }
+
     /* ── GENERATING ANIMATION ───────────────────────────────────── */
     .generating {
       display: flex; flex-direction: column;
