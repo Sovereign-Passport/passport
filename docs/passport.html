@@ -1371,5 +1371,28 @@
 <script src="passport.offers.js"></script>
 <script src="passport.boot.js"></script>
 <script src="spid.i18n.js"></script>
+<script>
+/* Language mirror: persist the choice inside the vault (the DID's container)
+   and adopt it on unlock. Best effort — the vault may be locked. */
+(function () {
+  var orig = window.unlockVault;
+  if (typeof orig === 'function') {
+    window.unlockVault = function () {
+      return Promise.resolve(orig.apply(this, arguments)).then(function (r) {
+        try { if (r && r.vault && r.vault.prefs && r.vault.prefs.lang) window.spidAdoptLang(r.vault.prefs.lang); } catch (e) {}
+        return r;
+      });
+    };
+  }
+  window.spidPersistLang = function (l) {
+    try {
+      if (typeof appState === 'undefined' || !appState.vault || !appState.vaultKey || !appState.stored) return null;
+      appState.vault.prefs = appState.vault.prefs || {};
+      appState.vault.prefs.lang = l;
+      return saveVault(appState.vaultKey, appState.vault, appState.stored.salt).then(persist);
+    } catch (e) { return null; }
+  };
+})();
+</script>
 </body>
 </html>
