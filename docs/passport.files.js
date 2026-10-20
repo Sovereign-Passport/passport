@@ -146,7 +146,7 @@ function renderVFList() {
         <div class="menu-icon">${icon}</div>
         <div class="menu-text">
           <strong>${escHtmlP((f.name || f.path || 'untitled'))}</strong>
-          <small>${f.date || '—'} · ${f.size || '—'}</small>
+          <small>${escHtmlP(f.date || '—')} · ${escHtmlP(f.size || '—')}</small>
         </div>
         <span class="menu-arrow">›</span>
       </div>
@@ -247,8 +247,13 @@ function openVFPad(index) {
   const isImage   = (f.mime || '').startsWith('image/') ||
                     (f.content || '').startsWith('data:image/')
   if (isImage) {
-    contentEl.innerHTML = `<img src="${f.content}" alt="${escHtmlP(f.name)}"
-      style="max-width:100%;border-radius:8px;display:block;margin:0 auto;">`
+    // Build the element and set .src — never interpolate content into HTML.
+    contentEl.textContent = ''
+    const img = document.createElement('img')
+    img.alt = f.name || ''
+    img.src = f.content || ''
+    img.style.cssText = 'max-width:100%;border-radius:8px;display:block;margin:0 auto;'
+    contentEl.appendChild(img)
   } else {
     contentEl.textContent = (f.content || '(empty)')
   }
