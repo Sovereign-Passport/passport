@@ -244,6 +244,7 @@ Zero errors = safe to commit.
 | No OID4VCI | Not interoperable with other wallets | Long-term roadmap |
 | Passkeys not implemented | Vision says passkeys, code uses passwords | Roadmap |
 | Sync on mdusl (temporary) | Wrong domain for the feature | DNS migration when ready |
+| UI i18n partial (fr/en/es) | Dictionary covers the main screens; some long strings stay in the source language | Extend `spid.i18n.js` rows |
 
 ---
 
