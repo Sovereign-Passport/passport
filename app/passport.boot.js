@@ -182,6 +182,7 @@ async function tryUnlock() {
     appState.vault    = vault
     appState.vaultKey = vaultKey
     populateHome()
+    syncProfileHandle()
     checkPendingOffer()
     checkPendingApproval()
     checkPendingDecision()

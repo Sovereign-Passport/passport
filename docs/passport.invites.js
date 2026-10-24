@@ -381,6 +381,19 @@ async function sbSelfCall(base, service, action, data, scope) {
   return { status: r.status, body: json }
 }
 
+/** Push the Passport's own handle to the home Vine (display only). */
+async function syncProfileHandle() {
+  if (!appState.vault || !appState.vaultKey) return
+  const handle = appState.vault.identity && appState.vault.identity.handle
+  if (!handle) return
+  try {
+    const base = new URL(SYNC_ENDPOINT).origin
+    const did = appState.vault.identity.id
+    await sbSelfCall(base, 'relation', 'profile', { handle: handle },
+      { type: 'did', id: did })
+  } catch (e) { /* display-name sync is best effort */ }
+}
+
 function _decodeUnifiedInvite(raw) {
   try {
     let s = String(raw).replace(/-/g, '+').replace(/_/g, '/')
