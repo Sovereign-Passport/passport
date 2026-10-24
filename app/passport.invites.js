@@ -352,11 +352,110 @@ function hasVineMembershipItem(vineId) {
     (c.issuer_did === vineId || c.node_id === vineId))
 }
 
-/** #invite= → open the existing invite screen for a canonical Cluster OR a Vine. */
+/** Call the Switchboard with a did:key SELF-PROOF (no device, no credential). */
+async function sbSelfCall(base, service, action, data, scope) {
+  if (!appState.vault || !appState.vaultKey) throw new Error('locked')
+  const root = String(base).replace(/\/+$/, '')
+  const n = await (await fetch(root + '/api/switch/nonce')).json()
+  const key = await crypto.subtle.importKey('jwk', appState.vault.keys.privateKey,
+    { name: 'Ed25519' }, false, ['sign'])
+  const sigBuf = await crypto.subtle.sign('Ed25519', key, enc(n.nonce))
+  const body = {
+    did: appState.vault.identity.id,
+    nonce: n.nonce,
+    self_proof: { nonce: n.nonce, signature: toB64(sigBuf) },
+    service: service,
+    action: action,
+    data: data || {},
+  }
+  if (scope && scope.type && scope.id) {
+    body.scope_type = scope.type
+    body.scope_id = scope.id
+  }
+  const r = await fetch(root + '/api/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = await r.json().catch(function () { return null })
+  return { status: r.status, body: json }
+}
+
+function _decodeUnifiedInvite(raw) {
+  try {
+    let s = String(raw).replace(/-/g, '+').replace(/_/g, '/')
+    while (s.length % 4) s += '='
+    const bin = atob(s)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const obj = JSON.parse(new TextDecoder().decode(bytes))
+    return (obj && obj.scope && obj.scope.type) ? obj : null
+  } catch (e) { return null }
+}
+
+function _inviteConsentCard(name, type, wanted) {
+  return new Promise(function (resolve) {
+    const ov = document.createElement('div')
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(8,11,18,0.96);z-index:200;' +
+      'display:flex;align-items:center;justify-content:center;padding:24px'
+    const card = document.createElement('div')
+    card.style.cssText = 'background:#14171c;border:1px solid rgba(201,169,97,0.4);border-radius:16px;' +
+      'padding:22px;max-width:360px;width:100%'
+    const h = document.createElement('p')
+    h.textContent = 'Invitation'
+    h.style.cssText = 'color:#c9a961;letter-spacing:.14em;text-transform:uppercase;font-size:11px'
+    const b = document.createElement('p')
+    b.textContent = 'Rejoindre « ' + name + ' » (' + type + ')'
+    b.style.cssText = 'color:#eee;font-size:15px;margin-top:8px'
+    const w = document.createElement('p')
+    w.textContent = 'Statut relation demandé : ' + wanted
+    w.style.cssText = 'color:#999;font-size:12px;margin-top:6px;font-style:italic'
+    const row = document.createElement('div')
+    row.style.cssText = 'display:flex;gap:8px;margin-top:16px'
+    const no = document.createElement('button')
+    no.className = 'btn btn-ghost'; no.type = 'button'; no.textContent = 'Refuser'
+    const yes = document.createElement('button')
+    yes.className = 'btn btn-primary'; yes.type = 'button'; yes.textContent = 'Accepter'
+    const close = function (v) { ov.remove(); resolve(v) }
+    no.addEventListener('click', function () { close(false) })
+    yes.addEventListener('click', function () { close(true) })
+    row.appendChild(no); row.appendChild(yes)
+    card.appendChild(h); card.appendChild(b); card.appendChild(w); card.appendChild(row)
+    ov.appendChild(card); document.body.appendChild(ov)
+  })
+}
+
+async function _handleUnifiedInvite(p) {
+  const name = (p.ref && p.ref.node_name) || (p.scope && p.scope.id) || '—'
+  const wanted = (p.requested || []).join(', ') || '—'
+  const ok = await _inviteConsentCard(name, p.scope.type, wanted)
+  if (!ok) { showToast('Invitation declined.'); return }
+  const base = p.anchor ? String(p.anchor).replace(/\/+$/, '') : null
+  if (!base) { showToast('Invitation accepted (private — no server).'); return }
+  try {
+    const did = appState.vault.identity.id
+    const r = await sbSelfCall(base, 'relation', 'accept', {
+      scope: p.scope,
+      handle: (appState.vault.identity && appState.vault.identity.handle) || null,
+      types: p.requested || [],
+    }, { type: 'did', id: did })
+    if (r.status !== 200 || !r.body || !r.body.ok) {
+      throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
+    }
+    showToast('Invitation accepted ✓')
+  } catch (e) {
+    showToast('Failed: ' + (e && e.message ? e.message : e))
+  }
+}
+
+/** #invite= → unified invitee join, or legacy descriptor. */
 function checkPendingInvite() {
   const raw = appState.pendingInviteRaw
   if (!raw) return false
   appState.pendingInviteRaw = null
+
+  const uni = _decodeUnifiedInvite(raw)
+  if (uni) { _handleUnifiedInvite(uni); return true }
 
   let demand = null
   try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
