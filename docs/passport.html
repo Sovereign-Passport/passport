@@ -279,6 +279,15 @@
       <span class="menu-arrow">›</span>
     </div>
 
+    <div class="menu-item fade-up fade-up-2" onclick="openFeedback()">
+      <div class="menu-icon">💬</div>
+      <div class="menu-text">
+        <strong>Feedback</strong>
+        <small>Partager une expérience — sans effet administratif</small>
+      </div>
+      <span class="menu-arrow">›</span>
+    </div>
+
     <div class="menu-item fade-up fade-up-2" onclick="openOfficialize()">
       <div class="menu-icon">🏛️</div>
       <div class="menu-text">
@@ -435,6 +444,40 @@
     </div>
   </div>
 
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCREEN — FEEDBACK
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="screen screen-top" id="screen-feedback">
+    <div class="screen-header">
+      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
+      <p class="logotype">Feedback</p>
+    </div>
+
+    <p class="section-label">Expérience</p>
+    <div class="field">
+      <label>Type de sujet</label>
+      <select id="fb-subject-type" class="did-input">
+        <option value="cluster">Cluster</option>
+        <option value="vine">Vine / communauté</option>
+        <option value="did">DID</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Identifiant du sujet</label>
+      <input id="fb-subject-id" class="did-input" type="text" placeholder="cluster_id, DID Vine ou did:key…" autocomplete="off">
+    </div>
+
+    <div class="bb-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" type="button" onclick="submitFeedback('positive')">🟢 Positif</button>
+      <button class="btn btn-ghost" type="button" onclick="submitFeedback('neutral')">🟡 Neutre</button>
+      <button class="btn btn-ghost" type="button" onclick="submitFeedback('negative')">🔴 Négatif</button>
+    </div>
+    <p id="fb-status" class="bb-note" style="display:none;"></p>
+
+    <p class="section-label" style="margin-top:24px;">Mes feedbacks sur ce sujet</p>
+    <div id="fb-list" class="bb-list"></div>
+  </div>
 
   <!-- ══════════════════════════════════════════════════════════════
        SCREEN — HEALTH
@@ -1361,6 +1404,7 @@
 <script src="passport.clusters.js"></script>
 <script src="passport.invites.js"></script>
 <script src="passport.offers.js"></script>
+<script src="passport.feedback.js"></script>
 <script src="passport.boot.js"></script>
 <script src="spid.i18n.js"></script>
 <script>
