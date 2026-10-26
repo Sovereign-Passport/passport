@@ -252,7 +252,8 @@ function populateHome() {
   // Clusters (founded or joined) are never counted here.
   const allCreds = (v.credentials || [])
   const vineCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard')
+    c.type === 'MembershipCredential' &&
+    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id)
   const seenVine = {}
   const vineCount = vineCreds.filter(c => {
     if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
@@ -635,7 +636,8 @@ async function checkClusterUpdates(membership, btn) {
 function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
   const vineCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard')
+    c.type === 'MembershipCredential' &&
+    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id)
   const vignardCreds = allCreds.filter(c =>
     c.type === 'MembershipCredential' && c.scope === 'vignard' &&
     (c.issuer_did || c.vignard_did))

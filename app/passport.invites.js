@@ -348,7 +348,8 @@ function hasVineMembershipItem(vineId) {
   const vault = appState.vault
   if (!vault || !vineId) return false
   return (vault.credentials || []).some(c =>
-    c.type === 'MembershipCredential' && c.scope !== 'cluster' && c.scope !== 'vignard' &&
+    c.type === 'MembershipCredential' &&
+    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id &&
     (c.issuer_did === vineId || c.node_id === vineId))
 }
 
@@ -407,6 +408,7 @@ function _decodeUnifiedInvite(raw) {
 }
 
 function _inviteConsentCard(name, type, wanted) {
+  var typeLabel = type === 'cluster' ? 'Cluster' : type === 'vine' ? 'Vine' : type === 'vignard' ? 'Vignard' : type
   return new Promise(function (resolve) {
     const ov = document.createElement('div')
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(8,11,18,0.96);z-index:200;' +
@@ -418,7 +420,7 @@ function _inviteConsentCard(name, type, wanted) {
     h.textContent = 'Invitation'
     h.style.cssText = 'color:#c9a961;letter-spacing:.14em;text-transform:uppercase;font-size:11px'
     const b = document.createElement('p')
-    b.textContent = 'Rejoindre « ' + name + ' » (' + type + ')'
+    b.textContent = 'Rejoindre « ' + name + ' » (' + typeLabel + ')'
     b.style.cssText = 'color:#eee;font-size:15px;margin-top:8px'
     const w = document.createElement('p')
     w.textContent = 'Statut relation demandé : ' + wanted
@@ -439,7 +441,10 @@ function _inviteConsentCard(name, type, wanted) {
 }
 
 async function _handleUnifiedInvite(p) {
-  const name = (p.ref && p.ref.node_name) || (p.scope && p.scope.id) || '—'
+  const name = p.name || (p.ref && p.ref.node_name) || (p.scope && p.scope.id) || '—'
+  const typeLabel = p.scope.type === 'cluster' ? 'Cluster'
+    : p.scope.type === 'vine' ? 'Vine'
+    : p.scope.type === 'vignard' ? 'Vignard' : p.scope.type
   const wanted = (p.requested || []).join(', ') || '—'
   const ok = await _inviteConsentCard(name, p.scope.type, wanted)
   if (!ok) { showToast('Invitation declined.'); return }
@@ -455,7 +460,7 @@ async function _handleUnifiedInvite(p) {
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
     }
-    showToast('Invitation accepted ✓')
+    showToast('Invitation ' + typeLabel + ' « ' + name + ' » acceptée — en attente d’approbation.')
   } catch (e) {
     showToast('Failed: ' + (e && e.message ? e.message : e))
   }
