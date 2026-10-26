@@ -39,10 +39,12 @@ function openInvite() {
   // Never use a Vine credential's node_id / vine_handle as a Cluster id.
   const ownClusters  = ((vault && vault.ownClusters) || [])
   const grapeCreds   = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'GrapeClusterCredential' && c.cluster_id)
+    .filter(c => c.type === 'GrapeClusterCredential' && c.cluster_id &&
+      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
   const clusterCreds = ((vault && vault.credentials) || [])
     .filter(c => c.type === 'MembershipCredential' && c.scope === 'cluster' &&
-                 c.status === 'approved' && c.cluster_id)
+                 c.status === 'approved' && c.cluster_id &&
+      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
 
   // Vines come from the SAME source as My Memberships (distinct space, by scope).
   const vineItems = (typeof collectMembershipItems === 'function')
@@ -350,7 +352,8 @@ function hasVineMembershipItem(vineId) {
   return (vault.credentials || []).some(c =>
     c.type === 'MembershipCredential' &&
     c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id &&
-    (c.issuer_did === vineId || c.node_id === vineId))
+    (c.issuer_did === vineId || c.node_id === vineId) &&
+    (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
 }
 
 /** Call the Switchboard with a did:key SELF-PROOF (no device, no credential). */
@@ -459,6 +462,9 @@ async function _handleUnifiedInvite(p) {
     }, { type: 'did', id: did })
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
+    }
+    if (typeof syncRelationsFromSwitchboard === 'function') {
+      await syncRelationsFromSwitchboard()
     }
     showToast('Invitation ' + typeLabel + ' « ' + name + ' » acceptée — en attente d’approbation.')
   } catch (e) {

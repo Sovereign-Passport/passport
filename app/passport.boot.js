@@ -183,6 +183,7 @@ async function tryUnlock() {
     appState.vaultKey = vaultKey
     populateHome()
     syncProfileHandle()
+    syncRelationsFromSwitchboard()
     checkPendingOffer()
     checkPendingApproval()
     checkPendingDecision()
@@ -344,10 +345,11 @@ function openNodes() {
     }
   })
   const clusterCandidates = [
-    ...((vault && vault.memberships) || []).filter(m => m.cluster_id),
+    ...((vault && vault.memberships) || []).filter(m => m.cluster_id && !m.stale),
     ...allCreds.filter(c =>
-      (c.type === 'MembershipCredential' && c.scope === 'cluster' && c.cluster_id) ||
-      (c.type === 'GrapeClusterCredential' && c.cluster_id)),
+      ((c.type === 'MembershipCredential' && c.scope === 'cluster' && c.cluster_id) ||
+       (c.type === 'GrapeClusterCredential' && c.cluster_id)) &&
+      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c))),
   ]
   const seenJoined = {}
   const memberships = clusterCandidates.filter(m => {
@@ -635,14 +637,18 @@ async function checkClusterUpdates(membership, btn) {
 /** Vines / Vignards / legacy memberships as display items (Cluster-free). */
 function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
-  const vineCreds = allCreds.filter(c =>
+  let vineCreds = allCreds.filter(c =>
     c.type === 'MembershipCredential' &&
     c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id)
-  const vignardCreds = allCreds.filter(c =>
+  let vignardCreds = allCreds.filter(c =>
     c.type === 'MembershipCredential' && c.scope === 'vignard' &&
     (c.issuer_did || c.vignard_did))
+  if (typeof relationCredentialActive === 'function') {
+    vineCreds = vineCreds.filter(c => relationCredentialActive(vault, c))
+    vignardCreds = vignardCreds.filter(c => relationCredentialActive(vault, c))
+  }
   const legacyMembers = ((vault && vault.memberships) || [])
-    .filter(m => !m.cluster_id)
+    .filter(m => !m.cluster_id && !m.stale)
     .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
   const seenVine = {}
   const vineList = vineCreds.filter(c => {
