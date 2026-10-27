@@ -284,7 +284,7 @@ Not three universal authorities over the Clusters using the Vine.
 
 But three administrators responsible for the continued operation of that community space.
 
-Until that target is reached, the Vine continues to operate. One administrator is sufficient to approve routine requests and tasks. The interface keeps a visible warning — currently “2 of 3” — without blocking the community.
+Until that target is reached, the Vine continues to operate. One administrator is sufficient to approve routine requests and tasks. The interface keeps a visible warning — `n/3`, currently `2/3` on MduSL — without blocking the community.
 
 If the administrative group later falls below three members, the Vine continues to run with the same warning. It is not paused or deleted merely because its governance is incomplete.
 
