@@ -5,6 +5,8 @@ concepts or architecture.
 
 ## Canonical reading order
 
+Paths are relative to `/opt/blindspot`.
+
 1. `passport/app/axismundi.md` — why SPID exists, principles, vision.
 2. `spid-js/docs/ARCHITECTURE.md` — SPID objects, identities, relations, Switchboard, data spaces.
 3. `spid-js/README.md` — where and how to work.
