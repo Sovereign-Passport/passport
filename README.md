@@ -38,6 +38,26 @@ node app/build.cjs
 The build copies CSS and JS as separate files next to `docs/passport.html`.
 It does not inline them.
 
+### Build flow
+
+1. Edit the relevant source file(s) in `app/`.
+2. Check ES2017 compatibility on changed JS files (if `es-check` is available):
+
+   ```bash
+   cd /opt/blindspot/passport
+   es-check es2017 app/passport.*.js
+   ```
+
+3. Build the artifact:
+
+   ```bash
+   node app/build.cjs
+   ```
+
+4. Commit source and the generated `docs/` files together.
+
+No external fonts, no CDN. Keep JS and CSS as separate files; do not inline them.
+
 ## Local check
 
 Open `app/passport.html` directly. The source links its sibling CSS/JS.
