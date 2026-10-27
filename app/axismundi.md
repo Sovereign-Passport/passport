@@ -3,7 +3,7 @@
 > The center that holds. Return here when the project feels complex.
 > Also return here when momentum feels too good — that's when honest review matters most.
 
-*Last updated: May 21, 2026 — Checkpoint L3A*
+*Last updated: May 21, 2026*
 
 > This document is the **why**. It is not a technical specification.
 > Object relations: `spid-js/docs/ARCHITECTURE.md`. Operations: `spid-js/README.md`.
@@ -204,6 +204,6 @@ not when the code is ready.
 
 ---
 
-*Written May 18, 2026 — Updated May 21, 2026 — Checkpoint L3A*
+*Written May 18, 2026 — Updated May 21, 2026*
 *Saint-Léon-de-Standon, Quebec, Canada*
 *🍇*
