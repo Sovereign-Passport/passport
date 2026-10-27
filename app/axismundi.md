@@ -274,9 +274,9 @@ Its continuity should not depend entirely on one individual.
 
 For this reason, Sovereign Passport establishes a principle of shared governance.
 
-**A Vine requires an administrative Cluster of at least three Grapes.**
+**A Vine is served by an administrative Cluster that should reach three Grapes.**
 
-Three sovereign participants sharing responsibility for the community's administration.
+Three sovereign participants sharing responsibility for the community's administration is the target.
 
 Not three owners of everyone else's identity.
 
@@ -284,9 +284,9 @@ Not three universal authorities over the Clusters using the Vine.
 
 But three administrators responsible for the continued operation of that community space.
 
-If the administrative group falls below three members, the Vine pauses rather than being deleted.
+Until that target is reached, the Vine continues to operate. One administrator is sufficient to approve routine requests and tasks. The interface keeps a visible warning — currently “2 of 3” — without blocking the community.
 
-Its existence and accumulated relationships are not erased simply because its governance temporarily becomes incomplete.
+If the administrative group later falls below three members, the Vine continues to run with the same warning. It is not paused or deleted merely because its governance is incomplete.
 
 This is an expression of a deeper principle:
 
