@@ -4,7 +4,7 @@ Thank you for your interest in contributing. This project exists because communi
 
 ## Before You Start
 
-Read the README fully. Understand the core principles. If you want to make a large change, open a Discussion first — architecture decisions here have cryptographic consequences that are hard to reverse.
+Read the three canonical documents in order (Axis Mundi, Architecture, operational README). Understand the core principles. If you want to make a large change, open a Discussion first — architecture decisions here have cryptographic consequences that are hard to reverse.
 
 ## What We Need Most Right Now
 
@@ -23,10 +23,11 @@ Read the README fully. Understand the core principles. If you want to make a lar
 
 ## Code Style
 
-- Vanilla JS / ES modules — no frameworks in `shared/` or `crypto/`
+- Vanilla JS / ES modules — no framework, WebCrypto only
 - Every new function needs a JSDoc comment
-- Every new module needs tests in `tests/`
-- Run the existing test suite before submitting — all 129 must pass
+- Every new module needs tests where a test harness exists
+- Do not claim a fixed test count; report what was actually run
+- Current recovery bases may not include the old `app/src/tests/` pages
 
 ## Submitting
 
