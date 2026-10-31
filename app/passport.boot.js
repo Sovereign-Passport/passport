@@ -189,7 +189,7 @@ async function tryUnlock() {
     checkPendingDecision()
     checkPendingRevoke()
     checkPendingNewCluster()
-    checkPendingInvite()
+    const inviteHandled = checkPendingInvite()
 
     // If a sync token was waiting, route to restore screen sync tab
     if (appState.pendingSyncToken) {
@@ -202,7 +202,7 @@ async function tryUnlock() {
         if (input) input.value = `${SYNC_ENDPOINT}/${token}`
         showToast('Enter your password to complete restore')
       })
-    } else {
+    } else if (!inviteHandled) {
       goTo('screen-home')
     }
 

@@ -293,9 +293,9 @@ async function tryRestore() {
     checkPendingDecision()
     checkPendingRevoke()
     checkPendingNewCluster()
-    checkPendingInvite()
+    const inviteHandled = checkPendingInvite()
     showToast('Passport restored')
-    goTo('screen-home')
+    if (!inviteHandled) goTo('screen-home')
 
   } catch (e) {
     // Show the REAL error — not a generic message

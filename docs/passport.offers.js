@@ -715,6 +715,7 @@ function normalizeVineEndpoint(raw) {
                     /^\[::1\](:\d+)?(\/|$)/i.test(s)
     s = (isLocal ? 'http://' : 'https://') + s
   }
+  s = s.replace(/\/api\/(?:offer|credentials\/issue)\/?$/i, '')
   return s.replace(/\/+$/, '')
 }
 

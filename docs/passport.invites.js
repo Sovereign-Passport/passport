@@ -50,13 +50,26 @@ function openInvite() {
   const vineItems = (typeof collectMembershipItems === 'function')
     ? collectMembershipItems(vault).items.filter(it => it.kind === 'vine' && it.cred)
     : []
+  // Endpoint map from the reconciled membership records. A Vine credential
+  // may predate offer_endpoint, while the Switchboard relation snapshot already
+  // carries the authoritative vine_endpoint. Keep both IDs (did:key / did:web).
+  const vineEndpoints = {}
+  ;((vault && vault.memberships) || []).forEach(m => {
+    if (m.cluster_id || !m.vine_endpoint) return
+    ;[m.node_id, m.vine_id, m.vine_did, m.issuer_did].forEach(id => {
+      if (id && !vineEndpoints[id]) vineEndpoints[id] = m.vine_endpoint
+    })
+  })
   const rawVines = vineItems.map(it => {
     const c = it.cred
+    const vineDid = c.issuer_did || c.vine_did || null
     return {
       kind:      'vine',
-      node_id:   c.issuer_did || c.node_id || null,   // the Vine's DID / id
-      node_name: c.node_name || c.issuer_did || 'Vine',
-      endpoint:  c.offer_endpoint || c.vine_endpoint || null,
+      node_id:   vineDid || c.node_id || null,   // the Vine's DID / id
+      vine_did:  vineDid,
+      node_name: c.node_name || c.vine_name || vineDid || 'Vine',
+      endpoint:  c.vine_endpoint || c.offer_endpoint ||
+                 vineEndpoints[vineDid] || vineEndpoints[c.node_id] || null,
       own:       true,
     }
   })
@@ -188,10 +201,14 @@ async function generateInvite() {
       // Vine target → the Vine's own endpoint (membership record or the object),
       // else the signed #invite= hand-off that targeted THIS Vine.
       const vm = (vault.memberships || []).find(m => !m.cluster_id &&
-        (m.issuer_did === target.node_id || m.node_id === target.node_id))
+        (m.issuer_did === target.node_id || m.node_id === target.node_id ||
+         m.vine_did === target.node_id || m.vine_id === target.node_id ||
+         (target.vine_did &&
+          (m.vine_did === target.vine_did || m.issuer_did === target.vine_did))))
       vineEndpoint = target.endpoint || (vm && vm.vine_endpoint) || null
       if (!vineEndpoint && appState.pendingInvite &&
-          appState.pendingInvite.vine_id === target.node_id) {
+          (appState.pendingInvite.vine_id === target.node_id ||
+           appState.pendingInvite.vine_id === target.vine_did)) {
         vineEndpoint = appState.pendingInvite.vine_endpoint
       }
     } else {
@@ -215,8 +232,22 @@ async function generateInvite() {
         : 'This Cluster is not linked to a Vine yet — open the invite from your Vine dashboard.')
     }
 
-    // Self-heal: when the endpoint came from a signed hand-off (#invite=), keep
-    // it on the owned Cluster so the NEXT invite needs no hand-off.
+    // Self-heal: keep the resolved base endpoint on the owned Cluster or Vine
+    // credential so the NEXT invite needs no hand-off and no global fallback.
+    if (target.kind === 'vine') {
+      const cred = (vault.credentials || []).find(c =>
+        c.type === 'MembershipCredential' && !c.cluster_id &&
+        (c.issuer_did === target.node_id || c.issuer_did === target.vine_did ||
+         c.node_id === target.node_id || c.vine_did === target.node_id))
+      if (cred && cred.vine_endpoint !== vineBase) {
+        cred.vine_endpoint = vineBase
+        try {
+          const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+          await persist(p)
+          appState.stored = p
+        } catch (e) { console.warn('[Invite] could not remember vine_endpoint:', e) }
+      }
+    }
     if (target.kind === 'cluster') {
       const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
       if (own && !own.vine_endpoint) {
