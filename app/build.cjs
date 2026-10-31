@@ -41,13 +41,14 @@ function build() {
     /<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g,
     (match, href) => {
       if (href.startsWith('http') || href.startsWith('//')) return match
-      const cssPath = path.join(SRC_DIR, href)
+      const cleanHref = href.split('?')[0].split('#')[0]
+      const cssPath = path.join(SRC_DIR, cleanHref)
       if (!fs.existsSync(cssPath)) {
         console.warn(`  ⚠ CSS not found: ${href}`)
         return match
       }
       const css = fs.readFileSync(cssPath, 'utf8')
-      fs.writeFileSync(path.join(DIST_DIR, path.basename(href)), css, 'utf8')
+      fs.writeFileSync(path.join(DIST_DIR, path.basename(cleanHref)), css, 'utf8')
       totalBytes += css.length
       cssCopied++
       return match            // keep <link rel="stylesheet" href="passport.css">
@@ -60,13 +61,14 @@ function build() {
     /<script\s+src="([^"]+)"><\/script>/g,
     (match, src) => {
       if (src.startsWith('http') || src.startsWith('//')) return match
-      const jsPath = path.join(SRC_DIR, src)
+      const cleanSrc = src.split('?')[0].split('#')[0]
+      const jsPath = path.join(SRC_DIR, cleanSrc)
       if (!fs.existsSync(jsPath)) {
         console.warn(`  ⚠ JS not found: ${src}`)
         return match
       }
       const js = fs.readFileSync(jsPath, 'utf8')
-      fs.writeFileSync(path.join(DIST_DIR, path.basename(src)), js, 'utf8')
+      fs.writeFileSync(path.join(DIST_DIR, path.basename(cleanSrc)), js, 'utf8')
       totalBytes += js.length
       jsCopied++
       return match            // keep <script src="passport.crypto.js"></script>
