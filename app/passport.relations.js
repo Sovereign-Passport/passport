@@ -93,6 +93,7 @@ async function syncRelationsFromSwitchboard() {
   var rel = r.body.relations
   var next = Array.isArray(vault.memberships) ? vault.memberships.slice() : []
   var before = JSON.stringify(vault.memberships || null)
+  var beforeOwn = JSON.stringify(vault.ownClusters || null)
   var beforeSnapshot = JSON.stringify(vault.relationSnapshot || null)
 
   var vines = (rel.vines || []).map(function (v) {
@@ -178,6 +179,7 @@ async function syncRelationsFromSwitchboard() {
   })
 
   if (before === JSON.stringify(next) &&
+      beforeOwn === JSON.stringify(vault.ownClusters || null) &&
       beforeSnapshot === JSON.stringify(vault.relationSnapshot)) return
   try {
     var payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
