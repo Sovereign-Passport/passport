@@ -285,6 +285,7 @@ async function tryRestore() {
     appState.stored   = payload
     appState.vault    = vault
     appState.vaultKey = vaultKey
+    await syncRelationsFromSwitchboard()
     populateHome()
     checkPendingOffer()
     // Signed hand-offs must also run on the RESTORE path (a new device that
