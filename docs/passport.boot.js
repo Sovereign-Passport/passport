@@ -181,9 +181,11 @@ async function tryUnlock() {
 
     appState.vault    = vault
     appState.vaultKey = vaultKey
+    // Reconcile first, then render: counts and invitation targets must not be
+    // computed from a pre-sync snapshot.
+    await syncRelationsFromSwitchboard()
     populateHome()
     syncProfileHandle()
-    syncRelationsFromSwitchboard()
     checkPendingOffer()
     checkPendingApproval()
     checkPendingDecision()
@@ -249,31 +251,21 @@ function populateHome() {
   // Settings handle display
   setText('settings-handle-display', handle)
 
-  // Memberships count — ONLY Vines/Vignards actually shown in My Memberships.
-  // Clusters (founded or joined) are never counted here.
-  const allCreds = (v.credentials || [])
-  const vineCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' &&
-    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id)
-  const seenVine = {}
-  const vineCount = vineCreds.filter(c => {
-    if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
-    return true
-  }).length
-  const vignardCount = allCreds.filter(c =>
-    c.type === 'MembershipCredential' && c.scope === 'vignard' &&
-    (c.issuer_did || c.vignard_did)).length
-  const legacyCount = (v.memberships || [])
-    .filter(m => !m.cluster_id)
-    .filter(m => !vineCreds.some(c => c.node_id === m.node_id)).length
-  const credCount = vineCount + vignardCount + legacyCount
-  setText('cred-count', `${credCount} membership${credCount !== 1 ? 's' : ''}`)
+  // One compact relation summary. Vine memberships and Clusters stay distinct:
+  // a Cluster is not renamed into a membership and a Vine is not a Cluster.
+  const relations = activeRelationSummary(v)
+  const parts = []
+  if (relations.vineCount) parts.push(`${relations.vineCount} Vine${relations.vineCount !== 1 ? 's' : ''}`)
+  if (relations.vignardCount) parts.push(`${relations.vignardCount} Vignard${relations.vignardCount !== 1 ? 's' : ''}`)
+  if (relations.clusterCount) parts.push(`${relations.clusterCount} Cluster${relations.clusterCount !== 1 ? 's' : ''}`)
+  setText('cred-count',
+    `${relations.total} relation${relations.total !== 1 ? 's' : ''}` +
+    (parts.length ? ` — ${parts.join(' · ')}` : ''))
 
-  // Clusters count (Groups and Communities)
-  const nodeCount = (v.ownClusters || []).length
+  // Clusters count (Groups and Communities) — active hosting view.
   setText('nodes-count',
-    nodeCount > 0
-      ? `${nodeCount} cluster${nodeCount !== 1 ? 's' : ''} — free forever`
+    relations.clusterCount > 0
+      ? `${relations.clusterCount} cluster${relations.clusterCount !== 1 ? 's' : ''} — free forever`
       : '0 clusters — free forever')
 
   // Vault files count
@@ -286,7 +278,7 @@ function populateHome() {
 
   // Health summary
   const issues = []
-  if (credCount === 0) issues.push('no memberships yet')
+  if (relations.total === 0) issues.push('no relations yet')
   setText('health-summary', issues.length === 0 ? 'All good ✓' : issues.join(' · '))
 
   // Health screen — only update if on health screen
@@ -297,8 +289,8 @@ function populateHome() {
   const hFilesB = document.getElementById('h-files-badge')
   try {
     if (hDid)    hDid.textContent    = did.slice(0,20) + '…'
-    if (hCreds)  hCreds.textContent  = `${credCount} membership credential${credCount !== 1 ? 's' : ''}`
-    if (hCredsB) hCredsB.textContent = `${credCount}`
+    if (hCreds)  hCreds.textContent  = `${relations.total} relation${relations.total !== 1 ? 's' : ''}`
+    if (hCredsB) hCredsB.textContent = `${relations.total}`
     if (hFiles)  hFiles.textContent  = `${fileCount} file${fileCount !== 1 ? 's' : ''} in vault`
     if (hFilesB) hFilesB.textContent = `${fileCount}`
   } catch(e) { console.warn('[populateHome] health section:', e) }
@@ -330,7 +322,8 @@ function openNodes() {
   const list       = document.getElementById('nodes-list')
   const empty      = document.getElementById('nodes-empty')
   const ownClusters = ((vault && vault.ownClusters) || [])
-    .filter(c => c.id && c.name && c.founder_did)
+    .filter(c => c.id && c.name && c.founder_did &&
+      c.status !== 'revoked' && c.status !== 'removed')
 
   // Joined Clusters ONLY — canonical cluster_id, never a Vine, never a founder.
   const allCreds = ((vault && vault.credentials) || [])
@@ -387,10 +380,10 @@ function openNodes() {
         card.innerHTML = `
           <p class="cred-type">${
             isLeft
-              ? 'FOUNDER · AWAY'
+              ? 'Cluster : founder · away'
               : c.status === 'pre-vine'
-                ? 'FOUNDER · 🌱 PRE-VINE'
-                : 'FOUNDER'
+                ? 'Cluster : founder · 🌱 pre-vine'
+                : 'Cluster : founder'
           }</p>
           <div class="cred-title">${escHtmlP(c.name)}</div>
           <div class="cred-sub" style="font-size:11px;color:var(--ink-dim);margin-top:4px;">
@@ -455,7 +448,8 @@ function openNodes() {
         const isLeft     = status === 'left'
         const isPending  = status === 'invited' || status === 'candidate' || status === 'temporary'
         const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
-        const statusText = isLeft ? 'MEMBER · AWAY' : (status ? status.toUpperCase() : 'MEMBER')
+        const statusText = isLeft ? 'Cluster : member · away'
+          : (status ? 'Cluster : ' + status : 'Cluster : member')
         const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
         // Every Joined card here is a canonical Cluster (cluster_id present).
         const markerScope = 'cluster'
@@ -634,7 +628,48 @@ async function checkClusterUpdates(membership, btn) {
 //   legacy vault.memberships without cluster_id → LEGACY VINE MEMBERSHIP
 // ═════════════════════════════════════════════════════════════════════════════
 
-/** Vines / Vignards / legacy memberships as display items (Cluster-free). */
+/** Active relations, counted by existing type. No new relation model. */
+function activeRelationSummary(vault) {
+  const allCreds = (vault && vault.credentials) || []
+  const active = c => typeof relationCredentialActive !== 'function' ||
+    relationCredentialActive(vault, c)
+  const seenVines = {}
+  allCreds.forEach(c => {
+    if (c.type !== 'MembershipCredential' || c.revoked) return
+    if (c.scope === 'cluster' || c.scope === 'vignard' || c.cluster_id) return
+    if (!active(c)) return
+    const id = c.issuer_did || c.node_id || c.vine_id
+    if (id) seenVines[id] = true
+  })
+  const seenVignards = {}
+  allCreds.forEach(c => {
+    if (c.type !== 'MembershipCredential' || c.scope !== 'vignard' || c.revoked) return
+    if (!active(c)) return
+    const id = c.issuer_did || c.vignard_did || c.node_id
+    if (id) seenVignards[id] = true
+  })
+  const ownIds = {}
+  ;(vault && vault.ownClusters || []).forEach(c => {
+    if (c.id && c.status !== 'revoked' && c.status !== 'removed') ownIds[c.id] = true
+  })
+  const clusterIds = Object.assign({}, ownIds)
+  ;(vault && vault.memberships || []).forEach(m => {
+    if (!m.cluster_id || m.stale || ownIds[m.cluster_id]) return
+    if (m.status === 'revoked' || m.status === 'removed') return
+    clusterIds[m.cluster_id] = true
+  })
+  allCreds.forEach(c => {
+    if (c.type !== 'MembershipCredential' || c.scope !== 'cluster' || !c.cluster_id || c.revoked) return
+    if (ownIds[c.cluster_id] || !active(c)) return
+    clusterIds[c.cluster_id] = true
+  })
+  const vineCount = Object.keys(seenVines).length
+  const vignardCount = Object.keys(seenVignards).length
+  const clusterCount = Object.keys(clusterIds).length
+  return { vineCount, vignardCount, clusterCount, total: vineCount + vignardCount + clusterCount }
+}
+
+/** Vines / Vignards as display items (Cluster-free). */
 function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
   let vineCreds = allCreds.filter(c =>
@@ -647,18 +682,16 @@ function collectMembershipItems(vault) {
     vineCreds = vineCreds.filter(c => relationCredentialActive(vault, c))
     vignardCreds = vignardCreds.filter(c => relationCredentialActive(vault, c))
   }
-  const legacyMembers = ((vault && vault.memberships) || [])
-    .filter(m => !m.cluster_id && !m.stale)
-    .filter(m => !vineCreds.some(c => c.node_id === m.node_id))
   const seenVine = {}
   const vineList = vineCreds.filter(c => {
     if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
     return true
   })
+  // Legacy vault.memberships are reconciliation scaffolding, not a second
+  // Vine membership. Credentials remain the authoritative display source.
   const items = [
     ...vineList.map(c     => ({ kind: 'vine',    cred: c, idx: allCreds.indexOf(c) })),
     ...vignardCreds.map(c => ({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })),
-    ...legacyMembers.map(m=> ({ kind: 'legacy',  cred: m, idx: -1 })),
   ]
   return { items, allCreds }
 }
