@@ -1,161 +1,35 @@
 /*
  * PASSPORT — Sovereign Identity System
- * passport.invites.js — §10b INVITES
+ * passport.invites.js — invitation acceptance
  *
- * Generating and sharing invite links.
- * The grape signs a referral and produces a shareable URL.
- *
- * Responsibilities:
- *   openInvite()        — navigate to invite screen, populate cluster dropdown
- *   generateInvite()    — sign referral, build invite URL, show QR + link
- *   copyInviteLink()    — copy invite URL to clipboard
- *   shareInviteLink()   — native share or copy fallback
- *
- * Dependencies: passport.crypto.js, passport.state.js
- * SYNC_ENDPOINT: used for invite URL base (defined in passport.state.js)
+ * Invitation creation and sharing live in Portail → Relations.
+ * This file verifies a signed #invite= descriptor and applies the result:
+ *   - private Cluster: local approved membership after founder proof
+ *   - hosted Cluster/Vine/Vignard: existing Switchboard relation/accept
  */
 
-function openInvite() {
-  const vault       = appState.vault
-  const select      = document.getElementById('invite-cluster-select')
-  const disclosures = document.getElementById('invite-disclosures')
-  const noteField   = document.getElementById('invite-note-field')
-  const result      = document.getElementById('invite-result')
-  const errEl       = document.getElementById('invite-error')
-  const btn         = document.getElementById('btn-generate-invite')
+// Invitation creation now lives in Portail → Relations.
+// Passport keeps referral verification and the acceptance path only.
 
-  // Reset state
-  result.style.display    = 'none'
-  errEl.style.display     = 'none'
-  disclosures.style.display = 'none'
-  noteField.style.display  = 'none'
-  btn.disabled             = true
-  document.getElementById('invite-note').value = ''
-
-  // Cluster dropdown — canonical Cluster ids ONLY:
-  //   1. ownClusters[].id (the Passport's canonical UUID)
-  //   2. GrapeClusterCredential.cluster_id
-  //   3. MembershipCredential scope=cluster, approved → cluster_id
-  // Never use a Vine credential's node_id / vine_handle as a Cluster id.
-  const ownClusters  = ((vault && vault.ownClusters) || [])
-  const grapeCreds   = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'GrapeClusterCredential' && c.cluster_id &&
-      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
-  const clusterCreds = ((vault && vault.credentials) || [])
-    .filter(c => c.type === 'MembershipCredential' && c.scope === 'cluster' &&
-                 c.status === 'approved' && c.cluster_id &&
-      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
-
-  // Vines come from the SAME source as My Memberships (distinct space, by scope).
-  const vineItems = (typeof collectMembershipItems === 'function')
-    ? collectMembershipItems(vault).items.filter(it => it.kind === 'vine' && it.cred)
-    : []
-  // Endpoint map from the reconciled membership records. A Vine credential
-  // may predate offer_endpoint, while the Switchboard relation snapshot already
-  // carries the authoritative vine_endpoint. Keep both IDs (did:key / did:web).
-  const vineEndpoints = {}
-  ;((vault && vault.memberships) || []).forEach(m => {
-    if (m.cluster_id || !m.vine_endpoint) return
-    ;[m.node_id, m.vine_id, m.vine_did, m.issuer_did].forEach(id => {
-      if (id && !vineEndpoints[id]) vineEndpoints[id] = m.vine_endpoint
-    })
-  })
-  const rawVines = vineItems.map(it => {
-    const c = it.cred
-    const vineDid = c.issuer_did || c.vine_did || null
-    return {
-      kind:      'vine',
-      node_id:   vineDid || c.node_id || null,   // the Vine's DID / id
-      vine_did:  vineDid,
-      node_name: c.node_name || c.vine_name || vineDid || 'Vine',
-      endpoint:  c.vine_endpoint || c.offer_endpoint ||
-                 vineEndpoints[vineDid] || vineEndpoints[c.node_id] || null,
-      own:       true,
-    }
-  })
-
-  const membershipEndpoints = {}
-  ;((vault && vault.memberships) || []).forEach(m => {
-    if (m.cluster_id && m.vine_endpoint && !membershipEndpoints[m.cluster_id]) {
-      membershipEndpoints[m.cluster_id] = m.vine_endpoint
-    }
-  })
-  const membershipClusters = ((vault && vault.memberships) || [])
-    .filter(m => m.cluster_id && !m.stale &&
-      (m.status === 'approved' || m.status === 'admin'))
-    .map(m => ({
-      kind: 'cluster', node_id: m.cluster_id,
-      node_name: m.node_name || m.cluster_name || m.cluster_id,
-      own: false, endpoint: m.vine_endpoint || membershipEndpoints[m.cluster_id] || null,
-    }))
-  const rawClusters = [
-    ...ownClusters.filter(c => c.status !== 'revoked' && c.status !== 'removed')
-      .map(c => ({ kind:'cluster', node_id: c.id, node_name: c.name, own: true,
-        endpoint: c.vine_endpoint || membershipEndpoints[c.id] || null })),
-    ...grapeCreds.map(c  => ({ kind:'cluster', node_id: c.cluster_id,  node_name: c.cluster_name, own: false, endpoint: c.vine_endpoint || null })),
-    ...clusterCreds.map(c=> ({ kind:'cluster', node_id: c.cluster_id,  node_name: c.cluster_name || 'Cluster', own: false, endpoint: c.vine_endpoint || membershipEndpoints[c.cluster_id] || null })),
-    ...membershipClusters,
-  ]
-  const seen = {}
-  const allTargets = [...rawClusters, ...rawVines].filter(c =>
-    c.node_id && !seen[c.node_id] && (seen[c.node_id] = true))
-
-  select.innerHTML = '<option value="">— select a membership —</option>'
-  allTargets.forEach(c => {
-    const opt = document.createElement('option')
-    opt.value       = JSON.stringify({ kind: c.kind, node_id: c.node_id, node_name: c.node_name, endpoint: c.endpoint })
-    opt.textContent = (c.node_name || c.node_id) + (c.own ? ' ✦' : '') + (c.kind === 'vine' ? ' · Vine' : '')
-    select.appendChild(opt)
-  })
-
-  // Show disclosures and note when a cluster is selected
-  select.onchange = () => {
-    const hasSelection = select.value !== ''
-    disclosures.style.display = hasSelection ? 'block' : 'none'
-    noteField.style.display   = hasSelection ? 'block' : 'none'
-    btn.disabled              = !hasSelection
-    result.style.display      = 'none'
-  }
-
-  // If no clusters available — explain and offer to create
-  if (allTargets.length === 0) {
-    select.innerHTML =
-      '<option value="">No memberships yet — create a cluster or receive a credential first</option>'
-    btn.disabled = true
-  }
-
-  goTo('screen-invite')
-}
-
-/** Founder proof for a private Cluster invitation (existing signature only). */
-function privateFounderProof(vault, clusterId) {
-  const did = vault && vault.identity && vault.identity.id
-  const c = (vault && vault.credentials || []).find(c =>
-    c && c.cluster_id === clusterId && c.type === 'FounderCredential' &&
-    c.issuer_did === did && c.claims && c.claims.role === 'founder' && c.signature)
-  if (!c) return null
-  return {
-    type: 'FounderCredential',
-    issuer_did: c.issuer_did,
-    subject: c.subject || c.issuer_did,
-    claims: c.claims,
-    signature: c.signature,
-  }
-}
-
-/** Verify a private #invite= descriptor with the existing Ed25519 primitives. */
-async function verifyPrivateInvite(p) {
+async function verifyInviteReferral(p, subjectDid) {
   try {
     const r = p && p.referral
-    if (!r || r.type !== 'ReferralCredential' || r.scope !== 'cluster' ||
-        !p.scope || r.node_id !== p.scope.id || !r.signature) return false
+    if (!r || r.type !== 'ReferralCredential' || !p.scope ||
+        r.node_id !== p.scope.id || r.scope !== p.scope.type || !r.signature) return false
+    if (r.to_did && subjectDid && r.to_did !== subjectDid) return false
     const signed = Object.assign({}, r)
     delete signed.signature
     const signer = await didKeyToPublicKey(r.from_did)
-    const referralOk = await crypto.subtle.verify(
+    return await crypto.subtle.verify(
       'Ed25519', signer, fromB64(r.signature), enc(JSON.stringify(signed))
     )
-    if (!referralOk) return false
+  } catch (e) { return false }
+}
+
+async function verifyPrivateInvite(p, subjectDid) {
+  if (!(await verifyInviteReferral(p, subjectDid))) return false
+  try {
+    const r = p.referral
     const fp = p.founder_proof
     if (!fp || fp.type !== 'FounderCredential' || fp.issuer_did !== r.from_did) return false
     const claims = fp.claims || {}
@@ -168,293 +42,6 @@ async function verifyPrivateInvite(p) {
 }
 
 /** Render an invite link, optional QR and the email action. */
-function showInviteResult(inviteUrl, qrSvg) {
-  document.getElementById('invite-link-display').textContent = inviteUrl
-  const qr = document.getElementById('invite-qr')
-  if (qr) {
-    qr.innerHTML = qrSvg || ''
-    qr.style.display = qrSvg ? 'block' : 'none'
-  }
-  const email = document.getElementById('btn-email-invite')
-  if (email) {
-    email.href = 'mailto:?subject=' + encodeURIComponent('Sovereign Passport invitation') +
-      '&body=' + encodeURIComponent(inviteUrl)
-    email.style.display = 'inline-block'
-  }
-  const shareBtn = document.getElementById('btn-share-invite')
-  if (shareBtn) shareBtn.style.display = navigator.share ? 'block' : 'none'
-  document.getElementById('invite-result').style.display = 'block'
-}
-
-/** Persist a signed referral after showing either a hosted or private link. */
-async function persistSentReferral(vault, payload) {
-  if (!vault.referrals_sent) vault.referrals_sent = []
-  vault.referrals_sent.push(payload)
-  const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-  await persist(p)
-  appState.stored = p
-}
-
-/**
- * Generate a signed invite link.
- *
- * Flow:
- *   1. Read selected cluster and disclosures
- *   2. Build referral payload (from identity.js model)
- *   3. Sign with holder's Ed25519 key
- *   4. Encode as base64url
- *   5. Build full invite URL:
- *      passport.html#offer=<issuer_url>&ref=<signed_referral>
- *   6. Display link + share button
- */
-async function generateInvite() {
-  const vault      = appState.vault
-  const select     = document.getElementById('invite-cluster-select')
-  const note       = document.getElementById('invite-note').value.trim()
-  const errEl      = document.getElementById('invite-error')
-  const errTxt     = document.getElementById('invite-error-text')
-  const result     = document.getElementById('invite-result')
-  const btn        = document.getElementById('btn-generate-invite')
-
-  errEl.style.display   = 'none'
-  result.style.display  = 'none'
-  btn.textContent       = 'Generating...'
-  btn.disabled          = true
-
-  try {
-    // Parse the selected membership (Cluster OR Vine)
-    const target = JSON.parse(select.value)
-
-    // Read disclosure choices
-    const disclosures = {
-      handle:  document.getElementById('disclose-handle').checked,
-      since:   document.getElementById('disclose-since').checked,
-      role:    document.getElementById('disclose-role').checked,
-    }
-
-    // Find this membership for status + weight
-    const membership = (vault.memberships || []).find(
-      m => m.node_id === target.node_id
-    )
-
-    // Build the referral payload
-    const payload = {
-      id:                  crypto.randomUUID(),
-      type:                'ReferralCredential',
-      from_did:            vault.identity.id,
-      to_did:              null,            // unknown until grape creates Passport
-      node_id:             target.node_id,
-      node_name:           target.node_name,
-      scope:               target.kind === 'vine' ? 'vine' : 'cluster',
-      from_status_at_time: (membership && membership.status) || 'unknown',
-      weight:              (membership && membership.status) === 'approved' ? 3 : 1,
-      disclosed:           {},
-      note:                note || null,
-      created_at:          new Date().toISOString(),
-      expires_at:          null,
-    }
-
-    // Apply disclosures
-    if (disclosures.handle && vault.identity.handle)
-      payload.disclosed.handle = vault.identity.handle
-    if (disclosures.since && (membership && membership.joined_at))
-      payload.disclosed.since = membership.joined_at
-    if (disclosures.role && (membership && membership.is_issuer))
-      payload.disclosed.role = 'issuer'
-
-    // Sign the referral with the holder's private key
-    const privateKey = await crypto.subtle.importKey(
-      'jwk', vault.keys.privateKey, {name:'Ed25519'}, false, ['sign']
-    )
-    const sigData   = JSON.stringify(payload)
-    const sigBuf    = await crypto.subtle.sign(
-      'Ed25519', privateKey, new TextEncoder().encode(sigData)
-    )
-    const signature = toB64(sigBuf)
-    payload.signature = signature
-
-    // Encode the signed referral as base64url
-    const encodedRef = toB64(new TextEncoder().encode(JSON.stringify(payload)))
-
-    // The endpoint must belong to THIS Cluster. Resolution order:
-    //   1. the ownCluster's stored vine_endpoint
-    //   2. the matching cluster-membership record's vine_endpoint
-    //   3. the one-shot #invite descriptor — ONLY if it targets this cluster_id
-    // No global fallback: absent endpoint → clear error, no request.
-    let vineEndpoint = null
-    if (target.kind === 'vine') {
-      // Vine target → the Vine's own endpoint (membership record or the object),
-      // else the signed #invite= hand-off that targeted THIS Vine.
-      const vm = (vault.memberships || []).find(m => !m.cluster_id &&
-        (m.issuer_did === target.node_id || m.node_id === target.node_id ||
-         m.vine_did === target.node_id || m.vine_id === target.node_id ||
-         (target.vine_did &&
-          (m.vine_did === target.vine_did || m.issuer_did === target.vine_did))))
-      vineEndpoint = target.endpoint || (vm && vm.vine_endpoint) || null
-      if (!vineEndpoint && appState.pendingInvite &&
-          (appState.pendingInvite.vine_id === target.node_id ||
-           appState.pendingInvite.vine_id === target.vine_did)) {
-        vineEndpoint = appState.pendingInvite.vine_endpoint
-      }
-    } else {
-      const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
-      vineEndpoint = (own && own.vine_endpoint) || null
-      if (!vineEndpoint) {
-        const mem = (vault.memberships || []).find(m =>
-          m.cluster_id === target.node_id || m.node_id === target.node_id)
-        vineEndpoint = (mem && mem.vine_endpoint) || null
-      }
-      if (!vineEndpoint && appState.pendingInvite &&
-          appState.pendingInvite.cluster_id === target.node_id) {
-        vineEndpoint = appState.pendingInvite.vine_endpoint
-      }
-    }
-    const vineBase = (typeof normalizeVineEndpoint === 'function')
-      ? normalizeVineEndpoint(vineEndpoint) : null
-    const passportBase = 'https://sovereign-passport.github.io/passport/passport.html'
-    if (!vineBase) {
-      if (target.kind === 'cluster') {
-        const founderProof = privateFounderProof(vault, target.node_id)
-        if (!founderProof) {
-          throw new Error('This Cluster has no Vine and no founder proof is available.')
-        }
-        // Private Cluster: the founder's signed invitation is the approval.
-        // No Vine endpoint, no relay, no Switchboard, no second approval.
-        const descriptor = {
-          scope: { type: 'cluster', id: target.node_id },
-          name: target.node_name || target.node_id,
-          anchor: null,
-          requested: ['handle'],
-          referral: payload,
-          founder_proof: founderProof,
-        }
-        const privateUrl = passportBase + '#invite=' +
-          toB64(new TextEncoder().encode(JSON.stringify(descriptor)))
-        showInviteResult(privateUrl, null)
-        await persistSentReferral(vault, payload)
-        showToast('Private invite link generated')
-        return
-      }
-      throw new Error('No endpoint for this Vine. Open the invite from your Vine dashboard.')
-    }
-
-    // Self-heal: keep the resolved base endpoint on the owned Cluster or Vine
-    // credential so the NEXT invite needs no hand-off and no global fallback.
-    if (target.kind === 'vine') {
-      const cred = (vault.credentials || []).find(c =>
-        c.type === 'MembershipCredential' && !c.cluster_id &&
-        (c.issuer_did === target.node_id || c.issuer_did === target.vine_did ||
-         c.node_id === target.node_id || c.vine_did === target.node_id))
-      if (cred && cred.vine_endpoint !== vineBase) {
-        cred.vine_endpoint = vineBase
-        try {
-          const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-          await persist(p)
-          appState.stored = p
-        } catch (e) { console.warn('[Invite] could not remember vine_endpoint:', e) }
-      }
-    }
-    if (target.kind === 'cluster') {
-      const own = (vault.ownClusters || []).find(c => c.id === target.node_id)
-      if (own && !own.vine_endpoint) {
-        own.vine_endpoint = vineBase
-        try {
-          const p = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-          await persist(p)
-          appState.stored = p
-        } catch (e) { console.warn('[Invite] could not remember vine_endpoint:', e) }
-      }
-    }
-    const offerBase    = vineBase + '/api/offer'
-    const refEndpoint  = vineBase + '/api/passport/ref'
-    const inviteUrl    = passportBase + '#offer=' + offerBase + '&ref=' + encodedRef
-
-    // POST encodedRef to the vine relay — returns short token + QR SVG
-    const refRes = await fetch(refEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: encodedRef }),
-    })
-    if (!refRes.ok) throw new Error('Could not connect to SP.id network')
-    const refData = await refRes.json()
-
-    // Display the link + QR + email action.
-    showInviteResult(refData.invite_url, refData.qr_svg || null)
-
-    // Store in vault referrals_sent.
-    await persistSentReferral(vault, payload)
-
-    showToast('Invite link generated')
-
-  } catch (err) {
-    console.error('[Invite] Failed:', err)
-    errEl.style.display  = 'flex'
-    errTxt.textContent   = err.message
-  } finally {
-    btn.textContent = 'Generate invite link →'
-    btn.disabled    = false
-  }
-}
-
-/**
- * Copy the generated invite link to clipboard.
- */
-function copyInviteLink() {
-  const link = document.getElementById('invite-link-display').textContent
-  if(navigator.clipboard) navigator.clipboard.writeText(link)
-    .then(() => showToast('Invite link copied'))
-    .catch(() => showToast('Copy failed'))
-}
-
-/**
- * Share the invite link via the Web Share API.
- * Falls back gracefully if not supported.
- */
-async function shareInviteLink() {
-  const link   = document.getElementById('invite-link-display').textContent
-  const handle = ((appState.vault && appState.vault.identity && appState.vault.identity.handle) || 'Someone')
-  try {
-    await navigator.share({
-      title: 'Join my cluster on Sovereign Passport',
-      text:  `${handle} has invited you to join their community on SP.id.`,
-      url:   link,
-    })
-  } catch (err) {
-    if (err.name !== 'AbortError') showToast('Share failed — copy the link instead')
-  }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OFFICIALIZE — screen-officialize
-// Explains the vine path and $100 upgrade
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Open the officialize screen.
- * Populates current cluster name and member status.
- */
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SIGNED FLOW HAND-OFFS — #newcluster= / #invite= from the Sovereign Passport dashboard.
-// Fragments are public demands, never an authority. No cluster-id conversion.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Does this Passport hold a canonical Cluster with this exact UUID? */
-function hasCanonicalCluster(clusterId) {
-  const vault = appState.vault
-  if (!vault || !clusterId) return false
-  if ((vault.ownClusters || []).some(c => c.id === clusterId &&
-      c.status !== 'revoked' && c.status !== 'removed')) return true
-  if ((vault.memberships || []).some(m => m.cluster_id === clusterId &&
-      !m.stale && (m.status === 'approved' || m.status === 'admin'))) return true
-  return (vault.credentials || []).some(c =>
-    c.type === 'MembershipCredential' && c.scope === 'cluster' &&
-    c.status === 'approved' && c.cluster_id === clusterId)
-}
-
-/** #newcluster= → open the existing create-cluster screen with the endpoint. */
 function checkPendingNewCluster() {
   const raw = appState.pendingNewClusterRaw
   if (!raw) return false
@@ -474,17 +61,6 @@ function checkPendingNewCluster() {
 }
 
 /** Does this Passport hold a membership of this Vine (by DID or id)? */
-function hasVineMembershipItem(vineId) {
-  const vault = appState.vault
-  if (!vault || !vineId) return false
-  return (vault.credentials || []).some(c =>
-    c.type === 'MembershipCredential' &&
-    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id &&
-    (c.issuer_did === vineId || c.node_id === vineId) &&
-    (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c)))
-}
-
-/** Call the Switchboard with a did:key SELF-PROOF (no device, no credential). */
 async function sbSelfCall(base, service, action, data, scope) {
   if (!appState.vault || !appState.vaultKey) throw new Error('locked')
   const root = String(base).replace(/\/+$/, '')
@@ -577,50 +153,51 @@ async function _handleUnifiedInvite(p) {
     : p.scope.type === 'vine' ? 'Vine'
     : p.scope.type === 'vignard' ? 'Vignard' : p.scope.type
   const wanted = (p.requested || []).join(', ') || '—'
+  const subjectDid = appState.vault && appState.vault.identity && appState.vault.identity.id
+  if (!(await verifyInviteReferral(p, subjectDid))) {
+    showToast('Invalid invitation.')
+    return
+  }
   const ok = await _inviteConsentCard(name, p.scope.type, wanted)
   if (!ok) { showToast('Invitation declined.'); return }
   const base = p.anchor ? String(p.anchor).replace(/\/+$/, '') : null
   if (!base) {
-    if (p.referral && p.founder_proof) {
-      if (!(await verifyPrivateInvite(p))) {
-        showToast('Invalid private invitation.')
-        return
-      }
-      const vault = appState.vault
-      const clusterId = p.scope && p.scope.id
-      if (!vault || !clusterId) { showToast('Private invitation incomplete.'); return }
-      if (!vault.memberships) vault.memberships = []
-      const now = new Date().toISOString()
-      const row = {
-        cluster_id: clusterId,
-        node_id: clusterId,
-        node_name: p.name || clusterId,
-        cluster_name: p.name || clusterId,
-        scope: 'cluster',
-        status: 'approved',
-        is_issuer: false,
-        joined_at: now,
-        invited_by_did: p.referral.from_did,
-        referral_id: p.referral.id || null,
-        vine_endpoint: null,
-        local_private: true,
-      }
-      const prev = vault.memberships.find(m => m.cluster_id === clusterId)
-      if (prev) Object.assign(prev, row)
-      else vault.memberships.push(row)
-      try {
-        const saved = await saveVault(appState.vaultKey, vault, appState.stored.salt)
-        await persist(saved)
-        appState.stored = saved
-        populateHome()
-        if (typeof openNodes === 'function') openNodes()
-        showToast('Invitation accepted — private Cluster membership approved.')
-      } catch (e) {
-        showToast('Could not save the private membership.')
-      }
+    if (!(await verifyPrivateInvite(p, subjectDid))) {
+      showToast('Invalid private invitation.')
       return
     }
-    showToast('Invitation accepted (private — no server).')
+    const vault = appState.vault
+    const clusterId = p.scope && p.scope.id
+    if (!vault || !clusterId) { showToast('Private invitation incomplete.'); return }
+    if (!vault.memberships) vault.memberships = []
+    const now = new Date().toISOString()
+    const row = {
+      cluster_id: clusterId,
+      node_id: clusterId,
+      node_name: p.name || clusterId,
+      cluster_name: p.name || clusterId,
+      scope: 'cluster',
+      status: 'approved',
+      is_issuer: false,
+      joined_at: now,
+      invited_by_did: p.referral.from_did,
+      referral_id: p.referral.id || null,
+      vine_endpoint: null,
+      local_private: true,
+    }
+    const prev = vault.memberships.find(m => m.cluster_id === clusterId)
+    if (prev) Object.assign(prev, row)
+    else vault.memberships.push(row)
+    try {
+      const saved = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+      await persist(saved)
+      appState.stored = saved
+      populateHome()
+      if (typeof openNodes === 'function') openNodes()
+      showToast('Invitation accepted — private Cluster membership approved.')
+    } catch (e) {
+      showToast('Could not save the private membership.')
+    }
     return
   }
   try {
@@ -629,6 +206,7 @@ async function _handleUnifiedInvite(p) {
       scope: p.scope,
       handle: (appState.vault.identity && appState.vault.identity.handle) || null,
       types: p.requested || [],
+      referral: p.referral,
     }, { type: 'did', id: did })
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
@@ -647,37 +225,8 @@ function checkPendingInvite() {
   const raw = appState.pendingInviteRaw
   if (!raw) return false
   appState.pendingInviteRaw = null
-
   const uni = _decodeUnifiedInvite(raw)
-  if (uni) { _handleUnifiedInvite(uni); return true }
-
-  let demand = null
-  try { demand = JSON.parse(new TextDecoder().decode(fromB64(raw))) } catch (e) { demand = null }
-  const endpoint = demand && typeof demand === 'object'
-    ? normalizeVineEndpoint(demand.vine_endpoint) : null
-
-  clearApproveFragment()
-
-  if (!endpoint) { showToast('Invalid or incomplete invite request.'); return false }
-
-  // Vine (community) target — the Passport must be a member of that Vine.
-  if (demand.vine_id) {
-    if (!hasVineMembershipItem(demand.vine_id)) {
-      showToast('This Vine is not linked to your Passport.')
-      return false
-    }
-    appState.pendingInvite = demand
-    openInviteFromCluster(demand.vine_id)   // preselects by node_id (Vine DID)
-    return true
-  }
-
-  if (!demand.cluster_id) { showToast('Invite request missing cluster.'); return false }
-  if (!hasCanonicalCluster(demand.cluster_id)) {
-    showToast('This legacy cluster is not linked to your Passport.')
-    return false
-  }
-
-  appState.pendingInvite = demand
-  openInviteFromCluster(demand.cluster_id)   // opens + preselects the canonical cluster
+  if (!uni) { showToast('Invalid or unsupported invitation.'); return false }
+  _handleUnifiedInvite(uni)
   return true
 }

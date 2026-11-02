@@ -9,7 +9,6 @@
  *   validateCreateCluster() — form validation
  *   createCluster()         — self-issues FounderCredential, pings vignard
  *   pingVignard()           — fire-and-forget witness registration
- *   openInviteFromCluster() — routes to invite screen with cluster pre-selected
  *   confirmLeaveCluster()   — modal: leave or dissolve
  *   softLeaveCluster()      — sets status 'left', keeps cluster in vault
  *   rejoinCluster()         — restores status 'active'
@@ -222,28 +221,6 @@ async function pingVignard(vineEndpoint, clusterId, name, description, founderDi
     appState.stored = newPayload
   }
   return true
-}
-
-/**
- * Open invite screen pre-selected to a specific cluster.
- */
-function openInviteFromCluster(clusterId) {
-  openInvite()
-  // After invite screen loads, pre-select the cluster
-  requestAnimationFrame(() => {
-    const select = document.getElementById('invite-cluster-select')
-    if (!select) return
-    for (const opt of select.options) {
-      try {
-        const val = JSON.parse(opt.value)
-        if (val.node_id === clusterId) {
-          select.value = opt.value
-          select.dispatchEvent(new Event('change'))
-          break
-        }
-      } catch(e) { /* skip */ }
-    }
-  })
 }
 
 /**

@@ -407,10 +407,6 @@ function openNodes() {
                 Rejoin as Founder
               </button>
             ` : `
-              <button class="btn btn-ghost" style="flex:1;font-size:11px;"
-                onclick="openInviteFromCluster('${c.id}')">
-                Invite a member
-              </button>
               <button class="btn btn-ghost" style="font-size:11px;"
                 onclick="softLeaveCluster('${c.id}')">
                 Leave

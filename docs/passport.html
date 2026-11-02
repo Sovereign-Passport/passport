@@ -270,15 +270,6 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <div class="menu-item fade-up fade-up-2" onclick="openInvite()">
-      <div class="menu-icon">🍇</div>
-      <div class="menu-text">
-        <strong>Invite a member</strong>
-        <small>Invite a member to a group or a Vine</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
     <div class="menu-item fade-up fade-up-2" onclick="openFeedback()">
       <div class="menu-icon">💬</div>
       <div class="menu-text">
@@ -1091,134 +1082,6 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SCREEN — INVITE A GRAPE
-       Generates a signed invite link for someone to join
-       one of your clusters. The link is pre-filled with
-       the offer URL so the new grape just taps and accepts.
-       The referral is signed with your DID key.
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen screen-top" id="screen-invite">
-
-    <div class="screen-header">
-      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
-      <p class="logotype">Invite a member</p>
-    </div>
-
-    <h1 class="display fade-up" style="margin-bottom:8px;">
-      Invite a<br><em>Grape.</em>
-    </h1>
-    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
-      Invite someone to your community. The new grape opens it,
-      creates their Passport, and receives a credential.
-      Your referral is recorded.
-    </p>
-
-    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
-
-      <!--
-        Step 1 — choose which cluster to invite to.
-        Populated from vault.memberships where status === approved.
-        Only approved members can invite.
-      -->
-      <div class="field">
-        <label>Invite to which membership?</label>
-        <select id="invite-cluster-select"
-          style="width:100%;background:var(--bg-lift);border:1px solid var(--ink-faint);
-                 border-radius:8px;padding:12px 14px;color:var(--ink);
-                 font-family:'Courier New',Courier,monospace;font-size:14px;outline:none;">
-          <option value="">— select a cluster —</option>
-        </select>
-      </div>
-
-      <!--
-        Step 2 — choose what to disclose in the referral.
-        These fields appear in the signed referral payload.
-        The invitee sees them when they open the link.
-      -->
-      <div class="field" id="invite-disclosures" style="display:none;">
-        <label>Share with the invitee</label>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <label style="display:flex;align-items:center;gap:8px;
-                        font-size:12px;color:var(--ink);text-transform:none;
-                        letter-spacing:0;cursor:pointer;">
-            <input type="checkbox" id="disclose-handle" checked>
-            Your handle
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;
-                        font-size:12px;color:var(--ink);text-transform:none;
-                        letter-spacing:0;cursor:pointer;">
-            <input type="checkbox" id="disclose-since">
-            Member since date
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;
-                        font-size:12px;color:var(--ink);text-transform:none;
-                        letter-spacing:0;cursor:pointer;">
-            <input type="checkbox" id="disclose-role">
-            Your role in the cluster
-          </label>
-        </div>
-      </div>
-
-      <!--
-        Optional personal note to the invitee
-      -->
-      <div class="field" id="invite-note-field" style="display:none;">
-        <label>Personal note (optional)</label>
-        <textarea id="invite-note"
-          placeholder="Welcome to the community!"
-          style="min-height:60px;"></textarea>
-      </div>
-
-      <!--
-        The generated invite link — shown after Generate is tapped.
-        Contains the offer URL + signed referral encoded in the hash.
-      -->
-      <div id="invite-result" style="display:none;margin-bottom:16px;">
-        <div id="invite-qr"
-          style="width:180px;height:180px;margin:0 auto 16px;display:block;
-                 border-radius:8px;overflow:hidden;"></div>
-        <div class="did-display">
-          <span class="did-label">Invite Link</span>
-          <span class="did-value" id="invite-link-display"
-            style="font-size:10px;word-break:break-all;"></span>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="btn btn-primary" onclick="copyInviteLink()"
-            style="flex:1;">
-            Copy link
-          </button>
-          <button class="btn btn-ghost" onclick="shareInviteLink()"
-            style="flex:1;" id="btn-share-invite">
-            Share
-          </button>
-          <a class="btn btn-ghost" id="btn-email-invite"
-            href="#" style="flex:1;display:none;text-align:center;text-decoration:none;">
-            Email
-          </a>
-        </div>
-      </div>
-
-      <div id="invite-error" class="notice"
-        style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
-        <span class="notice-icon">✗</span>
-        <span class="notice-text" id="invite-error-text" style="color:var(--red);"></span>
-      </div>
-
-      <button class="btn btn-primary" id="btn-generate-invite"
-        onclick="generateInvite()" style="margin-bottom:10px;" disabled>
-        Generate invite link →
-      </button>
-
-      <!-- Received an invitation instead? Open it manually here. -->
-      <button class="btn btn-ghost" onclick="openReceiveCredential()"
-        style="width:100%;">
-        Open an invitation
-      </button>
-
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════
        SCREEN — OFFICIALIZE MY CLUSTER
        Explains the path from a free cluster to a Vine.
        Requirements: 3 grapes in admin cluster.
@@ -1405,12 +1268,12 @@
 <script src="passport.ui.js"></script>
 <script src="passport.sync.js?v=4"></script>
 <script src="passport.files.js"></script>
-<script src="passport.clusters.js"></script>
-<script src="passport.invites.js?v=8"></script>
+<script src="passport.clusters.js?v=1"></script>
+<script src="passport.invites.js?v=9"></script>
 <script src="passport.offers.js?v=2"></script>
 <script src="passport.feedback.js?v=1"></script>
 <script src="passport.relations.js?v=4"></script>
-<script src="passport.boot.js?v=8"></script>
+<script src="passport.boot.js?v=9"></script>
 <script src="spid.i18n.js"></script>
 <script>
 /* Language mirror: persist the choice inside the vault (the DID's container)
