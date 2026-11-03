@@ -144,7 +144,7 @@ async function startGeneration() {
 // ═════════════════════════════════════════════════════════════════════════════
 // SECTION 5 — UNLOCK (RETURNING USER)
 // tryUnlock() — decrypts vault with password, boots into home screen.
-// Handles pending offer and pending sync token after unlock.
+// Handles pending signed hand-offs and sync token after unlock.
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function tryUnlock() {
@@ -186,7 +186,6 @@ async function tryUnlock() {
     // made the Passport look frozen).
     populateHome()
     syncProfileHandle()
-    checkPendingOffer()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
 
@@ -315,6 +314,19 @@ function populateHome() {
 // ─────────────────────────────────────────────────────────────────────────────
 // MY CLUSTERS — screen-nodes
 // Shows all cluster memberships stored in vault.memberships
+
+/** Future Vine officialization screen — reads only the local relation view. */
+function openOfficialize() {
+  const vault       = appState.vault
+  const memberships = (vault && vault.memberships) || []
+  const approved    = memberships.filter(m => m.status === 'approved')
+  const primary     = approved[0]
+  document.getElementById('officialize-cluster-name').textContent =
+    ((primary && primary.node_name) || 'No approved cluster yet')
+  document.getElementById('officialize-status').textContent =
+    primary ? 'Approved member ✓' : 'Not yet approved in any cluster'
+  goTo('screen-officialize')
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Shared Billboard portal URL for a canonical Cluster UUID (UI preference only). */
@@ -720,9 +732,9 @@ function findReceivedVineStatus(cred) {
 
 /** Base https endpoint of the Vine that issued this credential. */
 function credVineEndpoint(c) {
-  const e = c.offer_endpoint || c.vine_endpoint || null
+  const e = c.vine_endpoint || null
   if (!e) return null
-  return String(e).replace(/\/api\/(offer|credentials\/issue)\/?$/, '')
+  return String(e).replace(/\/+$/, '')
 }
 
 /** Manual "Check status" — the DID asks the Vine for its current status. */
@@ -1020,12 +1032,8 @@ async function boot() {
   // Check for existing vault
   const stored = await loadStored().catch(() => null)
 
-  // Support ?offer= (direct) and #offer= (GitHub Pages — hash not stripped by server)
   const params     = new URLSearchParams(window.location.search)
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  const offerUrl   = params.get('offer') || hashParams.get('offer')
-  const offerData  = params.get('r')     || hashParams.get('r')
-  const offerRef   = params.get('ref')   || hashParams.get('ref')
   const syncToken  = params.get('sync')  || hashParams.get('sync')
   // Signed-flow hand-offs from the Sovereign Passport dashboard.
   const newClusterRaw = params.get('newcluster') || hashParams.get('newcluster')
@@ -1037,14 +1045,6 @@ async function boot() {
     appState.stored = stored
     document.getElementById('unlock-handle-display').textContent =
       `DID: ${stored.did ? stored.did.slice(0,20) : ""}…`
-
-    if (offerUrl || offerData) {
-      // Store offer URL for after unlock
-      appState.pendingOfferUrl  = offerUrl
-      appState.pendingOfferData = offerData
-      appState.pendingOfferRef  = offerRef
-      showToast('Credential offer waiting — unlock your Passport')
-    }
 
     if (syncToken) {
       appState.pendingSyncToken = syncToken
@@ -1063,16 +1063,8 @@ async function boot() {
       if (input) input.value = `${SYNC_ENDPOINT}/${syncToken}`
     })
 
-  } else if (offerUrl || offerData) {
-    // New user — create passport first, then handle offer
-    appState.pendingOfferUrl  = offerUrl
-    appState.pendingOfferData = offerData
-    appState.pendingOfferRef  = offerRef
-    showToast('Create your Passport to accept this credential')
-    goTo('screen-welcome')
-
   } else {
-    // Fresh new grape — no vault, no offer, no sync
+    // Fresh new grape — no vault, no sync
     goTo('screen-welcome')
   }
 
@@ -1084,51 +1076,13 @@ async function boot() {
   }
 }
 
-// Override populateHome to also trigger pending offers
-// ─────────────────────────────────────────────────────────────────────────────
-// PENDING OFFER CHECK
-// Called after vault is unlocked (from tryUnlock and tryRestore).
-// Checks if a credential offer was waiting and triggers it.
-// Kept separate from populateHome() to avoid recursive override patterns.
-// ─────────────────────────────────────────────────────────────────────────────
-function checkPendingOffer() {
-  if (appState.pendingOfferUrl) {
-    const url = appState.pendingOfferUrl
-    const ref = appState.pendingOfferRef
-    appState.pendingOfferUrl = null
-    appState.pendingOfferRef = null
-    setTimeout(() => loadOffer(url, ref), 500)
-  } else if (appState.pendingOfferData) {
-    // pendingOfferData is a raw offer JSON string (not a URL)
-    // Only parse if it looks like JSON, not a URL or ref token
-    const data = appState.pendingOfferData
-    appState.pendingOfferData = null
-    try {
-      const offer = JSON.parse(data)
-      _pendingOffer = offer
-      document.getElementById('offer-node-name').textContent  = (offer.node_name || offer.node_id)
-      document.getElementById('offer-issuer-did').textContent = offer.issuer
-      setTimeout(() => goTo('screen-offer'), 500)
-    } catch(e) {
-      // Not JSON — ignore silently (was a ref token or malformed data)
-      console.warn('[SP.id] pendingOfferData was not valid JSON — ignored')
-    }
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // URL HASH LISTENER
-// Re-runs boot() when the hash changes — handles the case where the user
-// is already on the page and a new #offer= link is tapped or pasted.
-// This is needed because GitHub Pages and static hosts strip query strings
-// but preserve the hash fragment, so we use #offer= for offer delivery.
+// Re-runs boot() when a new signed hand-off is tapped while the app is open.
 // ─────────────────────────────────────────────────────────────────────────────
 window.addEventListener('hashchange', () => {
-  // Only re-run if there's actually an offer in the new hash
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  if (hashParams.get('offer') || hashParams.get('r') || hashParams.get('approve') ||
-      hashParams.get('decision') ||
-      hashParams.get('newcluster') || hashParams.get('invite')) {
+  if (hashParams.get('newcluster') || hashParams.get('invite')) {
     boot()
   }
 })

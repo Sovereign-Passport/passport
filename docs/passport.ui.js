@@ -4,7 +4,7 @@
  *
  * Shared UI helpers used across all passport modules.
  * Must load before passport.clusters.js, passport.invites.js,
- * passport.offers.js, and passport.sync.js.
+ * passport.status.js, and passport.sync.js.
  *
  * Globals exposed:
  *   escHtmlP(str)        — HTML-escape a string for safe DOM insertion

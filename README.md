@@ -11,7 +11,6 @@ Paths are relative to `/opt/blindspot`.
 2. `spid-js/docs/ARCHITECTURE.md` — SPID objects, identities, relations, Switchboard, data spaces.
 3. `spid-js/README.md` — where and how to work.
 
-Historical documents are in `passport/docs/archive/`. They are not instructions.
 
 ## Structure
 

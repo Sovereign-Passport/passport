@@ -668,128 +668,6 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 8 — RECEIVE CREDENTIAL
-       The user pastes an offer URL or raw offer JSON here.
-       This is the entry point for joining a community —
-       reachable from "Open an invitation" (invite screen).
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen screen-top" id="screen-receive">
-
-    <div class="screen-header">
-      <button class="btn-back" onclick="goTo('screen-home')">‹</button>
-      <p class="logotype">Open an invitation</p>
-    </div>
-
-    <h1 class="display fade-up" style="margin-bottom:8px;">
-      Receive a<br><em>credential.</em>
-    </h1>
-    <p class="body-text fade-up fade-up-1" style="margin-bottom:28px;">
-      Paste an invite link from a community.<br>
-      Your credential will be issued instantly.
-    </p>
-
-    <div class="card fade-up fade-up-2" style="width:100%;max-width:380px;">
-
-      <div class="field">
-        <label>Paste invite link</label>
-        <textarea
-          id="input-offer-paste"
-          placeholder="https://mdusl.sovereign-passport.id/offer/..."
-          style="min-height:100px;"
-          oninput="validateOfferInput()"
-        ></textarea>
-      </div>
-
-      <div class="notice" id="receive-error" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
-        <span class="notice-icon">✗</span>
-        <span class="notice-text" id="receive-error-text" style="color:var(--red);"></span>
-      </div>
-
-      <button class="btn btn-primary" id="btn-load-offer" disabled onclick="loadOfferFromInput()">
-        Load offer →
-      </button>
-
-      <div class="divider">or</div>
-
-      <button class="btn btn-ghost" onclick="showToast('QR scanner coming soon')">
-        📷 Scan QR code
-      </button>
-
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 9 — CREDENTIAL OFFER
-       Populated by loadOfferFromInput() or the URL hash flow.
-       Shows community name, issuer DID, and Accept / Decline.
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-offer">
-    <div class="shield fade-up">
-      <svg viewBox="0 0 56 56" fill="none">
-        <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
-          fill="rgba(201,168,76,0.08)" stroke="rgba(201,168,76,0.4)" stroke-width="1.5"/>
-        <path d="M20 28L25 33L36 22" stroke="#c9a961" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <p class="logotype fade-up fade-up-1">Credential Offer</p>
-    <h1 class="display fade-up fade-up-2" style="margin-bottom:8px;">You've been<br><em>invited.</em></h1>
-    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
-      <div class="cred-card" style="margin-bottom:20px;">
-        <p class="cred-type">Membership Credential</p>
-        <div class="cred-title" id="offer-node-name">—</div>
-        <div class="cred-sub" id="offer-issuer-did" style="font-size:10px;word-break:break-all;">—</div>
-        <div class="cred-meta" style="margin-top:12px;">
-          <div class="cred-meta-item">Type <span id="offer-type">membership</span></div>
-          <div class="cred-meta-item">Expires <span id="offer-expires">1 year</span></div>
-        </div>
-      </div>
-      <div class="notice">
-        <span class="notice-icon">🔑</span>
-        <span class="notice-text">Accepting adds this membership to your passport. It's up to you to share or not this information.</span>
-      </div>
-      <div id="offer-error" class="notice" style="display:none;border-color:var(--red);background:rgba(192,57,43,0.05);">
-        <span class="notice-icon">✗</span>
-        <span class="notice-text" id="offer-error-text" style="color:var(--red);"></span>
-      </div>
-      <button class="btn btn-primary fade-up fade-up-4" id="btn-accept-offer" onclick="acceptOffer()" style="margin-bottom:12px;">
-        Accept credential →
-      </button>
-      <button class="btn btn-ghost fade-up fade-up-5" onclick="goTo('screen-home')">Decline</button>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════
-       SCREEN 9 — CREDENTIAL RECEIVED
-  ══════════════════════════════════════════════════════════════ -->
-  <div class="screen" id="screen-credential-received">
-    <div class="shield fade-up" style="margin-bottom:20px;">
-      <svg viewBox="0 0 56 56" fill="none">
-        <path d="M28 4L8 12V28C8 39.05 16.4 49.36 28 52C39.6 49.36 48 39.05 48 28V12L28 4Z"
-          fill="rgba(39,174,96,0.1)" stroke="rgba(39,174,96,0.4)" stroke-width="1.5"/>
-        <path d="M19 28L24.5 33.5L37 21" stroke="#27ae60" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <h1 class="display fade-up fade-up-1">Credential<br><em>received.</em></h1>
-    <p class="body-text fade-up fade-up-2" style="margin-bottom:24px;">
-      Your membership credential is signed and stored in your vault.
-    </p>
-    <div style="width:100%;max-width:380px;" class="fade-up fade-up-3">
-      <div class="cred-card" style="margin-bottom:20px;">
-        <p class="cred-type">Membership Credential</p>
-        <div class="cred-title" id="received-node-name">—</div>
-        <div class="cred-sub" id="received-issuer" style="font-size:10px;">—</div>
-        <div style="display:flex;gap:8px;margin-top:12px;">
-          <span class="badge badge-green">✓ Signed by community</span>
-          <span class="badge badge-gold">✓ Stored in vault</span>
-        </div>
-      </div>
-      <button class="btn btn-primary fade-up fade-up-4" onclick="goTo('screen-home')">
-        Open my Passport →
-      </button>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════
        SCREEN — MY CLUSTERS
        Shows all cluster memberships stored in the vault.
        Each entry shows the community name, issuer DID,
@@ -920,12 +798,13 @@
         <p style="font-size:32px;margin-bottom:12px;">🎫</p>
         <p style="color:var(--ink-dim);font-size:13px;line-height:1.7;">
           No credentials in your vault yet.<br>
-          Join a community to receive your first credential.
+          Credentials are proofs issued by communities.
         </p>
-        <button class="btn btn-primary" onclick="openReceiveCredential()"
-          style="margin-top:20px;">
-          Receive a credential →
-        </button>
+        <a class="btn btn-primary"
+          href="https://sovereign-passport.github.io/portail/portail.html#service=relations"
+          target="_blank" rel="noopener" style="margin-top:20px;text-decoration:none;">
+          Manage relations in the Portail →
+        </a>
       </div>
     </div>
   </div>
@@ -1119,7 +998,7 @@
 <script src="passport.files.js"></script>
 <script src="passport.clusters.js?v=3"></script>
 <script src="passport.invites.js?v=11"></script>
-<script src="passport.offers.js?v=3"></script>
+<script src="passport.status.js?v=1"></script>
 <script src="passport.feedback.js?v=2"></script>
 <script src="passport.relations.js?v=5"></script>
 <script src="passport.boot.js?v=12"></script>

@@ -97,7 +97,7 @@ if (watchMode) {
     'passport.html', 'passport.css',
     'passport.crypto.js', 'passport.state.js',
     'passport.ui.js', 'passport.sync.js', 'passport.files.js',
-    'passport.clusters.js', 'passport.invites.js', 'passport.offers.js', 'passport.boot.js',
+    'passport.clusters.js', 'passport.invites.js', 'passport.status.js', 'passport.boot.js',
   ]
   watched.forEach(f => {
     const fp = path.join(SRC_DIR, f)
