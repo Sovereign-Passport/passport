@@ -90,7 +90,9 @@ async function syncToDevice() {
 
     const { token, expires_at, qr_svg } = await res.json()
     const expiresIn  = Math.round((new Date(expires_at) - Date.now()) / 60000)
-    const walletBase = 'https://sovereign-passport.github.io/passport/passport.html'
+    // Same code on both origins: the sync link returns to the app the holder
+    // is already using, not to a hardcoded public origin.
+    const walletBase = location.origin + location.pathname
     const syncUrl    = walletBase + '#sync=' + token
 
     // Show sync link modal — QR generated server-side by vine

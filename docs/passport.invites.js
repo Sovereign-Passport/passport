@@ -95,7 +95,7 @@ async function syncProfileHandle() {
   const handle = appState.vault.identity && appState.vault.identity.handle
   if (!handle) return
   try {
-    const base = new URL(SYNC_ENDPOINT).origin
+    const base = SPID_SWITCH_HOST
     const did = appState.vault.identity.id
     await sbSelfCall(base, 'relation', 'profile', { handle: handle },
       { type: 'did', id: did })

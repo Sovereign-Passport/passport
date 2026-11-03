@@ -45,32 +45,6 @@ function _relLocalMembership(vault, m) {
          _relIsHome(ids, m.vine_endpoint)
 }
 
-/** Whether a credential still corresponds to an active server relation. */
-function relationCredentialActive(vault, cred) {
-  var ids = _relActiveIds(vault)
-  if (!ids) return true
-  if (!cred) return false
-
-  var isLocal = false
-  if (cred.cluster_id) {
-    isLocal = ids.clusters.has(cred.cluster_id) || _relIsHome(ids, cred.vine_endpoint)
-  } else if (cred.scope === 'vignard') {
-    isLocal = ids.vignards.has(cred.node_id || cred.vignard_did) || _relIsHome(ids, cred.vine_endpoint)
-  } else {
-    isLocal = ids.vines.has(cred.node_id) || ids.vines.has(cred.issuer_did) ||
-      ids.vineDids.has(cred.issuer_did) || ids.vineDids.has(cred.node_id) ||
-      _relIsHome(ids, cred.vine_endpoint) || _relIsHome(ids, cred.offer_endpoint) ||
-      _relIsHome(ids, cred.issuer_did)
-  }
-  if (!isLocal) return true   // another Vine: not judged by the home snapshot
-
-  if (cred.cluster_id) return ids.clusters.has(cred.cluster_id)
-  if (cred.scope === 'vignard') return ids.vignards.has(cred.node_id || cred.vignard_did)
-  if (cred.scope === 'cluster') return false
-  return ids.vines.has(cred.node_id) || ids.vines.has(cred.issuer_did) ||
-         ids.vineDids.has(cred.issuer_did) || ids.vineDids.has(cred.node_id)
-}
-
 function _relUpsert(list, match, next) {
   var i = list.findIndex(match)
   if (i >= 0) list[i] = Object.assign({}, list[i], next)
@@ -80,7 +54,7 @@ function _relUpsert(list, match, next) {
 async function syncRelationsFromSwitchboard() {
   if (!appState.vault || !appState.vaultKey || !appState.stored) return
   var did = appState.vault.identity.id
-  var base = new URL(SYNC_ENDPOINT).origin
+  var base = SPID_SWITCH_HOST
   var r
   try {
     r = await sbSelfCall(base, 'relation', 'list', {}, { type: 'did', id: did })

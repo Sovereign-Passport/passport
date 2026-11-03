@@ -322,14 +322,19 @@ function populateHome() {
 
 /** Shared Billboard portal URL for a canonical Cluster UUID (UI preference only). */
 function billboardUrl(clusterId) {
-  return 'https://sovereign-passport.github.io/portail/portail.html#service=billboard&cluster=' +
-    encodeURIComponent(String(clusterId))
+  // Relative to this app: /passport/ and /portail/ are siblings on both the
+  // public GitHub Pages origin and a Vine-served LAN origin.
+  return new URL(
+    '../portail/portail.html#service=billboard&cluster=' + encodeURIComponent(String(clusterId)),
+    location.href
+  ).href
 }
 
 /**
  * Open the clusters screen.
- * Reads vault.credentials (type MembershipCredential) as primary source.
- * Falls back to vault.memberships for passports predating the migration.
+ * Owned Clusters come from vault.ownClusters; joined Clusters come from the
+ * reconciled relation view (vault.memberships). Credentials are proofs and
+ * are listed separately; they never create a joined Cluster.
  */
 function openNodes() {
   const vault      = appState.vault
@@ -351,13 +356,10 @@ function openNodes() {
       if (cid) ownerIds.add(cid)
     }
   })
-  const clusterCandidates = [
-    ...((vault && vault.memberships) || []).filter(m => m.cluster_id && !m.stale),
-    ...allCreds.filter(c =>
-      ((c.type === 'MembershipCredential' && c.scope === 'cluster' && c.cluster_id) ||
-       (c.type === 'GrapeClusterCredential' && c.cluster_id)) &&
-      (typeof relationCredentialActive !== 'function' || relationCredentialActive(vault, c))),
-  ]
+  // Clusters come from the reconciled relation view. A credential is a proof,
+  // not a relation; it never creates a joined Cluster by itself.
+  const clusterCandidates = ((vault && vault.memberships) || [])
+    .filter(m => m.cluster_id && !m.stale)
   const seenJoined = {}
   const memberships = clusterCandidates.filter(m => {
     const cid = m.cluster_id
@@ -548,7 +550,7 @@ function openNodes() {
     if (vineItems.length > 0) {
       const vLabel = document.createElement('p')
       vLabel.className = 'section-label'
-      vLabel.textContent = 'Vine memberships'
+      vLabel.textContent = 'Vine relations'
       vLabel.style.marginTop = '16px'
       list.appendChild(vLabel)
       vineItems.forEach(it => list.appendChild(buildMembershipCard(it, vineAllCreds, openNodes)))
@@ -638,47 +640,32 @@ async function checkClusterUpdates(membership, btn) {
 //   legacy vault.memberships without cluster_id → LEGACY VINE MEMBERSHIP
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * A valid, unrevoked credential remains displayable even when a background
- * reconciliation has not returned it yet. A missing live row is a sync gap,
- * not a signed revocation; only an explicit credential/status revocation
- * hides it.
- */
-function _membershipCredentialVisible(vault, c) {
-  if (!c || c.revoked || c.type !== 'MembershipCredential') return false
-  if ((c.scope === 'vine' || (!c.scope && !c.cluster_id)) &&
-      typeof findReceivedVineStatus === 'function') {
-    const st = findReceivedVineStatus(c)
-    if (st && st.status === 'revoked') return false
-  }
-  return true
+/** A relation status that still represents a live link (pending included). */
+function relationStatusActive(status) {
+  return status !== 'revoked' && status !== 'removed' && status !== 'left'
 }
 
-/** Active relations, counted by existing type. No new relation model. */
+/**
+ * Active relations, counted by existing type.
+ *
+ * Relations come from `vault.memberships` (the Passport's reconciled view of
+ * relation/list) and `vault.ownClusters` (sovereign local Clusters). A
+ * credential is a proof, never a relation: it is not counted here, even when
+ * it is valid and historically significant.
+ */
 function activeRelationSummary(vault) {
-  const allCreds = (vault && vault.credentials) || []
-  const active = c => typeof relationCredentialActive !== 'function' ||
-    relationCredentialActive(vault, c)
   const seenVines = {}
   const seenVignards = {}
+  const clusterIds = {}
 
-  allCreds.forEach(c => {
-    if (!_membershipCredentialVisible(vault, c)) return
-    if (c.scope === 'cluster' || c.cluster_id) return
-    if (c.scope === 'vignard') {
-      const id = c.issuer_did || c.vignard_did || c.node_id
-      if (id) seenVignards[id] = true
+  ;(vault && vault.memberships || []).forEach(m => {
+    if (!m || m.stale) return
+    if (m.cluster_id) {
+      if (!relationStatusActive(m.status)) return
+      clusterIds[m.cluster_id] = true
       return
     }
-    const id = c.issuer_did || c.node_id || c.vine_id
-    if (id) seenVines[id] = true
-  })
-
-  // The Switchboard may know a live relation before any credential has been
-  // issued (invite acceptance, admin promotion). Show that relation too.
-  ;(vault && vault.memberships || []).forEach(m => {
-    if (!m || m.cluster_id || m.scope === 'cluster' || m.stale) return
-    if (m.status === 'revoked' || m.status === 'left') return
+    if (!relationStatusActive(m.status)) return
     if (m.scope === 'vignard') {
       const id = m.vignard_did || m.node_id
       if (id) seenVignards[id] = true
@@ -688,21 +675,10 @@ function activeRelationSummary(vault) {
     if (id) seenVines[id] = true
   })
 
-  const ownIds = {}
   ;(vault && vault.ownClusters || []).forEach(c => {
-    if (c.id && c.status !== 'revoked' && c.status !== 'removed') ownIds[c.id] = true
+    if (c.id && relationStatusActive(c.status || 'active')) clusterIds[c.id] = true
   })
-  const clusterIds = Object.assign({}, ownIds)
-  ;(vault && vault.memberships || []).forEach(m => {
-    if (!m.cluster_id || m.stale || ownIds[m.cluster_id]) return
-    if (m.status === 'revoked' || m.status === 'removed') return
-    clusterIds[m.cluster_id] = true
-  })
-  allCreds.forEach(c => {
-    if (c.type !== 'MembershipCredential' || c.scope !== 'cluster' || !c.cluster_id || c.revoked) return
-    if (ownIds[c.cluster_id] || !active(c)) return
-    clusterIds[c.cluster_id] = true
-  })
+
   const vineCount = Object.keys(seenVines).length
   const vignardCount = Object.keys(seenVignards).length
   const clusterCount = Object.keys(clusterIds).length
@@ -726,33 +702,16 @@ function membershipFromRelation(m) {
   }
 }
 
-/** Vines / Vignards as display items (Cluster-free). */
+/** Vines / Vignards as display items, from RELATIONS only. */
 function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
   const seenVine = {}
   const seenVignard = {}
   const items = []
 
-  allCreds.forEach(c => {
-    if (!_membershipCredentialVisible(vault, c)) return
-    if (c.scope === 'vignard') {
-      const id = c.issuer_did || c.vignard_did || c.node_id
-      if (!id || seenVignard[id]) return
-      seenVignard[id] = true
-      items.push({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })
-      return
-    }
-    if (c.scope === 'cluster' || c.cluster_id) return
-    const id = c.issuer_did || c.node_id || c.vine_id
-    if (!id || seenVine[id]) return
-    seenVine[id] = true
-    items.push({ kind: 'vine', cred: c, idx: allCreds.indexOf(c) })
-  })
-
-  // Live relations without a stored credential: same card, no SD-JWT actions.
   ;(vault && vault.memberships || []).forEach(m => {
     if (!m || m.cluster_id || m.scope === 'cluster' || m.stale) return
-    if (m.status === 'revoked' || m.status === 'left') return
+    if (!relationStatusActive(m.status)) return
     if (m.scope === 'vignard') {
       const id = m.vignard_did || m.node_id
       if (!id || seenVignard[id]) return
@@ -772,6 +731,52 @@ function collectMembershipItems(vault) {
   })
 
   return { items, allCreds }
+}
+
+/** The scope a stored MembershipCredential claims, independent of relation. */
+function credentialScope(c) {
+  if (!c || c.type !== 'MembershipCredential') return null
+  if (c.scope === 'cluster' || c.cluster_id) return 'cluster'
+  if (c.scope === 'vignard') return 'vignard'
+  return 'vine'
+}
+
+/** Does a stored credential have a matching current relation? */
+function credentialMatchesRelation(vault, c) {
+  const scope = credentialScope(c)
+  if (!scope) return false
+  const memberships = (vault && vault.memberships) || []
+  if (scope === 'cluster') {
+    return memberships.some(m =>
+      m && m.cluster_id === c.cluster_id && !m.stale && relationStatusActive(m.status))
+  }
+  const ids = [c.issuer_did, c.node_id, c.vine_id, c.vine_web_did, c.vignard_did]
+    .filter(Boolean)
+  return memberships.some(m => {
+    if (!m || m.cluster_id || m.stale || !relationStatusActive(m.status)) return false
+    if (scope === 'vignard' && m.scope !== 'vignard') return false
+    if (scope === 'vine' && m.scope === 'vignard') return false
+    const mid = [m.vine_did, m.node_id, m.vine_id, m.vignard_did, m.issuer_did]
+      .filter(Boolean)
+    return ids.some(id => mid.includes(id))
+  })
+}
+
+/** Every stored credential remains consultable as a distinct proof. */
+function collectCredentialItems(vault) {
+  const out = []
+  ;(vault && vault.credentials || []).forEach((c, idx) => {
+    const scope = credentialScope(c)
+    if (!scope) return
+    out.push({
+      kind: 'credential',
+      cred: c,
+      idx: idx,
+      scope: scope,
+      matchingRelation: credentialMatchesRelation(vault, c),
+    })
+  })
+  return out
 }
 
 // ── Received Vine status — a VINE-SIGNED proof the DID RECEIVES & holds ──
@@ -868,10 +873,12 @@ async function checkVignardStatus(cred, btn) {
   }
 }
 
-/** Build a membership card (Vine / Vignard / legacy). Reused by openCredentials + openNodes. */
+/** Build a membership-relation or credential card. Reused by the two screens. */
 function buildMembershipCard(item, allCreds, refreshFn) {
-  const c    = item.cred
-  const idx  = item.idx
+  const c          = item.cred
+  const idx        = item.idx
+  const isCredential = item.kind === 'credential'
+  const credScope  = isCredential ? item.scope : item.kind
   const card = document.createElement('div')
   card.className = 'cred-card'
   card.style.marginBottom = '12px'
@@ -879,13 +886,26 @@ function buildMembershipCard(item, allCreds, refreshFn) {
   let markerScope = null
   let markerId    = null
 
-  if (item.kind === 'vine') {
-    typeLabel  = 'VINE MEMBERSHIP'
+  if (isCredential) {
+    typeLabel  = 'CREDENTIAL — ' + String(credScope || 'vine').toUpperCase()
+    title      = c.node_name || c.cluster_name || c.node_id || c.cluster_id ||
+                 c.issuer_did || 'Credential'
+    issuerLine = c.issuer_did || c.node_id || ''
+    if (item.matchingRelation && credScope === 'vine' && c.issuer_did) {
+      markerScope = 'vine'; markerId = c.issuer_did
+    } else if (item.matchingRelation && credScope === 'vignard') {
+      const vid = c.issuer_did || c.vignard_did
+      if (vid) { markerScope = 'vignard'; markerId = vid }
+    } else if (item.matchingRelation && credScope === 'cluster' && c.cluster_id) {
+      markerScope = 'cluster'; markerId = c.cluster_id
+    }
+  } else if (item.kind === 'vine') {
+    typeLabel  = c.live_relation ? 'VINE RELATION' : 'VINE MEMBERSHIP'
     title      = c.node_name || c.issuer_did || 'Vine'
     issuerLine = c.issuer_did || ''
     if (c.issuer_did) { markerScope = 'vine'; markerId = c.issuer_did }
   } else if (item.kind === 'vignard') {
-    typeLabel  = 'VIGNARD MEMBERSHIP'
+    typeLabel  = c.live_relation ? 'VIGNARD RELATION' : 'VIGNARD MEMBERSHIP'
     title      = c.node_name || c.issuer_did || c.vignard_did || 'Vignard'
     issuerLine = c.issuer_did || c.vignard_did || ''
     const vid  = c.issuer_did || c.vignard_did
@@ -898,18 +918,31 @@ function buildMembershipCard(item, allCreds, refreshFn) {
 
   const expiry = c.expires_at
     ? new Date(c.expires_at).toLocaleDateString()
-    : 'No expiry'
+    : (isCredential ? 'No expiry' : '—')
 
-  const revokedBadge = c.revoked
-    ? `<span class="badge" style="background:rgba(192,57,43,0.1);
-        color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
-    : `<span class="badge badge-green">✓ Valid</span>`
+  // A live relation shows its relational status; a stored credential shows
+  // its own validity and whether a current relation still backs it.
+  const statusBadge = isCredential
+    ? (c.revoked
+        ? `<span class="badge" style="background:rgba(192,57,43,0.1);
+            color:var(--red);border:1px solid rgba(192,57,43,0.3);">✗ Revoked</span>`
+        : `<span class="badge badge-green">✓ Valid proof</span>`)
+    : `<span class="badge" style="${VINE_STATUS_COLORS[c.status] || ''}">` +
+      `${escHtmlP(VINE_STATUS_LABELS[c.status] || c.status || 'relation')}</span>`
+
+  const relationBadge = isCredential
+    ? `<div style="margin-top:8px;font-size:11px;color:var(--ink-dim);">` +
+      (item.matchingRelation
+        ? 'Matches a current relation.'
+        : 'No current relation — this credential is a historical proof.') +
+      `</div>`
+    : ''
 
   // Received status (the space grants it; the DID receives & holds it).
-  const receivedStatus = item.kind === 'vine'    ? findReceivedVineStatus(c)
-                       : item.kind === 'vignard' ? findReceivedVignardStatus(c)
+  const receivedStatus = credScope === 'vine'    ? findReceivedVineStatus(c)
+                       : credScope === 'vignard' ? findReceivedVignardStatus(c)
                        : null
-  const statusSource = item.kind === 'vignard' ? 'Vignard' : 'Vine'
+  const statusSource = credScope === 'vignard' ? 'Vignard' : 'Vine'
   const receivedStatusBadge = receivedStatus
     ? `<div style="margin-top:12px;"><span class="badge" style="${VINE_STATUS_COLORS[receivedStatus.status] || ''}">` +
       `${statusSource} says: ${escHtmlP(VINE_STATUS_LABELS[receivedStatus.status] || receivedStatus.status)}</span></div>`
@@ -933,7 +966,8 @@ function buildMembershipCard(item, allCreds, refreshFn) {
       <div class="cred-meta-item">Expires <span>${expiry}</span></div>
       ${markerScope ? '<div class="cred-meta-item">Health <span class="pm-slot" data-marker-slot></span></div>' : ''}
     </div>
-    <div style="display:flex;gap:8px;margin-top:12px;">${revokedBadge}</div>
+    <div style="display:flex;gap:8px;margin-top:12px;">${statusBadge}</div>
+    ${relationBadge}
     ${receivedStatusBadge}
     ${actions}
   `
@@ -941,14 +975,14 @@ function buildMembershipCard(item, allCreds, refreshFn) {
   const slot = card.querySelector('[data-marker-slot]')
   if (slot && markerScope) slot.appendChild(buildPersonalMarkers(markerScope, markerId, refreshFn))
 
-  // Vines/Vignards only: a manual "Check status" when an endpoint is known.
-  if ((item.kind === 'vine' || item.kind === 'vignard') && credVineEndpoint(c)) {
+  // Vines/Vignards: a manual "Check status" when an endpoint is known.
+  if ((credScope === 'vine' || credScope === 'vignard') && credVineEndpoint(c)) {
     const btn = document.createElement('button')
     btn.className     = 'btn btn-ghost'
     btn.style.cssText = 'font-size:11px;margin-top:12px;'
     btn.textContent   = 'Check status'
     btn.addEventListener('click', () =>
-      item.kind === 'vignard' ? checkVignardStatus(c, btn) : checkVineStatus(c, btn))
+      credScope === 'vignard' ? checkVignardStatus(c, btn) : checkVineStatus(c, btn))
     card.appendChild(btn)
   }
   return card
@@ -959,18 +993,30 @@ function openCredentials() {
   const list  = document.getElementById('credentials-list')
   const empty = document.getElementById('credentials-empty')
   const { items, allCreds } = collectMembershipItems(vault)
+  const credentials = collectCredentialItems(vault)
 
   list.innerHTML = ''
   const cc = document.getElementById('cred-count')
-  if (cc) cc.textContent = `${items.length} membership${items.length !== 1 ? 's' : ''}`
+  if (cc) cc.textContent = `${items.length} relation${items.length !== 1 ? 's' : ''}`
 
-  if (items.length === 0) {
+  if (items.length === 0 && credentials.length === 0) {
     empty.style.display = 'block'
     list.style.display  = 'none'
   } else {
     empty.style.display = 'none'
     list.style.display  = 'block'
+
     items.forEach(item => list.appendChild(buildMembershipCard(item, allCreds, openCredentials)))
+
+    if (credentials.length) {
+      const label = document.createElement('p')
+      label.className = 'section-label'
+      label.textContent = 'Credentials / proofs'
+      label.style.marginTop = items.length ? '18px' : '8px'
+      list.appendChild(label)
+      credentials.forEach(item =>
+        list.appendChild(buildMembershipCard(item, allCreds, openCredentials)))
+    }
   }
   goTo('screen-credentials')
 }

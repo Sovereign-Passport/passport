@@ -8,7 +8,7 @@ function _fbContract() {
 }
 
 function _fbBase() {
-  try { return new URL(SYNC_ENDPOINT).origin } catch (e) { return 'https://mdusl.sovereign-passport.id' }
+  return SPID_SWITCH_HOST || SPID_PUBLIC_ORIGIN
 }
 
 function _fbSetStatus(text) {

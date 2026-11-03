@@ -414,7 +414,7 @@ async function _executeClusterDelete(clusterId) {
   await _localClusterDelete(clusterId)
 }
 
-/** The Switchboard origin this Passport syncs with (delete fallback target). */
+/** The Vine origin used for direct Cluster administration fallbacks. */
 function syncOrigin() {
   try { return new URL(SYNC_ENDPOINT).origin } catch (e) { return null }
 }
