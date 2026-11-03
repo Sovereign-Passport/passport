@@ -388,14 +388,44 @@ function refreshPassportMessages(force) {
     .then(function () { _passportMessagesFetching = false })
 }
 
-document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible') refreshPassportMessages(false)
-})
-window.addEventListener('focus', function () { refreshPassportMessages(false) })
-window.addEventListener('pageshow', function () { refreshPassportMessages(false) })
+let _passportRelationsRefreshing = false
+let _passportRelationsLastRefresh = 0
+
+/** Reconcile the server relation projection into the local vault. */
+function refreshPassportRelations(force) {
+  if (!appState.vault || !appState.vaultKey || !appState.stored) return Promise.resolve()
+  if (_passportRelationsRefreshing) return Promise.resolve()
+  if (typeof syncRelationsFromSwitchboard !== 'function') return Promise.resolve()
+  var now = Date.now()
+  if (!force && now - _passportRelationsLastRefresh < 2000) return Promise.resolve()
+  _passportRelationsLastRefresh = now
+  _passportRelationsRefreshing = true
+  return Promise.resolve()
+    .then(function () { return syncRelationsFromSwitchboard() })
+    .then(function () {
+      populateHome()
+      if (_currentScreen === 'screen-nodes') openNodes()
+      if (_currentScreen === 'screen-credentials') openCredentials()
+    })
+    .catch(function () {})
+    .then(function () { _passportRelationsRefreshing = false })
+}
+
+function _passportRefreshOnVisible() {
+  if (document.visibilityState !== 'visible') return
+  refreshPassportMessages(false)
+  refreshPassportRelations(false)
+}
+
+document.addEventListener('visibilitychange', _passportRefreshOnVisible)
+window.addEventListener('focus', _passportRefreshOnVisible)
+window.addEventListener('pageshow', _passportRefreshOnVisible)
 setInterval(function () {
   if (document.visibilityState === 'visible') refreshPassportMessages(true)
 }, 30000)
+setInterval(function () {
+  if (document.visibilityState === 'visible') refreshPassportRelations(true)
+}, 60000)
 
 function _addDeleteRelationAction(card, relationId) {
   if (!relationId) return

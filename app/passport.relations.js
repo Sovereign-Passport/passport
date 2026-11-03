@@ -6,44 +6,6 @@
  * mark missing relations stale; signed proofs/credentials are never deleted.
  */
 
-function _relSnapshot(vault) {
-  return (vault && vault.relationSnapshot) || null
-}
-
-function _relActiveIds(vault) {
-  var snap = _relSnapshot(vault)
-  if (!snap) return null
-  return {
-    vines: new Set((snap.vines || []).map(function (v) { return v.id })),
-    vineDids: new Set((snap.vines || []).map(function (v) { return v.did }).filter(Boolean)),
-    clusters: new Set(snap.clusters || []),
-    vignards: new Set(snap.vignards || []),
-    homeHost: snap.homeHost || null,
-  }
-}
-
-function _relHost(value) {
-  if (typeof value !== 'string' || !value) return null
-  if (value.indexOf('did:web:') === 0) {
-    return value.slice('did:web:'.length).split(':')[0].split('/')[0].toLowerCase()
-  }
-  try { return new URL(value).hostname.toLowerCase() } catch (e) { return null }
-}
-
-function _relIsHome(ids, value) {
-  return !!ids.homeHost && _relHost(value) === ids.homeHost
-}
-
-/** Whether this membership row belongs to the home Vine being synced. */
-function _relLocalMembership(vault, m) {
-  var ids = _relActiveIds(vault)
-  if (!ids) return false
-  if (m.cluster_id) return ids.clusters.has(m.cluster_id) || _relIsHome(ids, m.vine_endpoint)
-  if (m.scope === 'vignard') return ids.vignards.has(m.node_id) || _relIsHome(ids, m.vine_endpoint)
-  return ids.vines.has(m.node_id) || ids.vines.has(m.vine_id) ||
-         ids.vineDids.has(m.node_id) || ids.vineDids.has(m.issuer_did) ||
-         _relIsHome(ids, m.vine_endpoint)
-}
 
 function _relUpsert(list, match, next) {
   var i = list.findIndex(match)
@@ -209,18 +171,25 @@ async function syncRelationsFromSwitchboard() {
   // Keep history, but hide relations the home Vine no longer returns or has
   // revoked. Hosting revocation is not member departure or Cluster deletion.
   next.forEach(function (m) {
-    if (m.cluster_id && clusterStatus[m.cluster_id]) {
-      m.stale = clusterStatus[m.cluster_id] !== 'active'
+    if (m.cluster_id) {
+      if (clusterStatus[m.cluster_id]) {
+        m.stale = clusterStatus[m.cluster_id] !== 'active'
+        return
+      }
+      // A private/local Cluster is not expected in relation/list. A
+      // server-backed Cluster missing from the projection is stale.
+      if (m.local_private) return
+      m.stale = true
       return
     }
-    if (!_relLocalMembership(vault, m)) return
-    if (m.scope === 'vignard') m.stale = !vignards.includes(m.node_id)
-    else if (!m.cluster_id) {
-      m.stale = !(vines.some(function (v) {
-        return v.id === m.node_id || v.id === m.vine_id ||
-          (v.did && (v.did === m.issuer_did || v.did === m.node_id))
-      }))
+    if (m.scope === 'vignard') {
+      m.stale = !vignards.includes(m.node_id)
+      return
     }
+    m.stale = !(vines.some(function (v) {
+      return v.id === m.node_id || v.id === m.vine_id ||
+        (v.did && (v.did === m.issuer_did || v.did === m.node_id))
+    }))
   })
 
   if (before === JSON.stringify(next) &&
