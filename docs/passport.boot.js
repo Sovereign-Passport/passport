@@ -576,8 +576,12 @@ function openNodes() {
         const isLeft     = status === 'left'
         const isPending  = status === 'invited' || status === 'candidate' || status === 'temporary'
         const isTerminal = status === 'suspended' || status === 'revoked' || status === 'removed'
+        const clusterLabel = status === 'approved' ? 'member'
+          : status === 'admin' ? 'admin'
+          : status === 'invited' ? 'pending'
+          : (status || 'member')
         const statusText = isLeft ? 'Cluster : member · away'
-          : (status ? 'Cluster : ' + status : 'Cluster : member')
+          : 'Cluster : ' + clusterLabel
         const title      = escHtmlP(m.node_name || m.cluster_name || m.node_id || m.cluster_id || 'Unknown cluster')
         // Every Joined card here is a canonical Cluster (cluster_id present).
         const markerScope = 'cluster'
