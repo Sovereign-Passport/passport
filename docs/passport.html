@@ -12,7 +12,17 @@
   <link rel="apple-touch-icon" href="spid-logo.jpg">
   <meta name="apple-mobile-web-app-title" content="Sovereign Passport">
   <!-- No external font calls — system fonts only. Sovereign by design. -->
-  <link rel="stylesheet" href="passport.css?v=4">
+  <link rel="stylesheet" href="passport.css?v=4"
+        onload="document.documentElement.classList.add('css-ready')">
+  <style>
+    html:not(.css-ready) #app { visibility: hidden; }
+    html, body { background: #0a0a0b; }
+  </style>
+  <script>
+    setTimeout(function () {
+      document.documentElement.classList.add('css-ready')
+    }, 1500)
+  </script>
 </head>
 <body>
 <div id="app">
