@@ -397,6 +397,38 @@ setInterval(function () {
   if (document.visibilityState === 'visible') refreshPassportMessages(true)
 }, 30000)
 
+function _addDeleteRelationAction(card, relationId) {
+  if (!relationId) return
+  const btn = document.createElement('button')
+  btn.className      = 'btn btn-ghost'
+  btn.style.cssText  = 'font-size:11px;margin-top:8px;color:var(--red);'
+  btn.textContent    = 'Delete'
+  btn.addEventListener('click', () => confirmDeleteMembership(relationId))
+  card.appendChild(btn)
+}
+
+function _addClusterRelationActions(card, relationId) {
+  if (!relationId) return
+  const actions = document.createElement('div')
+  actions.style.cssText = 'display:flex;gap:8px;margin-top:8px;'
+
+  const leaveBtn = document.createElement('button')
+  leaveBtn.className      = 'btn btn-ghost'
+  leaveBtn.style.cssText  = 'font-size:11px;flex:1;'
+  leaveBtn.textContent    = 'Leave'
+  leaveBtn.addEventListener('click', () => confirmLeaveMembership(relationId))
+
+  const deleteBtn = document.createElement('button')
+  deleteBtn.className      = 'btn btn-ghost'
+  deleteBtn.style.cssText  = 'font-size:11px;flex:1;color:var(--red);'
+  deleteBtn.textContent    = 'Delete'
+  deleteBtn.addEventListener('click', () => confirmDeleteMembership(relationId))
+
+  actions.appendChild(leaveBtn)
+  actions.appendChild(deleteBtn)
+  card.appendChild(actions)
+}
+
 /**
  * Open the clusters screen.
  * Owned Clusters come from vault.ownClusters; joined Clusters come from the
@@ -551,18 +583,17 @@ function openNodes() {
           note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
           note.textContent = 'Approval is managed in Portail → Relations.'
           card.appendChild(note)
+          _addClusterRelationActions(card, m.cluster_id || m.node_id || m.id)
         } else if (isLeft) {
           const note = document.createElement('p')
           note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
           note.textContent = 'You left this cluster. Your credential remains as a personal record. Rejoin by requesting a new invite from the founder.'
           card.appendChild(note)
+          _addDeleteRelationAction(card, m.cluster_id || m.node_id || m.id)
         } else if (!isTerminal) {
-          const leaveBtn = document.createElement('button')
-          leaveBtn.className      = 'btn btn-ghost'
-          leaveBtn.style.fontSize = '11px'
-          leaveBtn.textContent    = 'Leave'
-          leaveBtn.addEventListener('click', () => confirmLeaveMembership(m.cluster_id || m.node_id || m.id))
-          card.appendChild(leaveBtn)
+          _addClusterRelationActions(card, m.cluster_id || m.node_id || m.id)
+        } else {
+          _addDeleteRelationAction(card, m.cluster_id || m.node_id || m.id)
         }
 
         // Messages link — opens the shared portal on this Cluster (real cluster_id).
@@ -970,6 +1001,35 @@ function buildMembershipCard(item, allCreds, refreshFn) {
     btn.addEventListener('click', () =>
       credScope === 'vignard' ? checkVignardStatus(c, btn) : checkVineStatus(c, btn))
     card.appendChild(btn)
+  }
+
+  // Every live Vine/Vignard relation exposes Leave and Delete. Credentials
+  // are proofs, not relations, and never get these actions.
+  if (!isCredential && (item.kind === 'vine' || item.kind === 'vignard')) {
+    const relationId = c.node_id || c.issuer_did || c.vignard_did || null
+    if (relationId) {
+      const name = c.node_name || c.issuer_did || c.vignard_did || relationId
+      const actions = document.createElement('div')
+      actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;'
+
+      const leaveBtn = document.createElement('button')
+      leaveBtn.className     = 'btn btn-ghost'
+      leaveBtn.style.cssText = 'font-size:11px;flex:1;'
+      leaveBtn.textContent   = 'Leave'
+      leaveBtn.addEventListener('click', () =>
+        confirmLeaveRelation(item.kind, relationId, name))
+
+      const deleteBtn = document.createElement('button')
+      deleteBtn.className     = 'btn btn-ghost'
+      deleteBtn.style.cssText = 'font-size:11px;flex:1;color:var(--red);'
+      deleteBtn.textContent   = 'Delete'
+      deleteBtn.addEventListener('click', () =>
+        confirmDeleteRelation(item.kind, relationId, name))
+
+      actions.appendChild(leaveBtn)
+      actions.appendChild(deleteBtn)
+      card.appendChild(actions)
+    }
   }
   return card
 }

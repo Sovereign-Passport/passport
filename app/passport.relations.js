@@ -51,16 +51,43 @@ function _relUpsert(list, match, next) {
   else list.push(next)
 }
 
-/** Clear a local departure marker when the DID accepts a new invitation. */
-function clearLocalClusterLeft(scopeId) {
+function _relMatchesScope(m, scopeType, scopeId) {
+  if (!m || !scopeId) return false
+  if (scopeType === 'cluster') return m.cluster_id === scopeId
+  if (scopeType === 'vignard') {
+    return m.scope === 'vignard' &&
+      (m.node_id === scopeId || m.vignard_did === scopeId || m.issuer_did === scopeId)
+  }
+  return !m.cluster_id && m.scope !== 'vignard' &&
+    (m.vine_id === scopeId || m.node_id === scopeId ||
+     m.vine_did === scopeId || m.issuer_did === scopeId)
+}
+
+function _isDismissed(vault, scopeType, ids) {
+  var list = (vault && vault.dismissedRelations) || []
+  return list.some(function (d) {
+    return d && d.scope === scopeType &&
+      ids.some(function (id) { return id && d.id === id })
+  })
+}
+
+/** Clear local departure/dismissal markers when a new invite is accepted. */
+function clearLocalRelationLeft(scopeType, scopeId) {
   var vault = appState.vault
   if (!vault || !scopeId) return
   ;(vault.memberships || []).forEach(function (m) {
-    if ((m.cluster_id && m.cluster_id === scopeId) ||
-        (m.node_id && m.node_id === scopeId)) {
+    if (_relMatchesScope(m, scopeType, scopeId)) {
       m.left_at = null
       m.status = 'invited'
     }
+  })
+}
+
+function clearDismissedRelation(scopeType, scopeId) {
+  var vault = appState.vault
+  if (!vault || !scopeId) return
+  vault.dismissedRelations = (vault.dismissedRelations || []).filter(function (d) {
+    return !(d && d.scope === scopeType && d.id === scopeId)
   })
 }
 
@@ -87,6 +114,18 @@ async function syncRelationsFromSwitchboard() {
     return { id: v.id, did: v.did || null, name: v.name || v.id, endpoint: v.endpoint || null, status: v.status, role: v.role }
   })
   vines.forEach(function (v) {
+    if (_isDismissed(vault, 'vine', [v.id, v.did])) return
+    var existing = next.find(function (m) {
+      return m.vine_id === v.id || m.node_id === v.id ||
+             (v.did && (m.issuer_did === v.did || m.node_id === v.did))
+    })
+    if (existing && existing.status === 'left' && existing.left_at) {
+      existing.node_name = v.name
+      existing.vine_endpoint = v.endpoint
+      existing.role = v.role
+      existing.stale = false
+      return
+    }
     _relUpsert(next, function (m) {
       return m.vine_id === v.id || m.node_id === v.id ||
              (v.did && (m.issuer_did === v.did || m.node_id === v.did))
@@ -119,6 +158,7 @@ async function syncRelationsFromSwitchboard() {
       }
       return
     }
+    if (_isDismissed(vault, 'cluster', [c.id])) return
     var existing = next.find(function (m) { return m.cluster_id === c.id })
     var active = (c.cluster_status || 'active') === 'active'
     // Keep a revoked hosted Cluster as history, but never invent one locally.
@@ -144,6 +184,14 @@ async function syncRelationsFromSwitchboard() {
 
   var vignards = (rel.vignards || []).map(function (g) { return g.id })
   ;(rel.vignards || []).forEach(function (g) {
+    if (_isDismissed(vault, 'vignard', [g.id])) return
+    var existing = next.find(function (m) { return m.node_id === g.id && m.scope === 'vignard' })
+    if (existing && existing.status === 'left' && existing.left_at) {
+      existing.node_name = g.name
+      existing.role = g.role
+      existing.stale = false
+      return
+    }
     _relUpsert(next, function (m) { return m.node_id === g.id && m.scope === 'vignard' },
       { node_id: g.id, node_name: g.name, scope: 'vignard', status: g.status, role: g.role, stale: false })
   })

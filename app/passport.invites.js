@@ -169,6 +169,7 @@ async function _handleUnifiedInvite(p) {
     const vault = appState.vault
     const clusterId = p.scope && p.scope.id
     if (!vault || !clusterId) { showToast('Private invitation incomplete.'); return }
+    if (typeof clearDismissedRelation === 'function') clearDismissedRelation('cluster', clusterId)
     if (!vault.memberships) vault.memberships = []
     const now = new Date().toISOString()
     const row = {
@@ -212,7 +213,12 @@ async function _handleUnifiedInvite(p) {
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
     }
-    if (typeof clearLocalClusterLeft === 'function') clearLocalClusterLeft(p.scope.id)
+    if (typeof clearLocalRelationLeft === 'function') {
+      clearLocalRelationLeft(p.scope.type, p.scope.id)
+    }
+    if (typeof clearDismissedRelation === 'function') {
+      clearDismissedRelation(p.scope.type, p.scope.id)
+    }
     if (typeof syncRelationsFromSwitchboard === 'function') {
       await syncRelationsFromSwitchboard()
     }

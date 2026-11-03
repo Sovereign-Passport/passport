@@ -292,11 +292,31 @@ async function confirmLeaveCluster(clusterId) {
   document.body.appendChild(overlay)
 }
 
+/** Match a vault membership by its canonical relation scope and id. */
+function _membershipMatches(m, kind, id) {
+  if (!m || !id) return false
+  if (kind === 'cluster') return m.cluster_id === id
+  if (kind === 'vignard') {
+    return m.scope === 'vignard' &&
+      (m.node_id === id || m.vignard_did === id || m.issuer_did === id)
+  }
+  return !m.cluster_id && m.scope !== 'vignard' &&
+    (m.vine_id === id || m.node_id === id || m.vine_did === id || m.issuer_did === id)
+}
+
+function _findMembership(vault, kind, id) {
+  return ((vault && vault.memberships) || []).find(m => _membershipMatches(m, kind, id)) || null
+}
+
+function _relationDisplayName(m) {
+  return (m && (m.node_name || m.cluster_name || m.node_id || m.cluster_id)) || ''
+}
+
 /**
- * Confirmation modal for a soft leave. The existing delete confirmation is a
- * separate, destructive flow and must not be reused for Leave.
+ * Confirmation modal for a relation action. The existing delete confirmation
+ * is a separate, destructive Cluster flow and is not reused here.
  */
-function _showLeaveConfirm(title, name, bodyHtml, onConfirm) {
+function _showLeaveConfirm(title, name, bodyHtml, onConfirm, confirmLabel, danger) {
   const existing = document.getElementById('cluster-leave-modal')
   if (existing) existing.remove()
 
@@ -314,7 +334,7 @@ function _showLeaveConfirm(title, name, bodyHtml, onConfirm) {
       ${bodyHtml}
       <div style="display:flex;gap:8px;margin-top:20px;">
         <button class="btn btn-ghost" style="flex:1;" data-cancel>Cancel</button>
-        <button class="btn btn-primary" style="flex:1;" data-confirm>Leave</button>
+        <button class="btn btn-primary" style="flex:1;${danger ? 'background:var(--red);border-color:var(--red);' : ''}" data-confirm>${escHtmlP(confirmLabel || 'Leave')}</button>
       </div>
     </div>
   `
@@ -348,26 +368,59 @@ function confirmSoftLeaveCluster(clusterId) {
 
 /** Confirmation for leaving a Cluster the Passport joined. */
 function confirmLeaveMembership(membershipId) {
-  const vault = appState.vault || {}
-  const membership = (vault.memberships || []).find(m =>
-    (m.cluster_id && m.cluster_id === membershipId) ||
-    (m.node_id && m.node_id === membershipId) ||
-    (m.id && m.id === membershipId)
-  )
-  if (!membership) {
-    showToast('Membership not found.')
-    return
-  }
-  const name = membership.node_name || membership.cluster_name ||
-    membership.cluster_id || membership.node_id || ''
+  const membership = _findMembership(appState.vault, 'cluster', membershipId)
+  if (!membership) { showToast('Membership not found.'); return }
   _showLeaveConfirm(
     'Leave cluster',
-    name,
+    _relationDisplayName(membership),
     `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
        Leave this Cluster? Your credential remains in your vault as a personal
        historical record. You can rejoin later with a new invitation.
      </p>`,
     () => softLeaveMembership(membershipId)
+  )
+}
+
+/** Delete a joined Cluster relation from this Passport (not the Cluster). */
+function confirmDeleteMembership(membershipId) {
+  const membership = _findMembership(appState.vault, 'cluster', membershipId)
+  if (!membership) { showToast('Membership not found.'); return }
+  _showLeaveConfirm(
+    'Delete relation',
+    _relationDisplayName(membership),
+    `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+       Delete this relation from this Passport? It does not delete the remote
+       Cluster. Your credentials stay as historical proofs.
+     </p>`,
+    () => deleteLocalRelation('cluster', membershipId),
+    'Delete', true
+  )
+}
+
+/** Confirmation for leaving a Vine/Vignard relation. */
+function confirmLeaveRelation(kind, id, name) {
+  _showLeaveConfirm(
+    'Leave relation',
+    name,
+    `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+       Leave this relation? It becomes historical in this Passport. The remote
+       community is not deleted.
+     </p>`,
+    () => softLeaveRelation(kind, id)
+  )
+}
+
+/** Delete a Vine/Vignard relation from this Passport. */
+function confirmDeleteRelation(kind, id, name) {
+  _showLeaveConfirm(
+    'Delete relation',
+    name,
+    `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+       Delete this relation from this Passport? It does not delete the remote
+       community. Your credentials stay as historical proofs.
+     </p>`,
+    () => deleteLocalRelation(kind, id),
+    'Delete', true
   )
 }
 
@@ -419,20 +472,13 @@ async function rejoinCluster(clusterId) {
 }
 
 /**
- * Soft leave a membership credential.
- * Marks the credential status as 'left' — credential stays in vault.
+ * Soft leave a relation. Status 'left' keeps the historical relation but hides
+ * it from active scope lists.
  */
-async function softLeaveMembership(membershipId) {
+async function softLeaveRelation(kind, id) {
   const vault = appState.vault
-  const membership = (vault && vault.memberships || []).find(m =>
-    (m.cluster_id && m.cluster_id === membershipId) ||
-    (m.node_id && m.node_id === membershipId) ||
-    (m.id && m.id === membershipId)
-  )
-  if (!membership) {
-    showToast('Membership not found.')
-    return
-  }
+  const membership = _findMembership(vault, kind, id)
+  if (!membership) { showToast('Relation not found.'); return }
 
   membership.status  = 'left'
   membership.left_at = new Date().toISOString()
@@ -442,11 +488,38 @@ async function softLeaveMembership(membershipId) {
     await persist(newPayload)
     appState.stored = newPayload
     populateHome()
-    showToast('You left the cluster. Your credential stays as a personal record.')
-    openNodes()
+    showToast('Relation left. It remains as a historical record.')
+    if (kind === 'cluster') openNodes()
+    else openCredentials()
   } catch (err) {
     showToast('Could not leave: ' + err.message)
   }
+}
+
+/** Delete a relation row locally and remember the dismissal across syncs. */
+async function deleteLocalRelation(kind, id) {
+  const vault = appState.vault
+  if (!vault || !kind || !id) return
+  vault.memberships = (vault.memberships || []).filter(m => !_membershipMatches(m, kind, id))
+  vault.dismissedRelations = (vault.dismissedRelations || []).filter(d =>
+    !(d && d.scope === kind && d.id === id))
+  vault.dismissedRelations.push({ scope: kind, id: id, at: new Date().toISOString() })
+
+  try {
+    const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
+    await persist(newPayload)
+    appState.stored = newPayload
+    populateHome()
+    showToast('Relation deleted from this Passport.')
+    if (kind === 'cluster') openNodes()
+    else openCredentials()
+  } catch (err) {
+    showToast('Could not delete relation: ' + err.message)
+  }
+}
+
+async function softLeaveMembership(membershipId) {
+  return softLeaveRelation('cluster', membershipId)
 }
 async function _executeClusterDelete(clusterId) {
   const vault   = appState.vault
