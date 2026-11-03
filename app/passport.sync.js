@@ -292,9 +292,6 @@ async function tryRestore() {
     checkPendingOffer()
     // Signed hand-offs must also run on the RESTORE path (a new device that
     // restored from a synced passport must still honour #invite=/#approve=/…).
-    checkPendingApproval()
-    checkPendingDecision()
-    checkPendingRevoke()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
     showToast('Passport restored')

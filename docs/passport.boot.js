@@ -187,9 +187,6 @@ async function tryUnlock() {
     populateHome()
     syncProfileHandle()
     checkPendingOffer()
-    checkPendingApproval()
-    checkPendingDecision()
-    checkPendingRevoke()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
 
@@ -480,52 +477,22 @@ function openNodes() {
         `
 
         if (isPending) {
-          // Pending Cluster invitation: offer a manual check when an endpoint
-          // is known. Never invent an endpoint, never show a dead button.
-          if (m.vine_endpoint) {
-            const checkBtn = document.createElement('button')
-            checkBtn.className     = 'btn btn-primary'
-            checkBtn.style.cssText = 'font-size:11px;margin-top:12px;'
-            checkBtn.textContent   = 'Check approval'
-            checkBtn.addEventListener('click', () => checkClusterApproval(m, checkBtn))
-            card.appendChild(checkBtn)
-          } else {
-            const note = document.createElement('p')
-            note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
-            note.textContent = 'Approval endpoint unavailable'
-            card.appendChild(note)
-          }
+          const note = document.createElement('p')
+          note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
+          note.textContent = 'Approval is managed in Portail → Relations.'
+          card.appendChild(note)
         } else if (isLeft) {
           const note = document.createElement('p')
           note.style.cssText = 'font-size:11px;color:var(--ink-dim);margin-top:8px;'
           note.textContent = 'You left this cluster. Your credential remains as a personal record. Rejoin by requesting a new invite from the founder.'
           card.appendChild(note)
-        } else {
-          // Approved / suspended / terminal: never offer a misleading Leave or
-          // Rejoin. A single manual "Check updates" recovers any still-pending
-          // decision when an endpoint is known.
-          const actions = document.createElement('div')
-          actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;'
-
-          if (m.vine_endpoint) {
-            const updBtn = document.createElement('button')
-            updBtn.className      = 'btn btn-ghost'
-            updBtn.style.fontSize = '11px'
-            updBtn.textContent    = 'Check updates'
-            updBtn.addEventListener('click', () => checkClusterUpdates(m, updBtn))
-            actions.appendChild(updBtn)
-          }
-
-          if (!isTerminal) {
-            const leaveBtn = document.createElement('button')
-            leaveBtn.className      = 'btn btn-ghost'
-            leaveBtn.style.fontSize = '11px'
-            leaveBtn.textContent    = 'Leave'
-            leaveBtn.addEventListener('click', () => softLeaveMembership(m.id || m.node_id))
-            actions.appendChild(leaveBtn)
-          }
-
-          if (actions.children.length) card.appendChild(actions)
+        } else if (!isTerminal) {
+          const leaveBtn = document.createElement('button')
+          leaveBtn.className      = 'btn btn-ghost'
+          leaveBtn.style.fontSize = '11px'
+          leaveBtn.textContent    = 'Leave'
+          leaveBtn.addEventListener('click', () => softLeaveMembership(m.id || m.node_id))
+          card.appendChild(leaveBtn)
         }
 
         // Billboard link — opens the shared portal on this Cluster (real cluster_id).
@@ -566,58 +533,6 @@ function openNodes() {
   }
 
   goTo('screen-nodes')
-}
-
-
-/**
- * Manual Cluster claim action (approval or updates).
- * Reuses claimClusterApprovals(); disables the button to avoid double calls.
- * Never corrupts local data: claimClusterApprovals restores its snapshot on
- * a failed save, and a network failure returns before any mutation.
- *
- * @param {Object} membership
- * @param {HTMLElement} btn
- * @param {'approval'|'updates'} kind
- */
-async function _runClusterClaim(membership, btn, kind) {
-  const idle = kind === 'updates' ? 'Check updates' : 'Check approval'
-  if (btn && btn.disabled) return                    // single active request
-  if (!membership || !membership.vine_endpoint) {
-    showToast('Approval endpoint unavailable')
-    return
-  }
-  if (btn) { btn.disabled = true; btn.textContent = 'Checking…' }
-  try {
-    const r = await claimClusterApprovals(membership.vine_endpoint)
-    if (!r || !r.ok) {
-      showToast(r && r.error === 'SAVE_FAILED'
-        ? 'Could not save locally.'
-        : 'Could not check for updates.')
-      if (btn) { btn.disabled = false; btn.textContent = idle }
-      return
-    }
-    if (!r.stored || r.stored.length === 0) {
-      showToast(kind === 'updates' ? 'No updates available yet.' : 'No approval available yet.')
-      if (btn) { btn.disabled = false; btn.textContent = idle }
-      return
-    }
-    showToast(kind === 'updates' ? 'Cluster updates received ✓' : 'Cluster approval received ✓')
-    openNodes()        // refresh My Clusters
-    populateHome()     // refresh counters + cred-count
-  } catch (e) {
-    showToast('Could not check for updates.')
-    if (btn) { btn.disabled = false; btn.textContent = idle }
-  }
-}
-
-/** Manual "Check approval" for a pending Cluster membership. */
-async function checkClusterApproval(membership, btn) {
-  return _runClusterClaim(membership, btn, 'approval')
-}
-
-/** Manual "Check updates" for an established/terminal Cluster membership. */
-async function checkClusterUpdates(membership, btn) {
-  return _runClusterClaim(membership, btn, 'updates')
 }
 
 
@@ -1112,15 +1027,6 @@ async function boot() {
   const offerData  = params.get('r')     || hashParams.get('r')
   const offerRef   = params.get('ref')   || hashParams.get('ref')
   const syncToken  = params.get('sync')  || hashParams.get('sync')
-  // Public signed-approval demand: passport.html#approve=<base64url(payload)>
-  const approveRaw = params.get('approve') || hashParams.get('approve')
-  if (approveRaw) appState.pendingApproveRaw = approveRaw
-  // Public signed-decision demand: passport.html#decision=<base64url(payload)>
-  const decisionRaw = params.get('decision') || hashParams.get('decision')
-  if (decisionRaw) appState.pendingDecisionRaw = decisionRaw
-  // Public signed cluster-deletion demand: passport.html#revoke=<base64url(payload)>
-  const revokeRaw = params.get('revoke') || hashParams.get('revoke')
-  if (revokeRaw) appState.pendingRevokeRaw = revokeRaw
   // Signed-flow hand-offs from the Sovereign Passport dashboard.
   const newClusterRaw = params.get('newcluster') || hashParams.get('newcluster')
   const inviteRaw     = params.get('invite')     || hashParams.get('invite')
