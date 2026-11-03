@@ -115,14 +115,9 @@ window.addEventListener('popstate', () => {
 // One line changes when sync.sovereign-passport.id DNS is ready.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// One artifact, two origins:
-// - public GitHub Pages → the bootstrap Vine relay and the network Switchboard;
-// - served by a SPID node → that node is the same-origin relay/Switchboard.
-// IndexedDB is origin-bound: this selects transport, never the identity.
-const SPID_PUBLIC_ORIGIN = /(^|\.)github\.io$/i.test(location.hostname)
-  ? 'https://mdusl.sovereign-passport.id'
-  : location.origin
-const SPID_SWITCH_HOST = /(^|\.)github\.io$/i.test(location.hostname)
-  ? 'https://sb.sovereign-passport.id'
-  : location.origin
+// The Passport is a public static app. The network Switchboard is a distinct
+// service; the Vine owns only its relay endpoint. The Vine is not the app
+// origin and not the Switchboard.
+const SPID_PUBLIC_ORIGIN = 'https://mdusl.sovereign-passport.id'
+const SPID_SWITCH_HOST = 'https://sb.sovereign-passport.id'
 const SYNC_ENDPOINT = SPID_PUBLIC_ORIGIN + '/api/passport/sync'
