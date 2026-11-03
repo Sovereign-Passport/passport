@@ -214,6 +214,13 @@ async function _handleUnifiedInvite(p) {
     if (typeof syncRelationsFromSwitchboard === 'function') {
       await syncRelationsFromSwitchboard()
     }
+    // Refresh the local views immediately: the accepted relation is already
+    // in the vault, even before any MembershipCredential is issued.
+    if (typeof populateHome === 'function') populateHome()
+    if (typeof openNodes === 'function') openNodes()
+    if (typeof openCredentials === 'function' && _currentScreen === 'screen-credentials') {
+      openCredentials()
+    }
     showToast('Invitation ' + typeLabel + ' « ' + name + ' » acceptée — en attente d’approbation.')
   } catch (e) {
     showToast('Failed: ' + (e && e.message ? e.message : e))
