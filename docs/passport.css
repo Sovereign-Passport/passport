@@ -451,10 +451,18 @@
       text-decoration: none;
       box-shadow: 0 0 0 3px var(--gold-glow);
       transition: transform 0.15s var(--ease), border-color 0.15s, color 0.15s;
+      animation: assistGlow 2.8s ease-in-out infinite;
     }
     .assist-badge:hover,
     .assist-badge:active { transform: translateY(-1px); border-color: var(--gold); color: var(--gold-bright); }
     .assist-badge svg { width: 24px; height: 24px; display: block; }
+    @keyframes assistGlow {
+      0%, 100% { box-shadow: 0 0 0 3px var(--gold-glow), 0 0 10px rgba(201,169,97,0.28); }
+      50% { box-shadow: 0 0 0 5px rgba(201,169,97,0.10), 0 0 24px rgba(201,169,97,0.68); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .assist-badge { animation: none; }
+    }
 
     /* Language switch — round flag buttons, fixed top-left of the screen. */
     .lang-bar {
@@ -523,6 +531,45 @@
     .home-handle {
       font-family: Georgia, 'Times New Roman', serif;
       font-size: 22px;
+    }
+    .home-header > div { min-width: 0; flex: 1; }
+    .home-did-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 4px; min-width: 0;
+    }
+    .home-did {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 10.5px; color: var(--ink-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0;
+    }
+    .did-copy {
+      flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 1px solid var(--ink-faint);
+      background: transparent; color: var(--gold); cursor: pointer;
+    }
+    .did-copy:hover, .did-copy:active { border-color: var(--gold); color: var(--gold-bright); }
+    .did-copy svg { width: 13px; height: 13px; display: block; }
+    .home-quick {
+      width: 100%; max-width: 380px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin: 2px 0 4px;
+    }
+    .home-quick-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px; text-align: left;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--ink-faint); border-radius: 12px;
+      color: var(--ink); cursor: pointer;
+    }
+    .home-quick-btn:hover, .home-quick-btn:active { border-color: var(--gold-dim); }
+    .home-quick-icon { font-size: 20px; line-height: 1; flex: 0 0 auto; }
+    .home-quick-text { display: flex; flex-direction: column; min-width: 0; }
+    .home-quick-text strong { font-size: 13px; font-weight: 500; }
+    .home-quick-text small {
+      font-size: 10.5px; color: var(--ink-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .avatar {
       width: 40px; height: 40px; border-radius: 50%;

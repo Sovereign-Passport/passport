@@ -282,9 +282,9 @@ function populateHome() {
   const fileCount = (v.files || []).length
   setText('vault-file-count', `${fileCount} file${fileCount !== 1 ? 's' : ''}`)
 
-  // DID short
+  // DID under the handle — full value stays available through the copy button.
   const did = v.identity.id
-  setText('did-short', did.slice(0,16) + '…' + did.slice(-8))
+  setText('home-did', did.slice(0,20) + '…' + did.slice(-8))
 
   // Health summary
   const issues = []

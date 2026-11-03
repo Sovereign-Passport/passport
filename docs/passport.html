@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="spid-logo.jpg">
   <meta name="apple-mobile-web-app-title" content="Sovereign Passport">
   <!-- No external font calls — system fonts only. Sovereign by design. -->
-  <link rel="stylesheet" href="passport.css?v=1">
+  <link rel="stylesheet" href="passport.css?v=2">
 </head>
 <body>
 <div id="app">
@@ -242,19 +242,33 @@
       <div>
         <p class="logotype" style="margin-bottom:2px;">Passport</p>
         <div class="home-handle" id="home-handle">—</div>
+        <div class="home-did-row">
+          <span class="home-did" id="home-did">—</span>
+          <button class="did-copy" type="button" onclick="showDID()" title="Copy DID" aria-label="Copy DID">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+              <path d="M5 15V6a2 2 0 0 1 2-2h9"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- ── IDENTITY ─────────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-1">Identity</p>
-
-    <div class="menu-item fade-up fade-up-1" onclick="showDID()">
-      <div class="menu-icon">🔑</div>
-      <div class="menu-text">
-        <strong>My Passport Address</strong>
-        <small id="did-short">—</small>
-      </div>
-      <span class="menu-arrow">›</span>
+    <div class="home-quick fade-up fade-up-1">
+      <button class="home-quick-btn" type="button" onclick="openVaultFiles()">
+        <span class="home-quick-icon">🗄</span>
+        <span class="home-quick-text">
+          <strong>Files</strong>
+          <small id="vault-file-count">0 files</small>
+        </span>
+      </button>
+      <button class="home-quick-btn" type="button" onclick="goTo('screen-health')">
+        <span class="home-quick-icon">🔐</span>
+        <span class="home-quick-text">
+          <strong>Vault</strong>
+          <small id="health-summary">checking…</small>
+        </span>
+      </button>
     </div>
 
     <!-- ── GROUPS AND COMMUNITIES ───────────────────────────── -->
@@ -288,18 +302,6 @@
       <span class="menu-arrow">›</span>
     </div>
 
-    <!-- ── VAULT FILES ───────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-3">Vault Files</p>
-
-    <div class="menu-item fade-up fade-up-3" onclick="openVaultFiles()">
-      <div class="menu-icon">🗄</div>
-      <div class="menu-text">
-        <strong>Files</strong>
-        <small id="vault-file-count">0 files</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
     <!-- ── SETTINGS ──────────────────────────────────────────── -->
     <p class="section-label fade-up fade-up-4">Settings</p>
 
@@ -308,19 +310,6 @@
       <div class="menu-text">
         <strong>Settings</strong>
         <small>Handle · Backup · Restore</small>
-      </div>
-      <span class="menu-arrow">›</span>
-    </div>
-
-    <!-- ── HEALTH ────────────────────────────────────────────── -->
-    <p class="section-label fade-up fade-up-4">Health</p>
-
-    <div class="menu-item fade-up fade-up-5" onclick="goTo('screen-health')"
-      style="margin-bottom:40px;">
-      <div class="menu-icon">💚</div>
-      <div class="menu-text">
-        <strong>Passport Health</strong>
-        <small id="health-summary">checking…</small>
       </div>
       <span class="menu-arrow">›</span>
     </div>
@@ -1001,7 +990,7 @@
 <script src="passport.status.js?v=1"></script>
 <script src="passport.feedback.js?v=2"></script>
 <script src="passport.relations.js?v=5"></script>
-<script src="passport.boot.js?v=12"></script>
+<script src="passport.boot.js?v=13"></script>
 <script src="spid.i18n.js"></script>
 <script>
 /* Language mirror: persist the choice inside the vault (the DID's container)
