@@ -289,7 +289,7 @@ async function tryRestore() {
     await syncRelationsFromSwitchboard()
     populateHome()
     // Signed hand-offs must also run on the RESTORE path (a new device that
-    // restored from a synced passport must still honour #invite=/#approve=/…).
+    // restored from a synced passport must still honour #invite=/#newcluster=).
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
     showToast('Passport restored')

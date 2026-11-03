@@ -229,8 +229,7 @@ async function claimVignardStatuses(vineEndpoint) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-// APPROVE-MEMBER CONFIRMATION SCREEN — opened from a public #approve= demand.
-// The demand is NOT an authority; the server re-verifies everything.
+// VINE ENDPOINT NORMALIZATION
 // ═════════════════════════════════════════════════════════════════════════════
 
 /** Normalize a vine endpoint: scheme optional, no trailing slash, https by default. */
