@@ -535,21 +535,25 @@
     .home-header > div { min-width: 0; flex: 1; }
     .home-did-row {
       display: flex; align-items: center; gap: 6px;
-      margin-top: 4px; min-width: 0;
+      margin-top: 5px; min-width: 0;
+      padding: 6px 8px;
+      background: rgba(236,231,220,0.72);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 9px;
     }
     .home-did {
       font-family: 'SFMono-Regular', Consolas, monospace;
-      font-size: 10.5px; color: var(--ink-dim);
+      font-size: 10.5px; color: #111;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       min-width: 0;
     }
     .did-copy {
       flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
       display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 50%; border: 1px solid var(--ink-faint);
-      background: transparent; color: var(--gold); cursor: pointer;
+      border-radius: 50%; border: 1px solid rgba(0,0,0,0.14);
+      background: rgba(255,255,255,0.92); color: #111; cursor: pointer;
     }
-    .did-copy:hover, .did-copy:active { border-color: var(--gold); color: var(--gold-bright); }
+    .did-copy:hover, .did-copy:active { border-color: var(--gold-dim); color: #000; }
     .did-copy svg { width: 13px; height: 13px; display: block; }
     .home-quick {
       width: 100%; max-width: 380px;
@@ -559,16 +563,18 @@
     .home-quick-btn {
       display: flex; align-items: center; gap: 10px;
       padding: 12px; text-align: left;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--ink-faint); border-radius: 12px;
-      color: var(--ink); cursor: pointer;
+      background: rgba(236,231,220,0.72);
+      border: 1px solid rgba(255,255,255,0.18); border-radius: 12px;
+      color: #111; cursor: pointer;
     }
-    .home-quick-btn:hover, .home-quick-btn:active { border-color: var(--gold-dim); }
+    .home-quick-btn:hover, .home-quick-btn:active {
+      background: rgba(236,231,220,0.88); border-color: var(--gold-dim);
+    }
     .home-quick-icon { font-size: 20px; line-height: 1; flex: 0 0 auto; }
     .home-quick-text { display: flex; flex-direction: column; min-width: 0; }
-    .home-quick-text strong { font-size: 13px; font-weight: 500; }
+    .home-quick-text strong { font-size: 13px; font-weight: 500; color: #111; }
     .home-quick-text small {
-      font-size: 10.5px; color: var(--ink-dim);
+      font-size: 10.5px; color: rgba(17,17,19,0.62);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .avatar {
