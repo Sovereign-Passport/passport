@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPID — diagnostic du vault</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0a0a0b; color:#eee; font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:28px 20px 48px; }
+  h1 { font-size:22px; font-weight:400; color:#c9a961; }
+  p { color:#bbb; }
+  .card { background:#14171c; border:1px solid rgba(201,169,97,.35); border-radius:12px; padding:16px; margin:18px 0; }
+  code { word-break:break-all; color:#e8c877; font-size:12px; }
+  button, a.btn { display:inline-block; margin:8px 8px 0 0; padding:10px 16px; border-radius:8px;
+    border:1px solid rgba(201,169,97,.5); background:#1a1e24; color:#eee; font:inherit; cursor:pointer; text-decoration:none; }
+  button.primary { background:#c9a961; color:#111; border-color:#c9a961; font-weight:600; }
+  .ok { color:#6fbf73; } .bad { color:#e06c5b; }
+  small { color:#888; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SPID — diagnostic du vault sur cette origine</h1>
+  <p>Origine : <code id="origin"></code></p>
+  <p>Cette page lit uniquement l’IndexedDB local. Elle ne contacte aucun serveur et ne demande pas le mot de passe.</p>
+
+  <div class="card" id="status">Lecture…</div>
+
+  <div class="card">
+    <a class="btn" href="passport.html">Ouvrir le Passport</a>
+    <a class="btn" href="passport.html#restore">Restore</a>
+  </div>
+
+  <p><small>Page de diagnostic temporaire. Aucune donnée n’est envoyée.</small></p>
+</main>
+<script>
+const DB = 'passport'
+const STORE = 'vault'
+document.getElementById('origin').textContent = location.origin
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(DB, 1)
+    r.onupgradeneeded = (e) => {
+      if (!e.target.result.objectStoreNames.contains(STORE)) {
+        e.target.result.createObjectStore(STORE, { keyPath: 'key' })
+      }
+    }
+    r.onsuccess = (e) => resolve(e.target.result)
+    r.onerror = () => reject(r.error)
+  })
+}
+function readCurrent() {
+  return openDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly')
+    const req = tx.objectStore(STORE).get('current')
+    req.onsuccess = () => resolve(req.result || null)
+    req.onerror = () => reject(req.error)
+  }))
+}
+function listDatabases() {
+  if (!indexedDB.databases) return Promise.resolve([])
+  return indexedDB.databases().then((rows) => rows.map((r) => r.name).filter(Boolean))
+    .catch(() => [])
+}
+function esc(s) {
+  const d = document.createElement('div')
+  d.textContent = s == null ? '' : String(s)
+  return d.innerHTML
+}
+function download(payload) {
+  const data = { format: 'passport-vault', version: '1.0.0', exported_at: new Date().toISOString(), payload }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/x-passport-vault' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = (payload.did ? String(payload.did).slice(-12) : 'passport') + '-passport-backup.passport'
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 30000)
+}
+
+Promise.all([listDatabases(), readCurrent()]).then(([names, payload]) => {
+  const el = document.getElementById('status')
+  if (!payload) {
+    el.innerHTML = '<span class="bad">Aucun vault dans IndexedDB sur cette origine.</span>' +
+      '<p><small>Bases visibles : ' + esc(names.join(', ') || 'aucune') + '</small></p>'
+    return
+  }
+  const did = payload.did || '(DID absente du payload)'
+  el.innerHTML =
+    '<span class="ok">Vault trouvé.</span>' +
+    '<p>DID : <code>' + esc(did) + '</code></p>' +
+    '<p><small>Créé : ' + esc(payload.created_at || '—') +
+    ' · Mis à jour : ' + esc(payload.updated_at || '—') + '</small></p>' +
+    '<p><small>Champs : did=' + (payload.did ? 'oui' : 'non') +
+    ', salt=' + (payload.salt ? 'oui' : 'non') +
+    ', iv=' + (payload.iv ? 'oui' : 'non') +
+    ', ciphertext=' + (payload.ciphertext ? 'oui' : 'non') + '</small></p>' +
+    '<button class="primary" id="dl">Télécharger le .passport</button>' +
+    '<button id="copy">Copier la DID</button>'
+  document.getElementById('dl').onclick = () => download(payload)
+  document.getElementById('copy').onclick = () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(did)
+  }
+}).catch((e) => {
+  document.getElementById('status').innerHTML =
+    '<span class="bad">Lecture impossible : ' + esc(e && e.message ? e.message : e) + '</span>'
+})
+</script>
+</body>
+</html>
