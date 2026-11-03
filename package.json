@@ -29,10 +29,8 @@
   "type": "module",
   "scripts": {
     "dev":     "npx serve app -p 3000",
-    "test":    "echo 'Open tests/test-vault.html, test-identity.html, test-node.html, test-credentials.html in a browser'",
-    "serve":   "npx serve . -p 8080",
-    "lint":    "npx eslint app/src shared --ext .js",
-    "format":  "npx prettier --write app/src shared"
+    "test":    "echo 'No Passport unit suite in this artifact; use spid-js tests and browser checks.'",
+    "serve":   "npx serve . -p 8080"
   },
   "engines": {
     "node": ">=20.0.0"

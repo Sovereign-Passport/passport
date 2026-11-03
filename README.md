@@ -65,10 +65,9 @@ Open `app/passport.html` directly. The source links its sibling CSS/JS.
 
 ## Tests
 
-There is no fixed test count. The current recovery base may not include the old
-`app/src/tests/` pages. When test pages are present, open them in a browser and
-run the relevant suite manually. Do not claim a number of tests that is not
-measured.
+There is no fixed test count for the Passport artifact. Use the `spid-js`
+node tests and a real browser check for the Passport UI. Do not claim a number
+of tests that is not measured.
 
 ## Deployment
 
