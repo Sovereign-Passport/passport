@@ -179,6 +179,7 @@ async function _handleUnifiedInvite(p) {
       scope: 'cluster',
       status: 'approved',
       is_issuer: false,
+      left_at: null,
       joined_at: now,
       invited_by_did: p.referral.from_did,
       referral_id: p.referral.id || null,
@@ -211,6 +212,7 @@ async function _handleUnifiedInvite(p) {
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
     }
+    if (typeof clearLocalClusterLeft === 'function') clearLocalClusterLeft(p.scope.id)
     if (typeof syncRelationsFromSwitchboard === 'function') {
       await syncRelationsFromSwitchboard()
     }

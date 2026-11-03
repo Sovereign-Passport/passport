@@ -185,6 +185,7 @@ async function tryUnlock() {
     // useful, but it must never block unlock (a slow public/LAN round-trip
     // made the Passport look frozen).
     populateHome()
+    refreshPassportMessages(true)
     syncProfileHandle()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
@@ -195,6 +196,7 @@ async function tryUnlock() {
       syncRelationsFromSwitchboard()
         .then(function () {
           populateHome()
+          refreshPassportMessages(true)
           if (_currentScreen === 'screen-nodes') openNodes()
           if (_currentScreen === 'screen-credentials') openCredentials()
         })
@@ -329,15 +331,71 @@ function openOfficialize() {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Shared Billboard portal URL for a canonical Cluster UUID (UI preference only). */
-function billboardUrl(clusterId) {
-  // Relative to this app: /passport/ and /portail/ are siblings on both the
-  // public GitHub Pages origin and a Vine-served LAN origin.
-  return new URL(
-    '../portail/portail.html#service=billboard&cluster=' + encodeURIComponent(String(clusterId)),
-    location.href
-  ).href
+let _passportMessagesPending = 0
+let _passportMessagesFetching = false
+let _passportMessagesLastFetch = 0
+
+/** Shared Messages portal URL for a canonical Cluster UUID (UI preference only). */
+function messagesUrl(clusterId) {
+  var hash = '#service=messages'
+  if (clusterId) hash += '&cluster=' + encodeURIComponent(String(clusterId))
+  return new URL('../portail/portail.html' + hash, location.href).href
 }
+
+/** Apply the current unread count to the robot and the cluster message links. */
+function _applyPassportMessageState() {
+  var n = Number(_passportMessagesPending) || 0
+  var badge = document.getElementById('assist-badge')
+  var count = document.getElementById('assist-badge-count')
+  if (badge) {
+    badge.classList.toggle('has-messages', n > 0)
+    badge.title = n > 0
+      ? n + ' unread message' + (n === 1 ? '' : 's')
+      : 'Passport assistant — delegates routine actions'
+  }
+  if (count) {
+    count.hidden = n <= 0
+    count.textContent = n > 99 ? '99+' : String(n)
+  }
+  var links = document.querySelectorAll('.passport-message-link')
+  for (var i = 0; i < links.length; i++) {
+    links[i].textContent = n > 0 ? 'Messages*' : 'Messages'
+    links[i].classList.toggle('has-messages', n > 0)
+  }
+}
+
+/** Read the DID's unread message count from the Messages service. */
+function refreshPassportMessages(force) {
+  if (!appState.vault || !appState.vaultKey) return Promise.resolve()
+  if (_passportMessagesFetching) return Promise.resolve()
+  var now = Date.now()
+  if (!force && now - _passportMessagesLastFetch < 2000) return Promise.resolve()
+  var did = appState.vault.identity && appState.vault.identity.id
+  if (!did) return Promise.resolve()
+  _passportMessagesLastFetch = now
+  _passportMessagesFetching = true
+  return Promise.resolve()
+    .then(function () {
+      return sbSelfCall(SPID_SWITCH_HOST, 'messages', 'pending', {}, { type: 'did', id: did })
+    })
+    .then(function (r) {
+      if (r && r.status === 200 && r.body && r.body.ok) {
+        _passportMessagesPending = Number(r.body.pending) || 0
+        _applyPassportMessageState()
+      }
+    })
+    .catch(function () {})
+    .then(function () { _passportMessagesFetching = false })
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') refreshPassportMessages(false)
+})
+window.addEventListener('focus', function () { refreshPassportMessages(false) })
+window.addEventListener('pageshow', function () { refreshPassportMessages(false) })
+setInterval(function () {
+  if (document.visibilityState === 'visible') refreshPassportMessages(true)
+}, 30000)
 
 /**
  * Open the clusters screen.
@@ -433,7 +491,7 @@ function openNodes() {
               </button>
             ` : `
               <button class="btn btn-ghost" style="font-size:11px;"
-                onclick="softLeaveCluster('${c.id}')">
+                onclick="confirmSoftLeaveCluster('${c.id}')">
                 Leave
               </button>
             `}
@@ -441,8 +499,8 @@ function openNodes() {
               onclick="confirmLeaveCluster('${c.id}')">
               Delete
             </button>
-            <a class="btn btn-ghost" style="font-size:11px;text-decoration:none;flex:1;"
-               href="${billboardUrl(c.id)}" target="_blank" rel="noopener">Billboard</a>
+            <a class="btn btn-ghost passport-message-link" style="font-size:11px;text-decoration:none;flex:1;"
+               href="${messagesUrl(c.id)}" target="_blank" rel="noopener">Messages</a>
           </div>
         `
         // Personal markers — private, non-actionable (Cluster scope only).
@@ -503,18 +561,18 @@ function openNodes() {
           leaveBtn.className      = 'btn btn-ghost'
           leaveBtn.style.fontSize = '11px'
           leaveBtn.textContent    = 'Leave'
-          leaveBtn.addEventListener('click', () => softLeaveMembership(m.id || m.node_id))
+          leaveBtn.addEventListener('click', () => confirmLeaveMembership(m.cluster_id || m.node_id || m.id))
           card.appendChild(leaveBtn)
         }
 
-        // Billboard link — opens the shared portal on this Cluster (real cluster_id).
+        // Messages link — opens the shared portal on this Cluster (real cluster_id).
         const bbLink = document.createElement('a')
-        bbLink.className = 'btn btn-ghost'
+        bbLink.className = 'btn btn-ghost passport-message-link'
         bbLink.style.cssText = 'font-size:11px;text-decoration:none;margin-top:8px;display:inline-block;'
-        bbLink.href = billboardUrl(m.cluster_id)
+        bbLink.href = messagesUrl(m.cluster_id)
         bbLink.target = '_blank'
         bbLink.rel = 'noopener'
-        bbLink.textContent = 'Billboard'
+        bbLink.textContent = 'Messages'
         card.appendChild(bbLink)
 
         // Personal markers — private, non-actionable (Cluster scope only).
@@ -544,6 +602,7 @@ function openNodes() {
     list.appendChild(createBtn)
   }
 
+  _applyPassportMessageState()
   goTo('screen-nodes')
 }
 

@@ -51,6 +51,19 @@ function _relUpsert(list, match, next) {
   else list.push(next)
 }
 
+/** Clear a local departure marker when the DID accepts a new invitation. */
+function clearLocalClusterLeft(scopeId) {
+  var vault = appState.vault
+  if (!vault || !scopeId) return
+  ;(vault.memberships || []).forEach(function (m) {
+    if ((m.cluster_id && m.cluster_id === scopeId) ||
+        (m.node_id && m.node_id === scopeId)) {
+      m.left_at = null
+      m.status = 'invited'
+    }
+  })
+}
+
 async function syncRelationsFromSwitchboard() {
   if (!appState.vault || !appState.vaultKey || !appState.stored) return
   var did = appState.vault.identity.id
@@ -106,10 +119,20 @@ async function syncRelationsFromSwitchboard() {
       }
       return
     }
-    var existing = next.some(function (m) { return m.cluster_id === c.id })
+    var existing = next.find(function (m) { return m.cluster_id === c.id })
     var active = (c.cluster_status || 'active') === 'active'
     // Keep a revoked hosted Cluster as history, but never invent one locally.
     if (!active && !existing) return
+    // A local departure is the holder's decision. Do not let the next server
+    // projection silently rejoin the Cluster; a new invite clears left_at.
+    if (existing && existing.status === 'left' && existing.left_at) {
+      existing.cluster_name = c.name
+      existing.node_name = c.name
+      existing.cluster_status = c.cluster_status || 'active'
+      existing.stale = !active
+      if (c.vine_endpoint && active) existing.vine_endpoint = c.vine_endpoint
+      return
+    }
     var patch = {
       cluster_id: c.id, node_id: c.id, cluster_name: c.name, node_name: c.name,
       scope: 'cluster', status: c.status, is_issuer: !!c.is_issuer,

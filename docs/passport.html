@@ -12,13 +12,13 @@
   <link rel="apple-touch-icon" href="spid-logo.jpg">
   <meta name="apple-mobile-web-app-title" content="Sovereign Passport">
   <!-- No external font calls — system fonts only. Sovereign by design. -->
-  <link rel="stylesheet" href="passport.css?v=3">
+  <link rel="stylesheet" href="passport.css?v=4">
 </head>
 <body>
 <div id="app">
 
   <!-- Assistant badge — fixed top-right → the Passport portal (assistant) -->
-  <a class="assist-badge" href="../portail/portail.html"
+  <a class="assist-badge" id="assist-badge" href="../portail/portail.html"
      target="_blank" rel="noopener" title="Passport assistant — delegates routine actions">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -27,6 +27,7 @@
       <rect width="16" height="12" x="4" y="8" rx="2"/>
       <path d="M2 14h2M20 14h2M15 13v2M9 13v2"/>
     </svg>
+    <span class="assist-badge-count" id="assist-badge-count" hidden>0</span>
   </a>
 
   <!-- Language switch — round flag buttons (top-left, shared with the Portail) -->
@@ -985,12 +986,12 @@
 <script src="passport.ui.js"></script>
 <script src="passport.sync.js?v=7"></script>
 <script src="passport.files.js"></script>
-<script src="passport.clusters.js?v=3"></script>
-<script src="passport.invites.js?v=11"></script>
+<script src="passport.clusters.js?v=4"></script>
+<script src="passport.invites.js?v=12"></script>
 <script src="passport.status.js?v=1"></script>
 <script src="passport.feedback.js?v=2"></script>
-<script src="passport.relations.js?v=5"></script>
-<script src="passport.boot.js?v=13"></script>
+<script src="passport.relations.js?v=6"></script>
+<script src="passport.boot.js?v=14"></script>
 <script src="spid.i18n.js"></script>
 <script>
 /* Language mirror: persist the choice inside the vault (the DID's container)

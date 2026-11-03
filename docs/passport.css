@@ -456,12 +456,31 @@
     .assist-badge:hover,
     .assist-badge:active { transform: translateY(-1px); border-color: var(--gold); color: var(--gold-bright); }
     .assist-badge svg { width: 24px; height: 24px; display: block; }
+    .assist-badge.has-messages {
+      border-color: var(--green);
+      color: var(--green);
+      animation: assistMessageGlow 2.2s ease-in-out infinite;
+    }
+    .assist-badge-count {
+      position: absolute; top: -4px; right: -4px; z-index: 1;
+      min-width: 17px; height: 17px; padding: 0 4px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px; background: var(--green); color: #08110b;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 9px; font-weight: 700; line-height: 1; text-align: center;
+      box-shadow: 0 0 0 2px var(--bg);
+    }
+    .assist-badge-count[hidden] { display: none; }
     @keyframes assistGlow {
       0%, 100% { box-shadow: 0 0 0 3px var(--gold-glow), 0 0 10px rgba(201,169,97,0.28); }
       50% { box-shadow: 0 0 0 5px rgba(201,169,97,0.10), 0 0 24px rgba(201,169,97,0.68); }
     }
+    @keyframes assistMessageGlow {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(111,191,115,0.16), 0 0 10px rgba(111,191,115,0.35); }
+      50% { box-shadow: 0 0 0 5px rgba(111,191,115,0.10), 0 0 26px rgba(111,191,115,0.82); }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .assist-badge { animation: none; }
+      .assist-badge, .assist-badge.has-messages { animation: none; }
     }
 
     /* Language switch — round flag buttons, fixed top-left of the screen. */
@@ -619,6 +638,10 @@
     .menu-text strong { display: block; font-size: 13px; font-weight: 500; margin-bottom: 2px; }
     .menu-text small { font-size: 11px; color: var(--ink-dim); }
     .menu-arrow { color: var(--ink-dim); font-size: 16px; }
+    .passport-message-link.has-messages {
+      color: var(--green);
+      border-color: rgba(111,191,115,0.5);
+    }
 
     /* ── STATUS BADGE ───────────────────────────────────────────── */
     .badge {

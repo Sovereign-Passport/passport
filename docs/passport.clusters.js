@@ -10,9 +10,9 @@
  *   createCluster()         — self-issues FounderCredential, pings vignard
  *   pingVignard()           — fire-and-forget witness registration
  *   confirmLeaveCluster()   — modal: leave or dissolve
- *   softLeaveCluster()      — sets status 'left', keeps cluster in vault
+ *   softLeaveCluster()      — confirmation + sets status 'left', keeps cluster in vault
  *   rejoinCluster()         — restores status 'active'
- *   softLeaveMembership()   — leave a vine membership
+ *   softLeaveMembership()   — leave a joined Cluster membership
  *   _executeClusterDelete() — internal: permanent cluster removal
  *   leaveCluster()          — soft succession to highest-weight member
  *   dissolveCluster()       — permanent delete, no members
@@ -293,6 +293,85 @@ async function confirmLeaveCluster(clusterId) {
 }
 
 /**
+ * Confirmation modal for a soft leave. The existing delete confirmation is a
+ * separate, destructive flow and must not be reused for Leave.
+ */
+function _showLeaveConfirm(title, name, bodyHtml, onConfirm) {
+  const existing = document.getElementById('cluster-leave-modal')
+  if (existing) existing.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'cluster-leave-modal'
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(8,11,18,0.92);
+    z-index:200;display:flex;align-items:center;
+    justify-content:center;padding:24px;
+  `
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:380px;">
+      <p class="cred-type" style="color:var(--gold);">${escHtmlP(title)}</p>
+      <div class="cred-title" style="margin-bottom:12px;">${escHtmlP(name || '')}</div>
+      ${bodyHtml}
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        <button class="btn btn-ghost" style="flex:1;" data-cancel>Cancel</button>
+        <button class="btn btn-primary" style="flex:1;" data-confirm>Leave</button>
+      </div>
+    </div>
+  `
+  const close = () => overlay.remove()
+  overlay.querySelector('[data-cancel]').addEventListener('click', close)
+  overlay.querySelector('[data-confirm]').addEventListener('click', () => {
+    close()
+    Promise.resolve(onConfirm()).catch(function (e) {
+      showToast('Could not leave: ' + (e && e.message ? e.message : e))
+    })
+  })
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close() })
+  document.body.appendChild(overlay)
+}
+
+/** Confirmation for leaving a Cluster the Passport founded. */
+function confirmSoftLeaveCluster(clusterId) {
+  const cluster = ((appState.vault && appState.vault.ownClusters) || [])
+    .find(c => c.id === clusterId)
+  if (!cluster) return
+  _showLeaveConfirm(
+    'Leave cluster',
+    cluster.name,
+    `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+       Step back from your founder role? The Cluster remains, its members keep
+       their space, and you can rejoin later as founder.
+     </p>`,
+    () => softLeaveCluster(clusterId)
+  )
+}
+
+/** Confirmation for leaving a Cluster the Passport joined. */
+function confirmLeaveMembership(membershipId) {
+  const vault = appState.vault || {}
+  const membership = (vault.memberships || []).find(m =>
+    (m.cluster_id && m.cluster_id === membershipId) ||
+    (m.node_id && m.node_id === membershipId) ||
+    (m.id && m.id === membershipId)
+  )
+  if (!membership) {
+    showToast('Membership not found.')
+    return
+  }
+  const name = membership.node_name || membership.cluster_name ||
+    membership.cluster_id || membership.node_id || ''
+  _showLeaveConfirm(
+    'Leave cluster',
+    name,
+    `<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:8px;">
+       Leave this Cluster? Your credential remains in your vault as a personal
+       historical record. You can rejoin later with a new invitation.
+     </p>`,
+    () => softLeaveMembership(membershipId)
+  )
+}
+
+/**
  * Soft leave — founder steps back but keeps the cluster.
  * Status set to 'left'. Can rejoin anytime.
  */
@@ -343,20 +422,26 @@ async function rejoinCluster(clusterId) {
  * Soft leave a membership credential.
  * Marks the credential status as 'left' — credential stays in vault.
  */
-async function softLeaveMembership(credentialId) {
+async function softLeaveMembership(membershipId) {
   const vault = appState.vault
-  const cred  = (vault.credentials || []).find(
-    c => (c.id || c.node_id) === credentialId
+  const membership = (vault && vault.memberships || []).find(m =>
+    (m.cluster_id && m.cluster_id === membershipId) ||
+    (m.node_id && m.node_id === membershipId) ||
+    (m.id && m.id === membershipId)
   )
-  if (!cred) return
+  if (!membership) {
+    showToast('Membership not found.')
+    return
+  }
 
-  cred.status  = 'left'
-  cred.left_at = new Date().toISOString()
+  membership.status  = 'left'
+  membership.left_at = new Date().toISOString()
 
   try {
     const newPayload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
     await persist(newPayload)
     appState.stored = newPayload
+    populateHome()
     showToast('You left the cluster. Your credential stays as a personal record.')
     openNodes()
   } catch (err) {
