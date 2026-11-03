@@ -170,8 +170,9 @@ async function syncRelationsFromSwitchboard() {
         m.stale = clusterStatus[m.cluster_id] !== 'active'
         return
       }
-      // A private/local Cluster is not expected in relation/list. A
-      // server-backed Cluster missing from the projection is stale.
+      // A legacy Cluster without a Switchboard scope is not expected in
+      // relation/list. A server-backed Cluster missing from the projection
+      // is stale.
       if (m.local_private) return
       m.stale = true
       return

@@ -80,7 +80,7 @@ async function createCluster() {
     const clusterId  = crypto.randomUUID()
     const now        = new Date().toISOString()
 
-    // Endpoint is per-Cluster (from #newcluster). Absent → local-only Cluster.
+    // Endpoint is per-Cluster (from #newcluster). Absent → Cluster without a hosting endpoint.
     const clusterEndpoint = (typeof normalizeVineEndpoint === 'function')
       ? normalizeVineEndpoint(appState.pendingClusterEndpoint) : null
 

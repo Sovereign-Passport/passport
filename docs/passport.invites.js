@@ -4,7 +4,7 @@
  *
  * Invitation creation and sharing live in Portail → Relations.
  * This file verifies a signed #invite= descriptor and applies the result:
- *   - private Cluster: local approved membership after founder proof
+ *   - sovereign Cluster: local approved membership after founder proof
  *   - hosted Cluster/Vine/Vignard: existing Switchboard relation/accept
  */
 
@@ -185,7 +185,7 @@ async function _handleUnifiedInvite(p) {
       invited_by_did: p.referral.from_did,
       referral_id: p.referral.id || null,
       vine_endpoint: null,
-      local_private: true,
+      local_private: true, // legacy internal name: no server host cache; not a privacy claim
     }
     const prev = vault.memberships.find(m => m.cluster_id === clusterId)
     if (prev) Object.assign(prev, row)
@@ -196,7 +196,7 @@ async function _handleUnifiedInvite(p) {
       appState.stored = saved
       populateHome()
       if (typeof openNodes === 'function') openNodes()
-      showToast('Invitation accepted — private Cluster membership approved.')
+      showToast('Invitation accepted — sovereign Cluster membership approved.')
     } catch (e) {
       showToast('Could not save the private membership.')
     }
