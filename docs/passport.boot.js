@@ -185,7 +185,7 @@ async function tryUnlock() {
     // useful, but it must never block unlock (a slow public/LAN round-trip
     // made the Passport look frozen).
     populateHome()
-    refreshPassportMessages(true)
+    refreshPassportMessages()
     syncProfileHandle()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
@@ -196,7 +196,7 @@ async function tryUnlock() {
       syncRelationsFromSwitchboard()
         .then(function () {
           populateHome()
-          refreshPassportMessages(true)
+          refreshPassportMessages()
           if (_currentScreen === 'screen-nodes') openNodes()
           if (_currentScreen === 'screen-credentials') openCredentials()
         })
@@ -333,7 +333,6 @@ function openOfficialize() {
 
 let _passportMessagesPending = 0
 let _passportMessagesFetching = false
-let _passportMessagesLastFetch = 0
 
 /** Shared Messages portal URL for a canonical Cluster UUID (UI preference only). */
 function messagesUrl(clusterId) {
@@ -365,14 +364,11 @@ function _applyPassportMessageState() {
 }
 
 /** Read the DID's unread message count from the Messages service. */
-function refreshPassportMessages(force) {
+function refreshPassportMessages() {
   if (!appState.vault || !appState.vaultKey) return Promise.resolve()
   if (_passportMessagesFetching) return Promise.resolve()
-  var now = Date.now()
-  if (!force && now - _passportMessagesLastFetch < 2000) return Promise.resolve()
   var did = appState.vault.identity && appState.vault.identity.id
   if (!did) return Promise.resolve()
-  _passportMessagesLastFetch = now
   _passportMessagesFetching = true
   return Promise.resolve()
     .then(function () {
@@ -389,16 +385,12 @@ function refreshPassportMessages(force) {
 }
 
 let _passportRelationsRefreshing = false
-let _passportRelationsLastRefresh = 0
 
 /** Reconcile the server relation projection into the local vault. */
-function refreshPassportRelations(force) {
+function refreshPassportRelations() {
   if (!appState.vault || !appState.vaultKey || !appState.stored) return Promise.resolve()
   if (_passportRelationsRefreshing) return Promise.resolve()
   if (typeof syncRelationsFromSwitchboard !== 'function') return Promise.resolve()
-  var now = Date.now()
-  if (!force && now - _passportRelationsLastRefresh < 2000) return Promise.resolve()
-  _passportRelationsLastRefresh = now
   _passportRelationsRefreshing = true
   return Promise.resolve()
     .then(function () { return syncRelationsFromSwitchboard() })
@@ -413,19 +405,14 @@ function refreshPassportRelations(force) {
 
 function _passportRefreshOnVisible() {
   if (document.visibilityState !== 'visible') return
-  refreshPassportMessages(false)
-  refreshPassportRelations(false)
+  refreshPassportMessages()
+  refreshPassportRelations()
 }
 
 document.addEventListener('visibilitychange', _passportRefreshOnVisible)
 window.addEventListener('focus', _passportRefreshOnVisible)
 window.addEventListener('pageshow', _passportRefreshOnVisible)
-setInterval(function () {
-  if (document.visibilityState === 'visible') refreshPassportMessages(true)
-}, 30000)
-setInterval(function () {
-  if (document.visibilityState === 'visible') refreshPassportRelations(true)
-}, 60000)
+
 
 function _addDeleteRelationAction(card, relationId) {
   if (!relationId) return

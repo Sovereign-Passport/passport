@@ -70,7 +70,6 @@ async function syncRelationsFromSwitchboard() {
   var next = Array.isArray(vault.memberships) ? vault.memberships.slice() : []
   var before = JSON.stringify(vault.memberships || null)
   var beforeOwn = JSON.stringify(vault.ownClusters || null)
-  var beforeSnapshot = JSON.stringify(vault.relationSnapshot || null)
 
   var vines = (rel.vines || []).map(function (v) {
     return { id: v.id, did: v.did || null, name: v.name || v.id, endpoint: v.endpoint || null, status: v.status, role: v.role }
@@ -162,11 +161,6 @@ async function syncRelationsFromSwitchboard() {
   // duplicate "joined" row. Remove only the duplicate, never the Cluster.
   next = next.filter(function (m) { return !(m.cluster_id && ownIds[m.cluster_id]) })
   vault.memberships = next
-  vault.relationSnapshot = {
-    vines: vines, clusters: clusters, vignards: vignards,
-    homeHost: new URL(SYNC_ENDPOINT).hostname.toLowerCase(),
-    at: new Date().toISOString(),
-  }
 
   // Keep history, but hide relations the home Vine no longer returns or has
   // revoked. Hosting revocation is not member departure or Cluster deletion.
@@ -193,8 +187,7 @@ async function syncRelationsFromSwitchboard() {
   })
 
   if (before === JSON.stringify(next) &&
-      beforeOwn === JSON.stringify(vault.ownClusters || null) &&
-      beforeSnapshot === JSON.stringify(vault.relationSnapshot)) return
+      beforeOwn === JSON.stringify(vault.ownClusters || null)) return
   try {
     var payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
     await persist(payload)
