@@ -181,9 +181,9 @@ async function tryUnlock() {
 
     appState.vault    = vault
     appState.vaultKey = vaultKey
-    // Reconcile first, then render: counts and invitation targets must not be
-    // computed from a pre-sync snapshot.
-    await syncRelationsFromSwitchboard()
+    // Render the local vault immediately. The Switchboard reconciliation is
+    // useful, but it must never block unlock (a slow public/LAN round-trip
+    // made the Passport look frozen).
     populateHome()
     syncProfileHandle()
     checkPendingOffer()
@@ -192,6 +192,20 @@ async function tryUnlock() {
     checkPendingRevoke()
     checkPendingNewCluster()
     const inviteHandled = checkPendingInvite()
+
+    // An invitation acceptance performs its own sync. Otherwise reconcile in
+    // the background and refresh the visible membership views afterwards.
+    if (!inviteHandled) {
+      syncRelationsFromSwitchboard()
+        .then(function () {
+          populateHome()
+          if (_currentScreen === 'screen-nodes') openNodes()
+          if (_currentScreen === 'screen-credentials') openCredentials()
+        })
+        .catch(function (err) {
+          console.warn('[Relations] background sync skipped:', err)
+        })
+    }
 
     // If a sync token was waiting, route to restore screen sync tab
     if (appState.pendingSyncToken) {
@@ -624,26 +638,56 @@ async function checkClusterUpdates(membership, btn) {
 //   legacy vault.memberships without cluster_id → LEGACY VINE MEMBERSHIP
 // ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * A valid, unrevoked credential remains displayable even when a background
+ * reconciliation has not returned it yet. A missing live row is a sync gap,
+ * not a signed revocation; only an explicit credential/status revocation
+ * hides it.
+ */
+function _membershipCredentialVisible(vault, c) {
+  if (!c || c.revoked || c.type !== 'MembershipCredential') return false
+  if ((c.scope === 'vine' || (!c.scope && !c.cluster_id)) &&
+      typeof findReceivedVineStatus === 'function') {
+    const st = findReceivedVineStatus(c)
+    if (st && st.status === 'revoked') return false
+  }
+  return true
+}
+
 /** Active relations, counted by existing type. No new relation model. */
 function activeRelationSummary(vault) {
   const allCreds = (vault && vault.credentials) || []
   const active = c => typeof relationCredentialActive !== 'function' ||
     relationCredentialActive(vault, c)
   const seenVines = {}
+  const seenVignards = {}
+
   allCreds.forEach(c => {
-    if (c.type !== 'MembershipCredential' || c.revoked) return
-    if (c.scope === 'cluster' || c.scope === 'vignard' || c.cluster_id) return
-    if (!active(c)) return
+    if (!_membershipCredentialVisible(vault, c)) return
+    if (c.scope === 'cluster' || c.cluster_id) return
+    if (c.scope === 'vignard') {
+      const id = c.issuer_did || c.vignard_did || c.node_id
+      if (id) seenVignards[id] = true
+      return
+    }
     const id = c.issuer_did || c.node_id || c.vine_id
     if (id) seenVines[id] = true
   })
-  const seenVignards = {}
-  allCreds.forEach(c => {
-    if (c.type !== 'MembershipCredential' || c.scope !== 'vignard' || c.revoked) return
-    if (!active(c)) return
-    const id = c.issuer_did || c.vignard_did || c.node_id
-    if (id) seenVignards[id] = true
+
+  // The Switchboard may know a live relation before any credential has been
+  // issued (invite acceptance, admin promotion). Show that relation too.
+  ;(vault && vault.memberships || []).forEach(m => {
+    if (!m || m.cluster_id || m.scope === 'cluster' || m.stale) return
+    if (m.status === 'revoked' || m.status === 'left') return
+    if (m.scope === 'vignard') {
+      const id = m.vignard_did || m.node_id
+      if (id) seenVignards[id] = true
+      return
+    }
+    const id = m.vine_did || m.node_id || m.vine_id
+    if (id) seenVines[id] = true
   })
+
   const ownIds = {}
   ;(vault && vault.ownClusters || []).forEach(c => {
     if (c.id && c.status !== 'revoked' && c.status !== 'removed') ownIds[c.id] = true
@@ -665,30 +709,68 @@ function activeRelationSummary(vault) {
   return { vineCount, vignardCount, clusterCount, total: vineCount + vignardCount + clusterCount }
 }
 
+/** Build the display view of a live Switchboard relation (no credential yet). */
+function membershipFromRelation(m) {
+  const vineDid = m.vine_did || m.issuer_did || m.node_id || m.vine_id || null
+  return {
+    type: 'MembershipCredential',
+    scope: 'vine',
+    issuer_did: vineDid,
+    node_id: m.node_id || m.vine_id || vineDid,
+    node_name: m.node_name || m.name || 'Vine',
+    vine_endpoint: m.vine_endpoint || null,
+    status: m.status || null,
+    role: m.role || null,
+    issued_at: m.joined_at || null,
+    live_relation: true,
+  }
+}
+
 /** Vines / Vignards as display items (Cluster-free). */
 function collectMembershipItems(vault) {
   const allCreds = (vault && vault.credentials) || []
-  let vineCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' &&
-    c.scope !== 'cluster' && c.scope !== 'vignard' && !c.cluster_id)
-  let vignardCreds = allCreds.filter(c =>
-    c.type === 'MembershipCredential' && c.scope === 'vignard' &&
-    (c.issuer_did || c.vignard_did))
-  if (typeof relationCredentialActive === 'function') {
-    vineCreds = vineCreds.filter(c => relationCredentialActive(vault, c))
-    vignardCreds = vignardCreds.filter(c => relationCredentialActive(vault, c))
-  }
   const seenVine = {}
-  const vineList = vineCreds.filter(c => {
-    if (c.issuer_did) { if (seenVine[c.issuer_did]) return false; seenVine[c.issuer_did] = true }
-    return true
+  const seenVignard = {}
+  const items = []
+
+  allCreds.forEach(c => {
+    if (!_membershipCredentialVisible(vault, c)) return
+    if (c.scope === 'vignard') {
+      const id = c.issuer_did || c.vignard_did || c.node_id
+      if (!id || seenVignard[id]) return
+      seenVignard[id] = true
+      items.push({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })
+      return
+    }
+    if (c.scope === 'cluster' || c.cluster_id) return
+    const id = c.issuer_did || c.node_id || c.vine_id
+    if (!id || seenVine[id]) return
+    seenVine[id] = true
+    items.push({ kind: 'vine', cred: c, idx: allCreds.indexOf(c) })
   })
-  // Legacy vault.memberships are reconciliation scaffolding, not a second
-  // Vine membership. Credentials remain the authoritative display source.
-  const items = [
-    ...vineList.map(c     => ({ kind: 'vine',    cred: c, idx: allCreds.indexOf(c) })),
-    ...vignardCreds.map(c => ({ kind: 'vignard', cred: c, idx: allCreds.indexOf(c) })),
-  ]
+
+  // Live relations without a stored credential: same card, no SD-JWT actions.
+  ;(vault && vault.memberships || []).forEach(m => {
+    if (!m || m.cluster_id || m.scope === 'cluster' || m.stale) return
+    if (m.status === 'revoked' || m.status === 'left') return
+    if (m.scope === 'vignard') {
+      const id = m.vignard_did || m.node_id
+      if (!id || seenVignard[id]) return
+      seenVignard[id] = true
+      items.push({ kind: 'vignard', cred: {
+        type: 'MembershipCredential', scope: 'vignard',
+        issuer_did: id, node_id: id, node_name: m.node_name || 'Vignard',
+        vine_endpoint: m.vine_endpoint || null, status: m.status || null,
+        role: m.role || null, issued_at: m.joined_at || null, live_relation: true,
+      }, idx: -1 })
+      return
+    }
+    const id = m.vine_did || m.node_id || m.vine_id
+    if (!id || seenVine[id]) return
+    seenVine[id] = true
+    items.push({ kind: 'vine', cred: membershipFromRelation(m), idx: -1 })
+  })
+
   return { items, allCreds }
 }
 
