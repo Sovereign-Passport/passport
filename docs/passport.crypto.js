@@ -321,7 +321,7 @@ Built in Saint-Léon-de-Standon, Quebec, Canada.
       size:       `${Math.round(new TextEncoder().encode(welcomeContent).length / 1024 * 10) / 10}kb`,
       content:    welcomeContent,
     }],
-    memberships:[], ownClusters:[], referrals_sent:[], referrals_received:[],
+    memberships:[], ownClusters:[], shareGrants:[], referrals_sent:[], referrals_received:[],
     created_at:n, updated_at:null,
   }
   const {iv,ciphertext} = await encryptVault(vk,JSON.stringify(vault))
@@ -333,7 +333,9 @@ async function unlockVault(password,salt,iv,ciphertext) {
   let pt
   try { pt = await decryptVault(vk,iv,ciphertext) }
   catch { const e=new Error('WRONG_PASSWORD'); e.code='WRONG_PASSWORD'; throw e }
-  return {vault:JSON.parse(pt),vaultKey:vk}
+  const vault = JSON.parse(pt)
+  if (!Array.isArray(vault.shareGrants)) vault.shareGrants = []
+  return {vault,vaultKey:vk}
 }
 
 async function saveVault(vaultKey,vault,salt) {

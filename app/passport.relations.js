@@ -53,6 +53,189 @@ function clearDismissedRelation(scopeType, scopeId) {
   })
 }
 
+// ── SOVEREIGN SHARE GRANTS ────────────────────────────────────────────────
+// The signed grant lives in the Passport vault. The server's share_grants row
+// is only a projection; a failed projection stays `pendingSync` locally.
+
+function _shareContract() {
+  var c = window.SPIDRelations && window.SPIDRelations.contract
+  if (!c || typeof c.canonicalShareGrantPayload !== 'function') {
+    throw new Error('SHARE_CONTRACT_UNAVAILABLE')
+  }
+  return c
+}
+
+function _shareScopeKey(scope) {
+  if (!scope || !scope.type || !scope.id) return ''
+  return scope.type + '|' + scope.id
+}
+
+function getLocalShareGrant(scope) {
+  var vault = appState.vault
+  if (!vault || !scope) return null
+  var key = _shareScopeKey(scope)
+  return (vault.shareGrants || []).find(function (g) {
+    return g && g.scope && _shareScopeKey(g.scope) === key
+  }) || null
+}
+
+function _setLocalShareGrant(entry) {
+  var vault = appState.vault
+  if (!vault || !entry || !entry.scope) return null
+  if (!Array.isArray(vault.shareGrants)) vault.shareGrants = []
+  var key = _shareScopeKey(entry.scope)
+  var idx = vault.shareGrants.findIndex(function (g) {
+    return g && g.scope && _shareScopeKey(g.scope) === key
+  })
+  if (idx >= 0) vault.shareGrants[idx] = entry
+  else vault.shareGrants.push(entry)
+  return entry
+}
+
+async function _persistLocalShareGrants() {
+  if (!appState.vault || !appState.vaultKey || !appState.stored) return
+  var payload = await saveVault(appState.vaultKey, appState.vault, appState.stored.salt)
+  await persist(payload)
+  appState.stored = payload
+}
+
+async function signShareGrant(scope, types, expiresAt) {
+  var C = _shareContract()
+  var payload = C.canonicalShareGrantPayload({
+    holder_did: appState.vault.identity.id,
+    scope: scope,
+    types: types,
+    issued_at: new Date().toISOString(),
+    expires_at: expiresAt || null,
+  })
+  var key = await crypto.subtle.importKey('jwk', appState.vault.keys.privateKey,
+    { name: 'Ed25519' }, false, ['sign'])
+  var sig = await crypto.subtle.sign('Ed25519', key, enc(JSON.stringify(payload)))
+  return Object.assign({}, payload, { signature: toB64(sig) })
+}
+
+async function signShareRevocation(scope) {
+  var C = _shareContract()
+  var payload = C.canonicalShareRevocationPayload({
+    holder_did: appState.vault.identity.id,
+    scope: scope,
+    issued_at: new Date().toISOString(),
+  })
+  var key = await crypto.subtle.importKey('jwk', appState.vault.keys.privateKey,
+    { name: 'Ed25519' }, false, ['sign'])
+  var sig = await crypto.subtle.sign('Ed25519', key, enc(JSON.stringify(payload)))
+  return Object.assign({}, payload, { signature: toB64(sig) })
+}
+
+/** Save a signed grant in the vault. `pendingSync` is for offline projection. */
+async function saveLocalShareGrant(grant, options) {
+  var opts = options || {}
+  var entry = Object.assign({}, grant, {
+    saved_at: new Date().toISOString(),
+    pendingSync: !!opts.pendingSync,
+    local: !!opts.local,
+  })
+  _setLocalShareGrant(entry)
+  await _persistLocalShareGrants()
+  return entry
+}
+
+/** Save a signed revocation locally, preserving the last committed grant types. */
+async function saveLocalShareRevocation(scope, revocation, options) {
+  var opts = options || {}
+  var prev = getLocalShareGrant(scope)
+  var entry = {
+    type: 'ShareGrant',
+    holder_did: appState.vault.identity.id,
+    scope: scope,
+    types: prev ? (prev.types || []) : [],
+    issued_at: prev ? prev.issued_at : revocation.issued_at,
+    expires_at: prev ? (prev.expires_at || null) : null,
+    revoked_at: revocation.issued_at,
+    revocation: revocation,
+    saved_at: new Date().toISOString(),
+    pendingSync: !!opts.pendingSync,
+    local: !!(prev && prev.local),
+    legacy: !!(prev && prev.legacy),
+  }
+  _setLocalShareGrant(entry)
+  await _persistLocalShareGrants()
+  return entry
+}
+
+async function removeLocalShareGrant(scope) {
+  var vault = appState.vault
+  if (!vault || !scope) return
+  var key = _shareScopeKey(scope)
+  var before = (vault.shareGrants || []).length
+  vault.shareGrants = (vault.shareGrants || []).filter(function (g) {
+    return !(g && g.scope && _shareScopeKey(g.scope) === key)
+  })
+  if (vault.shareGrants.length !== before) await _persistLocalShareGrants()
+}
+
+/**
+ * Merge the server projection into the local vault, without ever overwriting
+ * a local signed choice. Existing server-only rows become legacy history and
+ * are not treated as holder-signed.
+ */
+function _mergeServerShareGrants(serverGrants) {
+  var vault = appState.vault
+  if (!vault || !Array.isArray(serverGrants)) return false
+  if (!Array.isArray(vault.shareGrants)) vault.shareGrants = []
+  var changed = false
+  serverGrants.forEach(function (g) {
+    if (!g || !g.consumer_type || !g.consumer_id) return
+    var scope = { type: g.consumer_type, id: g.consumer_id }
+    if (getLocalShareGrant(scope)) return
+    var types = []
+    try { types = Array.isArray(g.types_list) ? g.types_list : JSON.parse(g.types || '[]') }
+    catch (e) { types = [] }
+    vault.shareGrants.push({
+      type: 'ShareGrant',
+      holder_did: vault.identity.id,
+      scope: scope,
+      types: Array.isArray(types) ? types : [],
+      granted_at: g.granted_at || null,
+      expires_at: g.expires_at || null,
+      revoked_at: g.revoked_at || null,
+      legacy: true,
+      pendingSync: false,
+    })
+    changed = true
+  })
+  return changed
+}
+
+/** Best-effort projection of local pending choices after reconnect. */
+async function flushPendingShareGrants() {
+  if (!appState.vault || !appState.vaultKey || !appState.stored) return
+  var did = appState.vault.identity.id
+  var changed = false
+  var list = (appState.vault.shareGrants || []).slice()
+  for (var i = 0; i < list.length; i++) {
+    var g = list[i]
+    if (!g || !g.pendingSync || g.local || g.legacy) continue
+    try {
+      var r
+      if (g.revocation) {
+        r = await sbSelfCall(SPID_SWITCH_HOST, 'relation', 'revoke', {
+          scope: g.scope, revocation: g.revocation,
+        }, { type: 'did', id: did })
+      } else if (g.signature) {
+        r = await sbSelfCall(SPID_SWITCH_HOST, 'relation', 'share', {
+          scope: g.scope, grant: g,
+        }, { type: 'did', id: did })
+      } else { continue }
+      if (r.status === 200 && r.body && r.body.ok) {
+        g.pendingSync = false
+        changed = true
+      }
+    } catch (e) { /* keep pending for the next visibility/unlock */ }
+  }
+  if (changed) await _persistLocalShareGrants()
+}
+
 async function syncRelationsFromSwitchboard() {
   if (!appState.vault || !appState.vaultKey || !appState.stored) return
   var did = appState.vault.identity.id
@@ -70,6 +253,7 @@ async function syncRelationsFromSwitchboard() {
   var next = Array.isArray(vault.memberships) ? vault.memberships.slice() : []
   var before = JSON.stringify(vault.memberships || null)
   var beforeOwn = JSON.stringify(vault.ownClusters || null)
+  var beforeGrants = JSON.stringify(vault.shareGrants || null)
 
   var vines = (rel.vines || []).map(function (v) {
     return { id: v.id, did: v.did || null, name: v.name || v.id, endpoint: v.endpoint || null, status: v.status, role: v.role }
@@ -187,8 +371,11 @@ async function syncRelationsFromSwitchboard() {
     }))
   })
 
+  _mergeServerShareGrants(r.body.grants)
+
   if (before === JSON.stringify(next) &&
-      beforeOwn === JSON.stringify(vault.ownClusters || null)) return
+      beforeOwn === JSON.stringify(vault.ownClusters || null) &&
+      beforeGrants === JSON.stringify(vault.shareGrants || null)) return
   try {
     var payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
     await persist(payload)

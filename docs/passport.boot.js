@@ -195,6 +195,9 @@ async function tryUnlock() {
     if (!inviteHandled) {
       syncRelationsFromSwitchboard()
         .then(function () {
+          if (typeof flushPendingShareGrants === 'function') return flushPendingShareGrants()
+        })
+        .then(function () {
           populateHome()
           refreshPassportMessages()
           if (_currentScreen === 'screen-nodes') openNodes()
@@ -394,6 +397,9 @@ function refreshPassportRelations() {
   _passportRelationsRefreshing = true
   return Promise.resolve()
     .then(function () { return syncRelationsFromSwitchboard() })
+    .then(function () {
+      if (typeof flushPendingShareGrants === 'function') return flushPendingShareGrants()
+    })
     .then(function () {
       populateHome()
       if (_currentScreen === 'screen-nodes') openNodes()

@@ -114,7 +114,35 @@ function _decodeUnifiedInvite(raw) {
   } catch (e) { return null }
 }
 
-function _inviteConsentCard(name, type, wanted) {
+function _shareTypeLabel(type) {
+  var labels = {
+    handle: 'Pseudo / handle',
+    icons: 'Icônes',
+    feedback: 'Feedback',
+    relations: 'Relations',
+    'data:read': 'Données — lecture',
+    'data:write': 'Données — écriture',
+  }
+  return labels[type] || type
+}
+
+/** Prefer the signed referral.requested; legacy descriptors keep p.requested. */
+function _inviteShareTypes(p) {
+  var raw = (p.referral && Object.prototype.hasOwnProperty.call(p.referral, 'requested'))
+    ? p.referral.requested
+    : (p.requested || [])
+  try {
+    var C = window.SPIDRelations && window.SPIDRelations.contract
+    if (C && typeof C.normalizeShareTypes === 'function') return C.normalizeShareTypes(raw)
+    return Array.isArray(raw) ? raw.slice() : []
+  } catch (e) { return null }
+}
+
+/**
+ * The invitee chooses exactly what to share. Returns null on refusal, or the
+ * selected capability list on acceptance. The choice is signed afterwards.
+ */
+function _inviteConsentCard(name, type, requested) {
   var typeLabel = type === 'cluster' ? 'Cluster' : type === 'vine' ? 'Vine' : type === 'vignard' ? 'Vignard' : type
   return new Promise(function (resolve) {
     const ov = document.createElement('div')
@@ -122,7 +150,7 @@ function _inviteConsentCard(name, type, wanted) {
       'display:flex;align-items:center;justify-content:center;padding:24px'
     const card = document.createElement('div')
     card.style.cssText = 'background:#14171c;border:1px solid rgba(201,169,97,0.4);border-radius:16px;' +
-      'padding:22px;max-width:360px;width:100%'
+      'padding:22px;max-width:380px;width:100%'
     const h = document.createElement('p')
     h.textContent = 'Invitation'
     h.style.cssText = 'color:#c9a961;letter-spacing:.14em;text-transform:uppercase;font-size:11px'
@@ -130,8 +158,30 @@ function _inviteConsentCard(name, type, wanted) {
     b.textContent = 'Rejoindre « ' + name + ' » (' + typeLabel + ')'
     b.style.cssText = 'color:#eee;font-size:15px;margin-top:8px'
     const w = document.createElement('p')
-    w.textContent = 'Statut relation demandé : ' + wanted
-    w.style.cssText = 'color:#999;font-size:12px;margin-top:6px;font-style:italic'
+    w.textContent = requested.length ? 'Données demandées :' : 'Aucun partage de données demandé.'
+    w.style.cssText = 'color:#999;font-size:12px;margin-top:8px'
+
+    const list = document.createElement('div')
+    list.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:10px;'
+    const boxes = requested.map(function (t) {
+      const label = document.createElement('label')
+      label.style.cssText = 'display:flex;align-items:center;gap:10px;color:#ddd;font-size:13px;'
+      const input = document.createElement('input')
+      input.type = 'checkbox'
+      input.checked = true
+      input.dataset.shareType = t
+      input.style.cssText = 'width:16px;height:16px;accent-color:#c9a961;'
+      const span = document.createElement('span')
+      span.textContent = _shareTypeLabel(t)
+      label.appendChild(input); label.appendChild(span)
+      list.appendChild(label)
+      return { type: t, input: input }
+    })
+
+    const note = document.createElement('p')
+    note.textContent = 'Ces choix seront signés et conservés dans votre Passport. Le serveur n’en reçoit qu’une projection.'
+    note.style.cssText = 'color:#777;font-size:11px;line-height:1.5;margin-top:12px;'
+
     const row = document.createElement('div')
     row.style.cssText = 'display:flex;gap:8px;margin-top:16px'
     const no = document.createElement('button')
@@ -139,10 +189,14 @@ function _inviteConsentCard(name, type, wanted) {
     const yes = document.createElement('button')
     yes.className = 'btn btn-primary'; yes.type = 'button'; yes.textContent = 'Accepter'
     const close = function (v) { ov.remove(); resolve(v) }
-    no.addEventListener('click', function () { close(false) })
-    yes.addEventListener('click', function () { close(true) })
+    no.addEventListener('click', function () { close(null) })
+    yes.addEventListener('click', function () {
+      close(boxes.filter(function (x) { return x.input.checked }).map(function (x) { return x.type }))
+    })
     row.appendChild(no); row.appendChild(yes)
-    card.appendChild(h); card.appendChild(b); card.appendChild(w); card.appendChild(row)
+    card.appendChild(h); card.appendChild(b); card.appendChild(w)
+    if (requested.length) card.appendChild(list)
+    card.appendChild(note); card.appendChild(row)
     ov.appendChild(card); document.body.appendChild(ov)
   })
 }
@@ -152,14 +206,26 @@ async function _handleUnifiedInvite(p) {
   const typeLabel = p.scope.type === 'cluster' ? 'Cluster'
     : p.scope.type === 'vine' ? 'Vine'
     : p.scope.type === 'vignard' ? 'Vignard' : p.scope.type
-  const wanted = (p.requested || []).join(', ') || '—'
+  const requested = _inviteShareTypes(p)
+  if (requested === null) { showToast('Invalid sharing request.'); return }
   const subjectDid = appState.vault && appState.vault.identity && appState.vault.identity.id
   if (!(await verifyInviteReferral(p, subjectDid))) {
     showToast('Invalid invitation.')
     return
   }
-  const ok = await _inviteConsentCard(name, p.scope.type, wanted)
-  if (!ok) { showToast('Invitation declined.'); return }
+  const selected = await _inviteConsentCard(name, p.scope.type, requested)
+  if (selected === null) { showToast('Invitation declined.'); return }
+
+  let signedGrant = null
+  if (selected.length) {
+    try {
+      signedGrant = await signShareGrant(p.scope, selected, null)
+    } catch (e) {
+      showToast('Could not sign data sharing: ' + (e && e.message ? e.message : e))
+      return
+    }
+  }
+
   const base = p.anchor ? String(p.anchor).replace(/\/+$/, '') : null
   if (!base) {
     if (!(await verifyPrivateInvite(p, subjectDid))) {
@@ -190,6 +256,13 @@ async function _handleUnifiedInvite(p) {
     const prev = vault.memberships.find(m => m.cluster_id === clusterId)
     if (prev) Object.assign(prev, row)
     else vault.memberships.push(row)
+    // A Vine-less Cluster keeps its signed sharing choice locally. No server
+    // projection exists until the Cluster is hosted.
+    if (signedGrant) {
+      _setLocalShareGrant(Object.assign({}, signedGrant, {
+        local: true, pendingSync: false, saved_at: now,
+      }))
+    }
     try {
       const saved = await saveVault(appState.vaultKey, vault, appState.stored.salt)
       await persist(saved)
@@ -207,11 +280,21 @@ async function _handleUnifiedInvite(p) {
     const r = await sbSelfCall(base, 'relation', 'accept', {
       scope: p.scope,
       handle: (appState.vault.identity && appState.vault.identity.handle) || null,
-      types: p.requested || [],
+      types: selected,
+      grant: signedGrant || undefined,
       referral: p.referral,
     }, { type: 'did', id: did })
     if (r.status !== 200 || !r.body || !r.body.ok) {
       throw new Error((r.body && (r.body.error || r.body.message)) || ('HTTP ' + r.status))
+    }
+    if (signedGrant) {
+      try {
+        await saveLocalShareGrant(signedGrant, { pendingSync: false })
+      } catch (e) {
+        showToast('Relation accepted, but the local sharing choice could not be saved.')
+      }
+    } else if (typeof removeLocalShareGrant === 'function') {
+      await removeLocalShareGrant(p.scope)
     }
     if (typeof clearLocalRelationLeft === 'function') {
       clearLocalRelationLeft(p.scope.type, p.scope.id)

@@ -75,6 +75,18 @@ function build() {
     }
   )
 
+  // ES module dependencies imported by relations-client.js are not visible
+  // as <script src> tags. Copy them explicitly so the deploy artifact does
+  // not keep an older contract.
+  for (const f of ['relations-contract.js', 'feedback-contract.js']) {
+    const src = path.join(SRC_DIR, f)
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(DIST_DIR, f))
+      totalBytes += fs.statSync(src).size
+      jsCopied++
+    }
+  }
+
   fs.writeFileSync(OUT_FILE, html, 'utf8')
 
   const outSize  = fs.statSync(OUT_FILE).size
