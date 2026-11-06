@@ -126,15 +126,17 @@ function _shareTypeLabel(type) {
   return labels[type] || type
 }
 
-/** Prefer the signed referral.requested; legacy descriptors keep p.requested. */
+/** The requested list must be part of the signed referral. */
 function _inviteShareTypes(p) {
-  var raw = (p.referral && Object.prototype.hasOwnProperty.call(p.referral, 'requested'))
-    ? p.referral.requested
-    : (p.requested || [])
+  if (!p.referral || !Object.prototype.hasOwnProperty.call(p.referral, 'requested')) {
+    return null
+  }
   try {
     var C = window.SPIDRelations && window.SPIDRelations.contract
-    if (C && typeof C.normalizeShareTypes === 'function') return C.normalizeShareTypes(raw)
-    return Array.isArray(raw) ? raw.slice() : []
+    if (C && typeof C.normalizeShareTypes === 'function') {
+      return C.normalizeShareTypes(p.referral.requested)
+    }
+    return Array.isArray(p.referral.requested) ? p.referral.requested.slice() : []
   } catch (e) { return null }
 }
 
@@ -318,7 +320,7 @@ async function _handleUnifiedInvite(p) {
   }
 }
 
-/** #invite= → unified invitee join, or legacy descriptor. */
+/** #invite= → signed invitee join with requested sharing. */
 function checkPendingInvite() {
   const raw = appState.pendingInviteRaw
   if (!raw) return false

@@ -156,7 +156,6 @@ async function saveLocalShareRevocation(scope, revocation, options) {
     saved_at: new Date().toISOString(),
     pendingSync: !!opts.pendingSync,
     local: !!(prev && prev.local),
-    legacy: !!(prev && prev.legacy),
   }
   _setLocalShareGrant(entry)
   await _persistLocalShareGrants()
@@ -174,39 +173,6 @@ async function removeLocalShareGrant(scope) {
   if (vault.shareGrants.length !== before) await _persistLocalShareGrants()
 }
 
-/**
- * Merge the server projection into the local vault, without ever overwriting
- * a local signed choice. Existing server-only rows become legacy history and
- * are not treated as holder-signed.
- */
-function _mergeServerShareGrants(serverGrants) {
-  var vault = appState.vault
-  if (!vault || !Array.isArray(serverGrants)) return false
-  if (!Array.isArray(vault.shareGrants)) vault.shareGrants = []
-  var changed = false
-  serverGrants.forEach(function (g) {
-    if (!g || !g.consumer_type || !g.consumer_id) return
-    var scope = { type: g.consumer_type, id: g.consumer_id }
-    if (getLocalShareGrant(scope)) return
-    var types = []
-    try { types = Array.isArray(g.types_list) ? g.types_list : JSON.parse(g.types || '[]') }
-    catch (e) { types = [] }
-    vault.shareGrants.push({
-      type: 'ShareGrant',
-      holder_did: vault.identity.id,
-      scope: scope,
-      types: Array.isArray(types) ? types : [],
-      granted_at: g.granted_at || null,
-      expires_at: g.expires_at || null,
-      revoked_at: g.revoked_at || null,
-      legacy: true,
-      pendingSync: false,
-    })
-    changed = true
-  })
-  return changed
-}
-
 /** Best-effort projection of local pending choices after reconnect. */
 async function flushPendingShareGrants() {
   if (!appState.vault || !appState.vaultKey || !appState.stored) return
@@ -215,7 +181,7 @@ async function flushPendingShareGrants() {
   var list = (appState.vault.shareGrants || []).slice()
   for (var i = 0; i < list.length; i++) {
     var g = list[i]
-    if (!g || !g.pendingSync || g.local || g.legacy) continue
+    if (!g || !g.pendingSync || g.local) continue
     try {
       var r
       if (g.revocation) {
@@ -253,7 +219,6 @@ async function syncRelationsFromSwitchboard() {
   var next = Array.isArray(vault.memberships) ? vault.memberships.slice() : []
   var before = JSON.stringify(vault.memberships || null)
   var beforeOwn = JSON.stringify(vault.ownClusters || null)
-  var beforeGrants = JSON.stringify(vault.shareGrants || null)
 
   var vines = (rel.vines || []).map(function (v) {
     return { id: v.id, did: v.did || null, name: v.name || v.id, endpoint: v.endpoint || null, status: v.status, role: v.role }
@@ -371,11 +336,8 @@ async function syncRelationsFromSwitchboard() {
     }))
   })
 
-  _mergeServerShareGrants(r.body.grants)
-
   if (before === JSON.stringify(next) &&
-      beforeOwn === JSON.stringify(vault.ownClusters || null) &&
-      beforeGrants === JSON.stringify(vault.shareGrants || null)) return
+      beforeOwn === JSON.stringify(vault.ownClusters || null)) return
   try {
     var payload = await saveVault(appState.vaultKey, vault, appState.stored.salt)
     await persist(payload)
