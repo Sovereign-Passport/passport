@@ -87,6 +87,22 @@ function build() {
     }
   }
 
+  // PWA assets: referenced by the manifest, the service worker and Apple's
+  // touch icon. The HTML/JS/CSS are already handled above.
+  for (const f of [
+    'manifest.json', 'sw.js',
+    'spid-logo-192.png', 'spid-logo-512.png', 'spid-logo-180.png',
+    'spid-logo-maskable-512.png',
+  ]) {
+    const src = path.join(SRC_DIR, f)
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(DIST_DIR, f))
+      totalBytes += fs.statSync(src).size
+    } else {
+      console.warn(`  ⚠ PWA asset not found: ${f}`)
+    }
+  }
+
   fs.writeFileSync(OUT_FILE, html, 'utf8')
 
   const outSize  = fs.statSync(OUT_FILE).size
